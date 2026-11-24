@@ -1,0 +1,2892 @@
+(function () {
+if (!window.React || !window.ReactDOM) {
+  var rootEl = document.getElementById("root");
+  if (rootEl) rootEl.innerHTML = '<p class="boot">Bright Minds could not load. Check your internet connection, then open the page again.</p>';
+  return;
+}
+const { useState, useEffect, useMemo, useRef, useContext, createContext } = React;
+
+/* ---------- helpers ---------- */
+const EVERYONE = "Everyone";
+const GUEST = { id: "guest", name: "Guest", group: EVERYONE };
+const DEFAULT_CLASSES = 8; // two classes a week
+const LOCALE = { en: "en-US", fr: "fr-FR" };
+const DAYS = {
+  en: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+  fr: ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"],
+};
+
+const uid = () => Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+const pad = (n) => String(n).padStart(2, "0");
+const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const monthKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+const shiftMonth = (key, delta) => { const [y, m] = key.split("-").map(Number); return monthKey(new Date(y, m - 1 + delta, 1)); };
+const monthLabel = (key, lang = "en") => { const [y, m] = key.split("-").map(Number); return new Date(y, m - 1, 1).toLocaleDateString(LOCALE[lang], { month: "long", year: "numeric" }); };
+const parseISO = (iso) => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); };
+const fmtDate = (iso, lang = "en") => (iso ? parseISO(iso).toLocaleDateString(LOCALE[lang], { weekday: "short", month: "short", day: "numeric" }) : "");
+const fmtShort = (iso, lang = "en") => (iso ? parseISO(iso).toLocaleDateString(LOCALE[lang], { month: "short", day: "numeric" }) : "");
+const num = (n) => Math.round(Number(n) || 0).toLocaleString("fr-FR");
+const fcfa = (n) => `${num(n)} FCFA`;
+const addMin = (hhmm, mins) => { const [h, m] = (hhmm || "00:00").split(":").map(Number); const t = h * 60 + m + (Number(mins) || 0); return `${pad(Math.floor(t / 60) % 24)}:${pad(t % 60)}`; };
+const forGroup = (g, mine) => !g || g === EVERYONE || g === mine;
+const shuffle = (list) => { const a = [...list]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const arr = (x) => (Array.isArray(x) ? x : []);
+const classWord = (n) => (n === 1 ? "class" : "classes");
+const isLink = (s) => /^https:\/\/\S+$/i.test(String(s || "").trim());
+const monthRange = (key) => { const [y, m] = key.split("-").map(Number); const last = new Date(y, m, 0).getDate(); return [key + "-01", key + "-" + pad(last)]; };
+const isoOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const NBSP_RE = new RegExp("[" + String.fromCharCode(0x202f) + String.fromCharCode(0xa0) + "]", "g");
+const plainNum = (n, dec = 0) => Number(n || 0).toLocaleString("fr-FR", { maximumFractionDigits: dec }).replace(NBSP_RE, " ");
+const COMBINING_RE = new RegExp("[" + String.fromCharCode(0x300) + "-" + String.fromCharCode(0x36f) + "]", "g");
+const fileSafe = (s) => String(s).normalize("NFD").replace(COMBINING_RE, "").replace(/[^A-Za-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+const ONLINE_RE = /online|en ligne|zoom|meet|teams/i;
+const placeName = (s) => (s ? s.place || (s.link ? "Online" : "") : "");
+const placeKey = (p) => String(p || "").trim().toLowerCase();
+const LEVELS = [
+  { id: "starter", en: "Starter", fr: "Découverte" }, { id: "beginner", en: "Beginner", fr: "Débutant" },
+  { id: "elementary", en: "Elementary", fr: "Élémentaire" }, { id: "intermediate", en: "Intermediate", fr: "Intermédiaire" },
+  { id: "upper", en: "Upper-intermediate", fr: "Intermédiaire avancé" }, { id: "advanced", en: "Advanced", fr: "Avancé" },
+];
+const levelName = (id, lang = "en") => { const l = LEVELS.find((x) => x.id === id); return l ? l[lang] : ""; };
+const AUDIENCES = ["Little kids", "Kids", "Teens", "Adults", "Conversation"];
+const PDF_LIB = "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js";
+const scriptLoads = {};
+function loadScript(src, globalName) {
+  if (window[globalName]) return Promise.resolve(window[globalName]);
+  if (!scriptLoads[src]) {
+    scriptLoads[src] = new Promise((resolve, reject) => {
+      const el = document.createElement("script");
+      el.src = src; el.async = true;
+      el.onload = () => (window[globalName] ? resolve(window[globalName]) : reject(new Error("load failed")));
+      el.onerror = () => { delete scriptLoads[src]; reject(new Error("load failed")); };
+      document.head.appendChild(el);
+    });
+  }
+  return scriptLoads[src];
+}
+
+function makeStore(kind) {
+  const s = () => window[kind];
+  return {
+    get(k, d = null) { try { const v = s().getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { s().setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+    del(k) { try { s().removeItem(k); } catch (e) { /* storage unavailable */ } },
+  };
+}
+const ls = makeStore("localStorage");
+const ss = makeStore("sessionStorage");
+
+const canSpeak = "speechSynthesis" in window;
+function speak(text) {
+  if (!canSpeak || !text) return;
+  try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = "en-US"; u.rate = 0.85; window.speechSynthesis.speak(u); } catch (e) { /* no voice */ }
+}
+
+/* ---------- words on the student side, in English and French ---------- */
+const STR = {
+  en: {
+    tagline: "English words, homework and class times in one place.",
+    enterCode: "Enter your code", codeHint: "Your teacher sent you a code with 4 numbers.", yourCode: "Your code", open: "Open",
+    codeShort: "Your code has 4 numbers.", codeWrong: "That code doesn't match. Check it with your teacher.", noCode: "Practice words without a code",
+    switchUser: "Switch", otherLang: "Français", otherLangName: "Lire en français",
+    tabWords: "Words", tabHomework: "Homework", tabClasses: "Classes", tabPay: "Pay",
+    words: "Words", noLists: "Your teacher hasn't added any word lists yet.", nWords: (n) => `${n} ${n === 1 ? "word" : "words"}`,
+    allLists: "All lists", flashcards: "Flashcards", quiz: "Quiz", emptyList: "This list has no words yet.",
+    tapMeaning: "Tap to see the meaning", ariaFront: (w) => `${w}. Tap to see the meaning.`, ariaBack: (w) => `${w}. Tap to see the English word.`,
+    xOfY: (a, b) => `${a} of ${b}`, hearSentence: "Hear the sentence", hearWord: "Hear the word", back: "Back", mix: "Mix", next: "Next",
+    quizMin: "A quiz needs at least 4 words in the list.", yourScore: "Your score", perfect: "Perfect score!", great: "Great work.",
+    practiceMore: "Practice the flashcards, then try again.", newBest: "New best score", best: (s, t) => `Best: ${s} of ${t}`, tryAgain: "Try again",
+    questionN: (i, n) => `Question ${i} of ${n}`, whatMeans: "What does this mean?", howSay: "How do you say this in English?",
+    correctAnswer: "Correct answer", yourAnswer: "Your answer", correct: "Correct!", notQuite: "Not quite. The answer is ",
+    nextQ: "Next question", seeScore: "See my score",
+    homework: "Homework", noLessons: "No lessons yet. Notes and homework from your classes will show up here.",
+    due: (d) => `, due ${d}`, markDone: "Mark as done", done: "Done", pastDue: "Past due",
+    myClasses: "My classes", nextClass: "Next class", now: "Happening now", todayAt: (t) => `Today at ${t}`, tomorrowAt: (t) => `Tomorrow at ${t}`,
+    dayAt: (d, t) => `${d} at ${t}`, placeNotSet: "Place not set", noClasses: "No classes on the schedule yet.", todayDay: (d) => `Today, ${d}`,
+    timeRange: (a, b) => `${a} to ${b}`, joinClass: "Join class", join: "Join", online: "Online",
+    classesLeft: (l, t, m) => `${l} of ${t} classes left in ${m}`, extraClasses: (x, m) => `${x} extra ${x === 1 ? "class" : "classes"} in ${m}`,
+    updatedOn: (d) => `Updated ${d}`,
+    payTitle: "Pay for classes", yourFee: "Your class fee", eachMonth: "each month",
+    noPayDetails: "Your teacher hasn't added payment details yet. Ask them how to pay.", sendTo: "Send your payment to",
+    name: (n) => `Name: ${n}`, payWith: (k) => `Pay with ${k}`, copy: "Copy", copied: "Copied", holdCopy: "Press and hold to copy",
+    afterPay: "After you pay, tell your teacher", yourName: "Your name", amount: "Amount (FCFA)", paidWith: "Paid with", cash: "Cash",
+    payMsg: (n, a, m, w) => `Hello, this is ${n} from Bright Minds. I paid ${a} for ${m} by ${w}.`, aStudent: "a student", myFee: "my class fee",
+    sendWa: "Send on WhatsApp", copyMsg: "Copy the message",
+    waFallback: (n) => `If WhatsApp doesn't open, copy the message and send it to ${n} with a screenshot of your payment.`,
+    screenshot: "After you pay, send your teacher a screenshot of the payment.",
+    paid: (m) => `${cap(m)}: paid`, partial: (m) => `${cap(m)}: partly paid`, unpaid: (m) => `${cap(m)}: not paid yet`,
+    announcement: "Announcement",
+    codeOffline: "Your code couldn't be checked. Check your internet connection and try again.", teacherSignIn: "Teacher sign-in",
+    offline: "Bright Minds can't be reached right now. Check your internet connection, then open the page again.", opening: "Opening Bright Minds...",
+    seeClasses: "New student? See classes and prices", haveCode: "I have a code",
+    joinTagline: "English classes for children and adults, in person and online.", classesPrices: "Classes and prices",
+    perMonth: "a month", perClass: "a class", perHour: "an hour", openGroups: "Groups open now",
+    spotsLeft: (n) => `${n} ${n === 1 ? "spot" : "spots"} left`, full: "Full",
+    bookTrial: "Book a free trial class", trialMsg: "Hello! I would like to book a free trial class with Bright Minds.",
+    trialHint: "This opens WhatsApp with a message ready to send.",
+    yourLevel: (l) => `Your level: ${l}`, changesTitle: "Changes to classes", makeupLabel: "Make-up class",
+    cancelledOn: (d, t) => `${d} at ${t}: cancelled`, makeupOn: (d, t) => `Make-up class on ${d} at ${t}`,
+  },
+  fr: {
+    tagline: "Vocabulaire, devoirs et horaires de cours d'anglais, au même endroit.",
+    enterCode: "Entrez votre code", codeHint: "Votre professeur vous a envoyé un code à 4 chiffres.", yourCode: "Votre code", open: "Ouvrir",
+    codeShort: "Le code a 4 chiffres.", codeWrong: "Ce code ne correspond pas. Vérifiez-le avec votre professeur.", noCode: "Réviser le vocabulaire sans code",
+    switchUser: "Changer", otherLang: "English", otherLangName: "Read in English",
+    tabWords: "Vocabulaire", tabHomework: "Devoirs", tabClasses: "Cours", tabPay: "Payer",
+    words: "Vocabulaire", noLists: "Votre professeur n'a pas encore ajouté de liste de mots.", nWords: (n) => `${n} mot${n > 1 ? "s" : ""}`,
+    allLists: "Toutes les listes", flashcards: "Cartes", quiz: "Quiz", emptyList: "Cette liste n'a pas encore de mots.",
+    tapMeaning: "Touchez pour voir la traduction", ariaFront: (w) => `${w}. Touchez pour voir la traduction.`, ariaBack: (w) => `${w}. Touchez pour voir le mot anglais.`,
+    xOfY: (a, b) => `${a} sur ${b}`, hearSentence: "Écouter la phrase", hearWord: "Écouter le mot", back: "Retour", mix: "Mélanger", next: "Suivant",
+    quizMin: "Il faut au moins 4 mots dans la liste pour faire un quiz.", yourScore: "Votre score", perfect: "Score parfait !", great: "Très bien !",
+    practiceMore: "Révisez les cartes, puis réessayez.", newBest: "Nouveau record", best: (s, t) => `Record : ${s} sur ${t}`, tryAgain: "Réessayer",
+    questionN: (i, n) => `Question ${i} sur ${n}`, whatMeans: "Que veut dire ceci ?", howSay: "Comment dit-on ceci en anglais ?",
+    correctAnswer: "Bonne réponse", yourAnswer: "Votre réponse", correct: "Bravo !", notQuite: "Pas tout à fait. La réponse est ",
+    nextQ: "Question suivante", seeScore: "Voir mon score",
+    homework: "Devoirs", noLessons: "Pas encore de leçon. Les notes et les devoirs de vos cours apparaîtront ici.",
+    due: (d) => `, pour le ${d}`, markDone: "Marquer comme fait", done: "Fait", pastDue: "En retard",
+    myClasses: "Mes cours", nextClass: "Prochain cours", now: "En ce moment", todayAt: (t) => `Aujourd'hui à ${t}`, tomorrowAt: (t) => `Demain à ${t}`,
+    dayAt: (d, t) => `${cap(d)} à ${t}`, placeNotSet: "Lieu non précisé", noClasses: "Aucun cours n'est encore prévu.", todayDay: (d) => `Aujourd'hui, ${d}`,
+    timeRange: (a, b) => `${a} à ${b}`, joinClass: "Rejoindre le cours", join: "Rejoindre", online: "En ligne",
+    classesLeft: (l, t, m) => `Il reste ${l} cours sur ${t} en ${m}`, extraClasses: (x, m) => `${x} cours en plus en ${m}`,
+    updatedOn: (d) => `Mis à jour le ${d}`,
+    payTitle: "Payer les cours", yourFee: "Vos frais de cours", eachMonth: "par mois",
+    noPayDetails: "Votre professeur n'a pas encore ajouté ses informations de paiement. Demandez-lui comment payer.", sendTo: "Envoyez votre paiement à",
+    name: (n) => `Nom : ${n}`, payWith: (k) => `Payer avec ${k}`, copy: "Copier", copied: "Copié", holdCopy: "Appuyez longuement pour copier",
+    afterPay: "Après le paiement, prévenez votre professeur", yourName: "Votre nom", amount: "Montant (FCFA)", paidWith: "Payé avec", cash: "Espèces",
+    payMsg: (n, a, m, w) => `Bonjour, c'est ${n} de Bright Minds. J'ai payé ${a} pour ${m} par ${w}.`, aStudent: "un élève", myFee: "mes frais de cours",
+    sendWa: "Envoyer sur WhatsApp", copyMsg: "Copier le message",
+    waFallback: (n) => `Si WhatsApp ne s'ouvre pas, copiez le message et envoyez-le au ${n} avec une capture d'écran du paiement.`,
+    screenshot: "Après le paiement, envoyez une capture d'écran du paiement à votre professeur.",
+    paid: (m) => `${cap(m)} : payé`, partial: (m) => `${cap(m)} : payé en partie`, unpaid: (m) => `${cap(m)} : pas encore payé`,
+    announcement: "Annonce",
+    codeOffline: "Le code n'a pas pu être vérifié. Vérifiez votre connexion internet et réessayez.", teacherSignIn: "Connexion professeur",
+    offline: "Bright Minds est inaccessible pour le moment. Vérifiez votre connexion internet, puis rouvrez la page.", opening: "Ouverture de Bright Minds...",
+    seeClasses: "Nouvel élève ? Voir les cours et les prix", haveCode: "J'ai un code",
+    joinTagline: "Cours d'anglais pour enfants et adultes, en présentiel et en ligne.", classesPrices: "Cours et prix",
+    perMonth: "par mois", perClass: "par cours", perHour: "de l'heure", openGroups: "Groupes ouverts",
+    spotsLeft: (n) => `${n} place${n > 1 ? "s" : ""} libre${n > 1 ? "s" : ""}`, full: "Complet",
+    bookTrial: "Réserver un cours d'essai gratuit", trialMsg: "Bonjour ! Je voudrais réserver un cours d'essai gratuit avec Bright Minds.",
+    trialHint: "WhatsApp s'ouvre avec un message prêt à envoyer.",
+    yourLevel: (l) => `Votre niveau : ${l}`, changesTitle: "Changements", makeupLabel: "Rattrapage",
+    cancelledOn: (d, t) => `${cap(d)} à ${t} : annulé`, makeupOn: (d, t) => `Cours de rattrapage le ${d} à ${t}`,
+  },
+};
+const LangCtx = createContext("en");
+function useT() {
+  const lang = useContext(LangCtx);
+  const t = (k, ...args) => { const table = STR[lang] || STR.en; const v = k in table ? table[k] : STR.en[k]; return typeof v === "function" ? v(...args) : v; };
+  return { lang, t };
+}
+
+/* ---------- page data ---------- */
+function normalize(d) {
+  d = d || {};
+  return { updated: d.updated || null, decks: arr(d.decks), lessons: arr(d.lessons), schedule: arr(d.schedule), pay: normPay(d.pay), notices: arr(d.notices), settings: normSettings(d.settings), changes: arr(d.changes), join: normJoin(d.join),
+    groupCounts: d.groupCounts && typeof d.groupCounts === "object" ? d.groupCounts : {} };
+}
+function normJoin(j) {
+  j = j && typeof j === "object" ? j : {};
+  return { intro: String(j.intro || ""), contact: String(j.contact || ""), offers: arr(j.offers), groups: arr(j.groups) };
+}
+function normPay(p) {
+  p = p && typeof p === "object" ? p : {};
+  return { whatsapp: String(p.whatsapp || ""), accountName: String(p.accountName || ""), note: String(p.note || ""), methods: arr(p.methods) };
+}
+function normSettings(s) {
+  s = s && typeof s === "object" ? s : {};
+  return { showStatus: s.showStatus !== false };
+}
+/* WhatsApp wants the full international number as digits; Ivorian numbers are 10 digits locally. */
+function waDigits(raw) {
+  let d = String(raw || "").replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.length === 10) d = "225" + d;
+  return d.length >= 8 ? d : "";
+}
+const waLink = (phone, text) => `https://wa.me/${waDigits(phone)}?text=${encodeURIComponent(text)}`;
+
+/* Student codes: 4 numbers, unique within the class list. */
+function newCode(roster, exceptId) {
+  const used = new Set(roster.filter((r) => r.id !== exceptId).map((r) => r.code));
+  for (let i = 0; i < 500; i++) { const c = String(1000 + Math.floor(Math.random() * 9000)); if (!used.has(c)) return c; }
+  return String(Date.now()).slice(-4);
+}
+/* ---------- the site's settings and Firebase (sign-in and database) ---------- */
+const CONFIG = window.BM_CONFIG || {};
+// The teacher is named in config.js by a SHA-256 fingerprint of their Google address (teacherKeys),
+// so the address itself never appears on the public site. Plain teacherEmails still work too.
+const TEACHERS = arr(CONFIG.teacherEmails).map((e) => String(e).trim().toLowerCase()).filter(Boolean);
+const TEACHER_KEYS = arr(CONFIG.teacherKeys).map((k) => String(k).trim().toLowerCase()).filter(Boolean);
+const CONFIGURED = !!(CONFIG.firebase && CONFIG.firebase.apiKey && CONFIG.firebase.projectId);
+function startFirebase() {
+  if (!CONFIGURED || !window.firebase) return null;
+  try {
+    const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(CONFIG.firebase);
+    const db = app.firestore();
+    try { db.settings({ ignoreUndefinedProperties: true, merge: true }); } catch (e) { /* already set */ }
+    try { db.enablePersistence({ synchronizeTabs: true }).catch(() => {}); } catch (e) { /* no offline copy in this browser */ }
+    return { auth: app.auth(), db };
+  } catch (e) { return null; }
+}
+const FB = startFirebase();
+const teacherSeen = {};
+async function emailKey(email) {
+  const bytes = new TextEncoder().encode(String(email || "").trim().toLowerCase());
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+/* Works out once per account whether it is the teacher; isTeacherUser then answers from that. */
+async function checkTeacher(u) {
+  if (!u) return false;
+  if (!(u.uid in teacherSeen)) {
+    const email = String(u.email || "").trim().toLowerCase();
+    let ok = !!email && TEACHERS.includes(email);
+    if (!ok && email && TEACHER_KEYS.length) { try { ok = TEACHER_KEYS.includes(await emailKey(email)); } catch (e) { ok = false; } }
+    teacherSeen[u.uid] = ok;
+  }
+  return teacherSeen[u.uid];
+}
+const isTeacherUser = (u) => !!u && teacherSeen[u.uid] === true;
+async function teacherSignIn() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  try { await FB.auth.signInWithPopup(provider); }
+  catch (e) {
+    const code = e && e.code;
+    if (code === "auth/popup-blocked" || code === "auth/operation-not-supported-in-this-environment") { await FB.auth.signInWithRedirect(provider); return; }
+    if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return;
+    throw e;
+  }
+}
+
+/* Files the teacher saves (invoices, certificates): an ordinary browser download. */
+const downloads = {
+  async save({ filename, data }) {
+    const blob = data instanceof Blob ? data : new Blob([data]);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url; link.download = filename; link.rel = "noopener";
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    return { status: "saved" };
+  },
+};
+
+/* Compare values the same way whatever order the database returns their keys in. */
+function stable(v) {
+  if (Array.isArray(v)) return "[" + v.map(stable).join(",") + "]";
+  if (v && typeof v === "object") return "{" + Object.keys(v).filter((k) => v[k] !== undefined).sort().map((k) => JSON.stringify(k) + ":" + stable(v[k])).join(",") + "}";
+  return JSON.stringify(v === undefined ? null : v);
+}
+
+/* A student's own record: what they see after typing their code. The record's id is the code. */
+function studentDoc(r) {
+  const d = { id: r.id, name: r.name, group: r.group };
+  if (r.level) d.level = r.level;
+  if (r.due) d.due = r.due;
+  if (r.st) d.st = r.st;
+  return d;
+}
+const groupCountsOf = (roster) => { const c = {}; roster.forEach((r) => { if (r.group) c[r.group] = (c[r.group] || 0) + 1; }); return c; };
+
+function saveRosterDocs(prev, next) {
+  const db = FB.db;
+  const batch = db.batch();
+  const byId = new Map(prev.map((r) => [r.id, r]));
+  const keep = new Set(next.map((r) => r.id));
+  prev.forEach((r) => { if (!keep.has(r.id)) batch.delete(db.doc("students/" + r.code)); });
+  next.forEach((r) => {
+    const old = byId.get(r.id);
+    if (old && old.code !== r.code) batch.delete(db.doc("students/" + old.code));
+    if (!old || old.code !== r.code || stable(studentDoc(old)) !== stable(studentDoc(r))) batch.set(db.doc("students/" + r.code), studentDoc(r));
+  });
+  batch.set(db.doc("site/content"), { groupCounts: groupCountsOf(next), updated: new Date().toISOString() }, { mergeFields: ["groupCounts", "updated"] });
+  return batch.commit();
+}
+
+/* Moving in: the backup file made from the Claude version. Running it twice is safe. */
+const CONTENT_KEYS = ["decks", "lessons", "schedule", "pay", "notices", "settings", "changes", "join"];
+const REL_PATH_RE = /^[A-Za-z0-9_.~-]+(\/[A-Za-z0-9_.~-]+\/[A-Za-z0-9_.~-]+)*$/;
+async function importBackup(data, uid) {
+  const db = FB.db;
+  const writes = [];
+  const content = { updated: new Date().toISOString(), groupCounts: groupCountsOf(arr(data.roster)) };
+  CONTENT_KEYS.forEach((k) => { if (data.content && data.content[k] !== undefined) content[k] = data.content[k]; });
+  writes.push([db.doc("site/content"), content]);
+  arr(data.roster).forEach((r) => { if (r && r.code && r.id) writes.push([db.doc("students/" + r.code), studentDoc(r)]); });
+  Object.keys(data.private || {}).forEach((rel) => {
+    if (REL_PATH_RE.test(rel) && data.private[rel] && typeof data.private[rel] === "object") writes.push([db.doc("data/users/" + uid + "/" + rel), data.private[rel]]);
+  });
+  for (let i = 0; i < writes.length; i += 400) {
+    const b = db.batch();
+    writes.slice(i, i + 400).forEach(([ref, body]) => b.set(ref, body));
+    await b.commit();
+  }
+  return writes.length;
+}
+
+function ImportBackup() {
+  const [file, setFile] = useState(null);
+  const [state, setState] = useState("");
+  const [busy, setBusy] = useState(false);
+  const pick = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    setState(""); setFile(null);
+    if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      if (!data || data.kind !== "bright-minds-backup") throw new Error("bad");
+      setFile(data);
+    } catch (err) { setState("That file isn't a Bright Minds backup. Choose the file Claude sent you."); }
+  };
+  const run = async () => {
+    const u = FB && FB.auth.currentUser;
+    if (!file || !u) return;
+    setBusy(true); setState("Moving your data in...");
+    try { await importBackup(file, u.uid); setState(`Done. ${arr(file.roster).length} students and all your records are here now.`); setFile(null); }
+    catch (e) { setState("The move didn't finish. Check your connection and try again. Running it again is safe."); }
+    setBusy(false);
+  };
+  return (
+    <div className="pay-settings">
+      <p className="sub-h">Move in from the Claude version</p>
+      <p className="hint" style={{ marginTop: 0 }}>Choose the backup file Claude sent you. It brings in your students and their codes, classes, lessons, word lists, payments, class counts and schools. It replaces what's in the app now.</p>
+      <input id="import-file" className="inp" type="file" accept=".json,application/json" aria-label="Backup file" onChange={pick} />
+      {file && <p className="hint" style={{ margin: "8px 0 0" }}>{`Backup from ${file.made ? fmtDate(String(file.made).slice(0, 10)) : "the Claude version"}, with ${arr(file.roster).length} students.`}</p>}
+      <div className="form-actions" style={{ marginTop: 10 }}>
+        <button className="btn" onClick={run} disabled={!file || busy}>{busy ? "Moving..." : "Move my data in"}</button>
+      </div>
+      {state && <p className="hint" role="status" style={{ margin: "10px 0 0" }}>{state}</p>}
+    </div>
+  );
+}
+
+function makeQuiz(cards) {
+  return shuffle(cards).slice(0, Math.min(10, cards.length)).map((c) => {
+    const dir = Math.random() < 0.5 ? "en" : "fr";
+    const answer = dir === "en" ? c.fr : c.en;
+    const pool = [...new Set(cards.filter((x) => x.id !== c.id).map((x) => (dir === "en" ? x.fr : x.en)).filter((t) => t !== answer))];
+    return { id: c.id, dir, en: c.en, prompt: dir === "en" ? c.en : c.fr, answer, options: shuffle([answer, ...shuffle(pool).slice(0, 3)]) };
+  });
+}
+
+function parseBulk(text) {
+  return text.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => {
+    const i = l.indexOf("=");
+    if (i < 0) return null;
+    const en = l.slice(0, i).trim();
+    const rest = l.slice(i + 1);
+    const j = rest.indexOf("|");
+    const fr = (j < 0 ? rest : rest.slice(0, j)).trim();
+    const ex = j < 0 ? "" : rest.slice(j + 1).trim();
+    return en && fr ? { id: uid(), en, fr, ex } : null;
+  }).filter(Boolean);
+}
+
+function whenLabel(at, t, lang) {
+  const now = new Date();
+  if (at <= now) return t("now");
+  const d0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const d1 = new Date(at.getFullYear(), at.getMonth(), at.getDate());
+  const diff = Math.round((d1 - d0) / 86400000);
+  const time = `${pad(at.getHours())}:${pad(at.getMinutes())}`;
+  if (diff === 0) return t("todayAt", time);
+  if (diff === 1) return t("tomorrowAt", time);
+  return t("dayAt", DAYS[lang][(at.getDay() + 6) % 7], time);
+}
+
+/* ---------- private records (teacher only) ---------- */
+const writeChains = {};
+function queuedSet(ref, body) {
+  const run = (writeChains[ref.path] || Promise.resolve()).then(() => ref.set(body));
+  writeChains[ref.path] = run.catch(() => {});
+  return run;
+}
+
+function useMoney(db, userId, month) {
+  const enabled = !!(db && userId);
+  const [fees, setFees] = useState({});
+  const [pays, setPays] = useState([]);
+  const [feesOk, setFeesOk] = useState(false);
+  const [paysOk, setPaysOk] = useState(false);
+  const [slow, setSlow] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const feesPath = enabled ? "data/users/" + userId + "/money" : "";
+  const monthPath = enabled ? feesPath + "/months/" + month : "";
+
+  useEffect(() => {
+    if (!feesPath) return undefined;
+    let un = () => {};
+    const timer = setTimeout(() => setSlow(true), 10000);
+    try {
+      un = db.doc(feesPath).onSnapshot((s) => {
+        const d = s.exists ? s.data() : null;
+        setFees(d && d.fees && typeof d.fees === "object" ? d.fees : {});
+        setFeesOk(true);
+        if (!s.metadata.fromCache) { clearTimeout(timer); setSlow(false); }
+      }, () => { clearTimeout(timer); setFailed(true); });
+    } catch (e) { clearTimeout(timer); setFailed(true); }
+    return () => { clearTimeout(timer); un(); };
+  }, [feesPath]);
+
+  useEffect(() => {
+    if (!monthPath) return undefined;
+    setPaysOk(false); setPays([]);
+    let un = () => {};
+    try {
+      un = db.doc(monthPath).onSnapshot((s) => {
+        const d = s.exists ? s.data() : null;
+        setPays(d && Array.isArray(d.payments) ? d.payments : []);
+        setPaysOk(true);
+      }, () => setFailed(true));
+    } catch (e) { setFailed(true); }
+    return () => un();
+  }, [monthPath]);
+
+  const saveFees = (next) => { setFees(next); return queuedSet(db.doc(feesPath), { fees: next }); };
+  const savePays = (next) => { setPays(next); return queuedSet(db.doc(monthPath), { payments: next }); };
+  return { enabled, fees, pays, ready: feesOk && paysOk, slow, failed, saveFees, savePays };
+}
+
+/* Classes taken, one private document per month: { taken: [{ id, studentId, date, slot? }] } */
+function useAttendance(db, userId, month) {
+  const path = db && userId ? "data/users/" + userId + "/money/attendance/" + month : "";
+  const [taken, setTaken] = useState([]);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (!path) return undefined;
+    setTaken([]); setReady(false);
+    let un = () => {};
+    try {
+      un = db.doc(path).onSnapshot((s) => {
+        const d = s.exists ? s.data() : null;
+        setTaken(d && Array.isArray(d.taken) ? d.taken : []);
+        setReady(true);
+      }, () => {});
+    } catch (e) { /* attendance unavailable */ }
+    return () => un();
+  }, [path]);
+  const save = (next) => { setTaken(next); return queuedSet(db.doc(path), { taken: next }); };
+  return { on: !!path, ready, taken, save };
+}
+
+/* Where a class happened, and how much of the fee goes to that place. */
+function placeOfTaken(x, schedule, changes) {
+  if (typeof x.place === "string") return x.place;
+  let s = schedule.find((y) => y.id === x.slot);
+  if (!s) { const c = changes.find((y) => y.id === x.slot); if (c) s = schedule.find((y) => y.id === c.slot); }
+  return placeName(s);
+}
+function shareSplit(r, takenList, ctx) {
+  const map = {};
+  arr(ctx && ctx.places).forEach((p) => { map[placeKey(p.name)] = Number(p.pct) || 0; });
+  const schedule = arr(ctx && ctx.schedule), changes = arr(ctx && ctx.changes);
+  const out = {};
+  const add = (p, w) => { const v = ((map[placeKey(p)] || 0) * w) / 100; if (v > 0) out[p] = (out[p] || 0) + v; };
+  if (takenList.length) takenList.forEach((x) => add(placeOfTaken(x, schedule, changes), 1 / takenList.length));
+  else { const slots = schedule.filter((s) => s.group === r.group); slots.forEach((s) => add(placeName(s), 1 / slots.length)); }
+  return out;
+}
+function isOnline(r, schedule) {
+  const slots = schedule.filter((s) => s.group === r.group);
+  return slots.length > 0 && slots.every((s) => s.link || ONLINE_RE.test(s.place || ""));
+}
+
+/* One student's month: fee, payments, classes, shares. Used by the Students tab, income and what students see. */
+function studentMonth(r, fees, pays, taken, ctx) {
+  const f = fees[r.id] || {};
+  const fee = Number(f.fee) || 0;
+  const legacyShare = Number(f.share) || 0;
+  const myPays = pays.filter((p) => p.studentId === r.id).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const paid = myPays.reduce((a, p) => a + (Number(p.amount) || 0), 0);
+  const status = fee > 0 ? (paid >= fee ? "paid" : paid > 0 ? "partial" : "unpaid") : paid > 0 ? "paid" : "none";
+  const classesCustom = f.classes !== undefined && f.classes !== null && f.classes !== "";
+  const classes = classesCustom ? Number(f.classes) || 0 : DEFAULT_CLASSES;
+  const takenList = taken.filter((t) => t.studentId === r.id).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const split = shareSplit(r, takenList, ctx);
+  if (!Object.keys(split).length && legacyShare) split.Venue = legacyShare / 100;
+  const cutByPlace = {};
+  let cut = 0;
+  Object.keys(split).forEach((p) => { cutByPlace[p] = paid * split[p]; cut += cutByPlace[p]; });
+  return { fee, share: legacyShare, pays: myPays, paid, status, classes, classesCustom, takenList, used: takenList.length, left: classes - takenList.length,
+    phone: f.phone || "", lang: f.lang === "fr" ? "fr" : "en", cut, cutByPlace, online: isOnline(r, arr(ctx && ctx.schedule)) };
+}
+function computeStatuses(roster, fees, pays, taken, month) {
+  const out = {};
+  roster.forEach((r) => {
+    const s = studentMonth(r, fees, pays, taken);
+    out[r.id] = { m: month, left: s.left, total: s.classes, pay: s.fee > 0 ? s.status : "none" };
+  });
+  return out;
+}
+
+/* Messages the teacher sends on WhatsApp, in each family's language. */
+const codeText = (r, lang) => (lang === "fr"
+  ? `Bonjour ${r.name} ! Votre code Bright Minds est ${r.code}. Ouvrez l'application des cours et tapez ce code.`
+  : `Hi ${r.name}! Your Bright Minds code is ${r.code}. Open the class app and type it in.`);
+function reminderText(r, month, pay) {
+  const fr = r.lang === "fr";
+  const m = monthLabel(month, r.lang);
+  const rest = Math.max(0, r.fee - r.paid);
+  const kinds = pay.methods.filter((x) => x.number || x.link).map((x) => x.kind);
+  if (fr) {
+    const how = kinds.length ? ` Vous pouvez payer par ${kinds.join(", ")}, les détails sont dans l'application, onglet Payer.` : "";
+    return `Bonjour ${r.name}, petit rappel de Bright Minds : les frais de cours de ${m} sont de ${fcfa(r.fee)}${r.paid > 0 ? `, et il reste ${fcfa(rest)} à payer` : ""}.${how} Merci !`;
+  }
+  const how = kinds.length ? ` You can pay by ${kinds.join(", ")}. The details are in the class app, under Pay.` : "";
+  return `Hello ${r.name}, a friendly reminder from Bright Minds: the class fee for ${m} is ${fcfa(r.fee)}${r.paid > 0 ? `, and ${fcfa(rest)} is still to pay` : ""}.${how} Thank you!`;
+}
+function reportText(r, month, lessons, decks, comment) {
+  const fr = r.lang === "fr";
+  const m = monthLabel(month, r.lang);
+  const dates = r.takenList.map((x) => fmtShort(x.date, r.lang));
+  const mine = lessons.filter((l) => (l.date || "").startsWith(month) && forGroup(l.group, r.group)).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const hw = mine.filter((l) => l.homework).length;
+  const lists = decks.filter((d) => forGroup(d.group, r.group) && d.cards.length);
+  const lines = [fr ? `Bright Minds : bilan de ${m} pour ${r.name}` : `Bright Minds: ${m} report for ${r.name}`, ""];
+  const count = r.classes ? (fr ? `${r.used} sur ${r.classes}` : `${r.used} of ${r.classes}`) : String(r.used);
+  lines.push((fr ? "Cours suivis : " : "Classes attended: ") + count + (dates.length ? ` (${dates.join(", ")})` : ""));
+  if (mine.length) lines.push((fr ? "Leçons : " : "Lessons: ") + mine.map((l) => l.title).join("; "));
+  if (hw) lines.push((fr ? "Devoirs donnés : " : "Homework given: ") + hw);
+  if (lists.length) lines.push((fr ? "Vocabulaire à réviser dans l'application : " : "Words to practice in the app: ") + lists.map((d) => `${d.title} (${d.cards.length})`).join(", "));
+  if (comment.trim()) lines.push("", comment.trim());
+  lines.push("", fr ? "Merci pour votre confiance !" : "Thank you for your trust!");
+  return lines.join("\n");
+}
+
+/* ---------- icons ---------- */
+const ICONS = {
+  book: <><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></>,
+  clipboard: <><rect width="8" height="4" x="8" y="2" rx="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="m9 14 2 2 4-4" /></>,
+  calendar: <><rect width="18" height="18" x="3" y="4" rx="2" /><path d="M16 2v4" /><path d="M8 2v4" /><path d="M3 10h18" /><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" /></>,
+  users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>,
+  volume: <><path d="M11 5 6 9H2v6h4l5 4z" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></>,
+  shuffle: <><path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22" /><path d="m18 2 4 4-4 4" /><path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2" /><path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8" /><path d="m18 14 4 4-4 4" /></>,
+  left: <path d="m15 18-6-6 6-6" />,
+  right: <path d="m9 18 6-6-6-6" />,
+  plus: <><path d="M5 12h14" /><path d="M12 5v14" /></>,
+  trash: <><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M10 11v6M14 11v6" /></>,
+  check: <path d="M20 6 9 17l-5-5" />,
+  x: <><path d="M18 6 6 18" /><path d="m6 6 12 12" /></>,
+  again: <><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></>,
+  wallet: <><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></>,
+  pencil: <><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></>,
+  megaphone: <><path d="m3 11 18-5v12L3 14v-3z" /><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" /></>,
+  video: <><path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 10.5" /><rect x="2" y="6" width="14" height="12" rx="2" /></>,
+  chat: <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />,
+  spark: <path d="M9.9 15.5A2 2 0 0 0 8.5 14.1l-6.1-1.6a.5.5 0 0 1 0-1l6.1-1.6a2 2 0 0 0 1.4-1.4l1.6-6.1a.5.5 0 0 1 1 0l1.6 6.1a2 2 0 0 0 1.4 1.4l6.1 1.6a.5.5 0 0 1 0 1l-6.1 1.6a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0z" />,
+  briefcase: <><rect width="20" height="14" x="2" y="7" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></>,
+  report: <><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M10 9H8M16 13H8M16 17H8" /></>,
+};
+function Icon({ name, size = 18, label }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden={label ? undefined : "true"} role={label ? "img" : undefined} aria-label={label} focusable="false">{ICONS[name]}</svg>
+  );
+}
+
+/* ---------- small pieces ---------- */
+function Field({ label, children }) {
+  return <label className="field"><span>{label}</span>{children}</label>;
+}
+function Empty({ text, children }) {
+  return <div className="empty"><p>{text}</p>{children}</div>;
+}
+function ConfirmButton({ onConfirm, label = "Delete", iconOnly = false }) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => { if (!armed) return undefined; const t = setTimeout(() => setArmed(false), 3000); return () => clearTimeout(t); }, [armed]);
+  return (
+    <button type="button" className={"btn ghost sm danger" + (armed ? " armed" : "")} aria-label={iconOnly && !armed ? label : undefined}
+      onClick={() => { if (armed) { setArmed(false); onConfirm(); } else setArmed(true); }}>
+      {armed ? (iconOnly ? "Delete?" : "Tap again to delete") : <><Icon name="trash" size={15} />{!iconOnly && label}</>}
+    </button>
+  );
+}
+function CopyButton({ text, label, caption }) {
+  const { t } = useT();
+  const [state, setState] = useState("");
+  const copy = () => {
+    const show = (s) => { setState(s); setTimeout(() => setState(""), 2500); };
+    try { navigator.clipboard.writeText(text).then(() => show(t("copied")), () => show(t("holdCopy"))); }
+    catch (e) { show(t("holdCopy")); }
+  };
+  return <button type="button" className="btn ghost sm" onClick={copy} aria-label={label}>{state || caption || t("copy")}</button>;
+}
+function WaButton({ phone, text, children, ghost = false }) {
+  return (
+    <a className={"btn sm" + (ghost ? " ghost" : "")} href={waLink(phone, text)} target="_blank" rel="noopener noreferrer">
+      <Icon name="chat" size={16} />{children}
+    </a>
+  );
+}
+
+/* ---------- welcome ---------- */
+function Welcome({ canTeach, signedIn, notTeacher, onStudent, onTeacher, onSignIn, onSignOut, onLang, onJoin }) {
+  const { t } = useT();
+  const [code, setCode] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const open = async () => {
+    if (code.length < 4) { setErr(t("codeShort")); return; }
+    setBusy(true); setErr("");
+    try {
+      const s = await FB.db.doc("students/" + code).get();
+      if (s.exists) onStudent({ ...s.data(), code });
+      else setErr(t("codeWrong"));
+    } catch (e) { setErr(t("codeOffline")); }
+    setBusy(false);
+  };
+  return (
+    <div className="welcome">
+      <div className="welcome-lang"><button className="link" onClick={onLang} aria-label={t("otherLangName")}>{t("otherLang")}</button></div>
+      <div className="seyes welcome-page">
+        <h1 className="welcome-title">Bright Minds</h1>
+        <p className="welcome-sub">{t("tagline")}</p>
+      </div>
+      <h2 className="h">{t("enterCode")}</h2>
+      <p className="hint">{t("codeHint")}</p>
+      <div className="inline-add">
+        <input id="my-code" className="inp code-inp" type="text" inputMode="numeric" autoComplete="off" maxLength={4} aria-label={t("yourCode")}
+          value={code} onChange={(e) => { setCode(e.target.value.replace(/\D/g, "").slice(0, 4)); setErr(""); }}
+          onKeyDown={(e) => e.key === "Enter" && open()} />
+        <button className="btn" onClick={open} disabled={!code || busy}>{t("open")}</button>
+      </div>
+      {err && <p className="err" role="alert">{err}</p>}
+      <div className="stack" style={{ marginTop: 8 }}>
+        <button className="btn ghost" onClick={onJoin}>{t("seeClasses")}</button>
+        <button className="btn ghost" onClick={() => onStudent(null)}>{t("noCode")}</button>
+        {canTeach && <button className="btn" onClick={onTeacher}>Open teacher view</button>}
+      </div>
+      <div className="teacher-link">
+        {notTeacher
+          ? <p className="hint">{notTeacher} isn't the teacher account. <button className="link" onClick={onSignOut}>Sign out</button></p>
+          : !signedIn && <button className="link small" onClick={onSignIn}>{t("teacherSignIn")}</button>}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- words: study ---------- */
+function Flashcards({ cards }) {
+  const { t } = useT();
+  const [order, setOrder] = useState(() => cards.map((_, k) => k));
+  const [i, setI] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  useEffect(() => { setOrder(cards.map((_, k) => k)); setI(0); setFlipped(false); }, [cards.length]);
+  const card = cards[order[i]] || cards[0];
+  if (!card) return null;
+  const go = (d) => { setFlipped(false); setI((x) => (x + d + order.length) % order.length); };
+  const mix = () => { setOrder(shuffle(cards.map((_, k) => k))); setI(0); setFlipped(false); };
+  const sayExample = flipped && card.ex;
+  return (
+    <div>
+      <div key={order[i]} className={"flip" + (flipped ? " is-flipped" : "")}>
+        <button type="button" className="flip-inner" onClick={() => setFlipped((f) => !f)} aria-label={flipped ? t("ariaBack", card.fr) : t("ariaFront", card.en)}>
+          <span className="face seyes face-front">
+            <span className="face-word">{card.en}</span>
+            <span className="face-hint">{t("tapMeaning")}</span>
+          </span>
+          <span className="face seyes face-back">
+            <span className="face-word">{card.fr}</span>
+            {card.ex && <span className="face-ex">{card.ex}</span>}
+          </span>
+        </button>
+      </div>
+      <div className="card-tools">
+        <span className="muted small">{t("xOfY", i + 1, order.length)}</span>
+        {canSpeak && (
+          <button className="btn ghost sm" onClick={() => speak(sayExample ? card.ex : card.en)}>
+            <Icon name="volume" size={16} />{sayExample ? t("hearSentence") : t("hearWord")}
+          </button>
+        )}
+      </div>
+      <div className="card-nav">
+        <button className="btn ghost" onClick={() => go(-1)}><Icon name="left" />{t("back")}</button>
+        <button className="btn ghost" onClick={mix}><Icon name="shuffle" size={16} />{t("mix")}</button>
+        <button className="btn" onClick={() => go(1)}>{t("next")}<Icon name="right" /></button>
+      </div>
+    </div>
+  );
+}
+
+function Quiz({ deck }) {
+  const { t } = useT();
+  const cards = deck.cards;
+  const [qs, setQs] = useState(() => makeQuiz(cards));
+  const [idx, setIdx] = useState(0);
+  const [picked, setPicked] = useState(null);
+  const [score, setScore] = useState(0);
+  const [best, setBest] = useState(() => (ls.get("bm:best", {}) || {})[deck.id] || null);
+  const [newBest, setNewBest] = useState(false);
+  const restart = () => { setQs(makeQuiz(cards)); setIdx(0); setPicked(null); setScore(0); setNewBest(false); };
+
+  if (cards.length < 4) return <Empty text={t("quizMin")} />;
+
+  if (idx >= qs.length) {
+    const total = qs.length;
+    const msg = score === total ? t("perfect") : score / total >= 0.7 ? t("great") : t("practiceMore");
+    return (
+      <div>
+        <div className="seyes result">
+          <p className="muted">{t("yourScore")}</p>
+          <p className="result-big">{t("xOfY", score, total)}</p>
+          <p>{msg}</p>
+          {newBest ? <p className="new-best">{t("newBest")}</p> : best && <p className="muted small" style={{ marginTop: 4 }}>{t("best", best.score, best.total)}</p>}
+        </div>
+        <button className="btn" onClick={restart}><Icon name="again" size={16} />{t("tryAgain")}</button>
+      </div>
+    );
+  }
+
+  const q = qs[idx];
+  const pick = (o) => { if (picked !== null) return; setPicked(o); if (o === q.answer) setScore((s) => s + 1); };
+  const next = () => {
+    const n = idx + 1;
+    if (n >= qs.length && score > 0 && (!best || score / qs.length > best.score / best.total)) {
+      const b = { score, total: qs.length };
+      setBest(b); setNewBest(true);
+      ls.set("bm:best", { ...(ls.get("bm:best", {}) || {}), [deck.id]: b });
+    }
+    setPicked(null); setIdx(n);
+  };
+  return (
+    <div>
+      <p className="muted small" style={{ marginBottom: 8 }}>{t("questionN", idx + 1, qs.length)}</p>
+      <div className="seyes q-prompt">
+        <span className="face-hint">{q.dir === "en" ? t("whatMeans") : t("howSay")}</span>
+        <span className="face-word">{q.prompt}</span>
+      </div>
+      <div className="options">
+        {q.options.map((o) => {
+          const isRight = picked !== null && o === q.answer;
+          const isWrong = picked !== null && o === picked && o !== q.answer;
+          return (
+            <button key={o} className={"opt" + (isRight ? " right" : "") + (isWrong ? " wrong" : "")} disabled={picked !== null} onClick={() => pick(o)}>
+              <span>{o}</span>
+              {isRight && <Icon name="check" size={20} label={t("correctAnswer")} />}
+              {isWrong && <Icon name="x" size={20} label={t("yourAnswer")} />}
+            </button>
+          );
+        })}
+      </div>
+      {picked !== null && (
+        <p className="verdict" role="status">{picked === q.answer ? t("correct") : <>{t("notQuite")}<strong>{q.answer}</strong>.</>}</p>
+      )}
+      <div className="feedback">
+        {canSpeak && (q.dir === "en" || picked !== null) && (
+          <button className="btn ghost sm" onClick={() => speak(q.en)}><Icon name="volume" size={16} />{t("hearWord")}</button>
+        )}
+        {picked !== null && <button className="btn" onClick={next}>{idx + 1 < qs.length ? t("nextQ") : t("seeScore")}</button>}
+      </div>
+    </div>
+  );
+}
+
+function Study({ deck, onBack, backLabel }) {
+  const { t } = useT();
+  const [mode, setMode] = useState("cards");
+  return (
+    <section>
+      <button className="back-link" onClick={onBack}><Icon name="left" />{backLabel || t("allLists")}</button>
+      <h2 className="h">{deck.title}</h2>
+      <div className="seg">
+        <button aria-pressed={mode === "cards"} onClick={() => setMode("cards")}>{t("flashcards")}</button>
+        <button aria-pressed={mode === "quiz"} onClick={() => setMode("quiz")}>{t("quiz")}</button>
+      </div>
+      {deck.cards.length === 0 ? <Empty text={t("emptyList")} /> : mode === "cards" ? <Flashcards cards={deck.cards} /> : <Quiz deck={deck} />}
+    </section>
+  );
+}
+
+function WordsStudent({ decks, me }) {
+  const { t, lang } = useT();
+  const [openId, setOpenId] = useState(null);
+  const visible = decks.filter((d) => forGroup(d.group, me.group));
+  const deck = decks.find((d) => d.id === openId);
+  if (deck) return <Study deck={deck} onBack={() => setOpenId(null)} />;
+  return (
+    <section>
+      <h2 className="h">{t("words")}</h2>
+      {me.level && <p className="level-chip">{t("yourLevel", levelName(me.level, lang))}</p>}
+      {visible.length === 0 ? <Empty text={t("noLists")} /> : (
+        <ul className="rows">
+          {visible.map((d) => (
+            <li key={d.id}>
+              <button className="row-btn" onClick={() => setOpenId(d.id)}>
+                <span className="row-main"><span className="row-title">{d.title}</span><span className="row-sub">{t("nWords", d.cards.length)}</span></span>
+                <Icon name="right" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/* ---------- words: teacher ---------- */
+function DeckEditor({ deck, groups, onBack, onPractice, onChange, onDelete }) {
+  const [title, setTitle] = useState(deck.title);
+  const [en, setEn] = useState("");
+  const [fr, setFr] = useState("");
+  const [ex, setEx] = useState("");
+  const [bulk, setBulk] = useState("");
+  const [showBulk, setShowBulk] = useState(false);
+  const enRef = useRef(null);
+  const parsed = useMemo(() => parseBulk(bulk), [bulk]);
+  const current = deck.group || EVERYONE;
+  const opts = groups.includes(current) ? groups : [...groups, current];
+  const saveTitle = () => { const t = title.trim(); if (t && t !== deck.title) onChange({ ...deck, title: t }); else setTitle(deck.title); };
+  const addCard = () => {
+    if (!en.trim() || !fr.trim()) return;
+    onChange({ ...deck, cards: [...deck.cards, { id: uid(), en: en.trim(), fr: fr.trim(), ex: ex.trim() }] });
+    setEn(""); setFr(""); setEx("");
+    if (enRef.current) enRef.current.focus();
+  };
+  const addBulk = () => { if (!parsed.length) return; onChange({ ...deck, cards: [...deck.cards, ...parsed] }); setBulk(""); setShowBulk(false); };
+  const enter = (e) => { if (e.key === "Enter") addCard(); };
+  return (
+    <section>
+      <button className="back-link" onClick={onBack}><Icon name="left" />All lists</button>
+      <Field label="List name"><input id="deck-title" className="inp" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={saveTitle} /></Field>
+      <Field label="Who sees it">
+        <select id="deck-group" className="inp" value={current} onChange={(e) => onChange({ ...deck, group: e.target.value })}>
+          {opts.map((g) => <option key={g} value={g}>{g}</option>)}
+        </select>
+      </Field>
+      <div className="form-actions" style={{ marginBottom: 20 }}>
+        <button className="btn" onClick={onPractice} disabled={!deck.cards.length}>Practice this list</button>
+        <ConfirmButton label="Delete list" onConfirm={onDelete} />
+      </div>
+
+      <div className="form">
+        <p className="form-title">Add a word</p>
+        <div className="grid2">
+          <Field label="English"><input id="word-en" ref={enRef} className="inp" value={en} placeholder="window" onChange={(e) => setEn(e.target.value)} onKeyDown={enter} /></Field>
+          <Field label="French"><input id="word-fr" className="inp" value={fr} placeholder="la fenêtre" onChange={(e) => setFr(e.target.value)} onKeyDown={enter} /></Field>
+        </div>
+        <Field label="Example sentence (optional)"><input id="word-ex" className="inp" value={ex} placeholder="Open the window, please." onChange={(e) => setEx(e.target.value)} onKeyDown={enter} /></Field>
+        <div className="form-actions">
+          <button className="btn" onClick={addCard} disabled={!en.trim() || !fr.trim()}><Icon name="plus" size={16} />Add word</button>
+          <button className="btn ghost" onClick={() => setShowBulk((s) => !s)}>{showBulk ? "Hide paste box" : "Paste many words"}</button>
+        </div>
+        {showBulk && (
+          <div style={{ marginTop: 16 }}>
+            <Field label="One word per line: English = French | example">
+              <textarea id="word-bulk" className="inp" rows={5} value={bulk} onChange={(e) => setBulk(e.target.value)}
+                placeholder={"pencil = le crayon | I write with a pencil.\nruler = la règle"} />
+            </Field>
+            <button className="btn" onClick={addBulk} disabled={!parsed.length}>Add {parsed.length} {parsed.length === 1 ? "word" : "words"}</button>
+          </div>
+        )}
+      </div>
+
+      <p className="sub-h">{deck.cards.length} {deck.cards.length === 1 ? "word" : "words"}</p>
+      {deck.cards.length === 0 ? <Empty text="Add your first word above." /> : (
+        <ul>
+          {deck.cards.map((c) => (
+            <li key={c.id} className="word-row">
+              <div className="row-main">
+                <span className="row-title">{c.en}</span>
+                <span className="row-sub">{c.fr}</span>
+                {c.ex && <span className="row-sub ex">{c.ex}</span>}
+              </div>
+              {canSpeak && <button className="icon-btn" aria-label={`Hear ${c.en}`} onClick={() => speak(c.en)}><Icon name="volume" size={17} /></button>}
+              <ConfirmButton iconOnly label={`Delete ${c.en}`} onConfirm={() => onChange({ ...deck, cards: deck.cards.filter((x) => x.id !== c.id) })} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function WordsTeacher({ decks, groups, saveDecks, openId, setOpenId, sample }) {
+  const [practice, setPractice] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const deck = decks.find((d) => d.id === openId);
+  if (deck && practice) return <Study deck={deck} backLabel="Back to editing" onBack={() => setPractice(false)} />;
+  if (deck) {
+    return (
+      <DeckEditor key={deck.id} deck={deck} groups={groups}
+        onBack={() => setOpenId(null)} onPractice={() => setPractice(true)}
+        onChange={(nd) => saveDecks(decks.map((d) => (d.id === nd.id ? nd : d)))}
+        onDelete={() => { saveDecks(decks.filter((d) => d.id !== deck.id)); setOpenId(null); }} />
+    );
+  }
+  const add = () => {
+    const t = newTitle.trim();
+    if (!t) return;
+    const d = { id: uid(), title: t, group: EVERYONE, cards: [] };
+    saveDecks([d, ...decks]); setNewTitle(""); setOpenId(d.id);
+  };
+  return (
+    <section>
+      <h2 className="h">Word lists</h2>
+      <div className="inline-add">
+        <input id="new-list" className="inp" aria-label="New list name" placeholder="New list, e.g. Colors" value={newTitle}
+          onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
+        <button className="btn" onClick={add} disabled={!newTitle.trim()}><Icon name="plus" size={16} />Add list</button>
+      </div>
+      <AskClaude sample={sample} title="Make a list with Claude" label="What should the list be about?" placeholder="Food words for a 6-year-old" button="Make list"
+        makePrompt={listPrompt}
+        onResult={(data) => {
+          const cards = arr(data && data.words).map((w) => ({ id: uid(), en: String((w && w.en) || "").trim(), fr: String((w && w.fr) || "").trim(), ex: String((w && w.ex) || "").trim() })).filter((w) => w.en && w.fr);
+          if (!cards.length) return false;
+          const d = { id: uid(), title: String((data && data.title) || "New list").trim().slice(0, 60), group: EVERYONE, cards };
+          saveDecks([d, ...decks]); setPractice(false); setOpenId(d.id);
+          return true;
+        }} />
+      {decks.length === 0 ? <Empty text="Make a word list and your students can practice it with flashcards and quizzes." /> : (
+        <ul className="rows">
+          {decks.map((d) => (
+            <li key={d.id}>
+              <button className="row-btn" onClick={() => { setPractice(false); setOpenId(d.id); }}>
+                <span className="row-main">
+                  <span className="row-title">{d.title}</span>
+                  <span className="row-sub">{d.cards.length} words, for {d.group || EVERYONE}</span>
+                </span>
+                <Icon name="right" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/* ---------- lessons & homework ---------- */
+function LessonEntry({ lesson: l, teacher = false, isDone = false, onToggle, onEdit, onDelete, onSaveToLibrary }) {
+  const { t, lang } = useT();
+  const [libLevel, setLibLevel] = useState(null);
+  const d = l.date ? parseISO(l.date) : null;
+  const pastDue = l.due && l.due < todayISO();
+  return (
+    <li>
+      <div className="entry-date">
+        {d && <><span className="d-day">{d.getDate()}</span><span className="d-mon">{d.toLocaleDateString(LOCALE[lang], { month: "short" })}</span></>}
+      </div>
+      <div className="entry-body">
+        <h3>{l.title}</h3>
+        {teacher && <p className="muted small">For {l.group || EVERYONE}</p>}
+        {l.notes && <p className="notes">{l.notes}</p>}
+        {l.homework && (
+          <div className="hw">
+            <p className="hw-head">{t("homework")}{l.due && <span>{t("due", fmtDate(l.due, lang))}</span>}</p>
+            <p className="hw-text">{l.homework}</p>
+            {!teacher && onToggle && (
+              <button className={"btn sm" + (isDone ? " done" : "")} onClick={onToggle} aria-pressed={isDone}>
+                {isDone ? <><Icon name="check" size={16} />{t("done")}</> : t("markDone")}
+              </button>
+            )}
+            {!teacher && !isDone && pastDue && <p className="late">{t("pastDue")}</p>}
+          </div>
+        )}
+        {teacher && (
+          <div className="entry-actions">
+            <button className="btn ghost sm" onClick={onEdit}><Icon name="pencil" size={15} />Edit</button>
+            {onSaveToLibrary && libLevel === null && <button className="btn ghost sm" onClick={() => setLibLevel(AUDIENCES[0])}>Save to library</button>}
+            <ConfirmButton onConfirm={onDelete} />
+          </div>
+        )}
+        {teacher && libLevel !== null && (
+          <div className="inline-add" style={{ marginTop: 10, marginBottom: 0 }}>
+            <select className="inp" aria-label="Who it's for" value={libLevel} onChange={(e) => setLibLevel(e.target.value)}>{AUDIENCES.map((x) => <option key={x} value={x}>{x}</option>)}</select>
+            <button className="btn sm" onClick={() => { onSaveToLibrary(libLevel); setLibLevel(null); }}>Save</button>
+            <button className="btn ghost sm" onClick={() => setLibLevel(null)}>Cancel</button>
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId }) {
+  const [mode, setMode] = useState("lessons");
+  const [form, setForm] = useState(null);
+  const lib = useLibrary(db, userId);
+  const blank = () => ({ id: null, date: todayISO(), group: groups[1] || EVERYONE, title: "", notes: "", homework: "", due: "" });
+  const upd = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const submit = () => {
+    if (!form.title.trim()) return;
+    const item = { ...form, title: form.title.trim(), notes: form.notes.trim(), homework: form.homework.trim() };
+    if (form.id) saveLessons(lessons.map((l) => (l.id === form.id ? item : l)));
+    else saveLessons([{ ...item, id: uid() }, ...lessons]);
+    setForm(null); flash("Lesson saved. Students can see it now.");
+  };
+  const saveToLib = (l, level) => lib.save({ id: uid(), title: l.title, level, notes: l.notes || "", homework: l.homework || "" })
+    .then(() => flash(`Saved to your library under ${level}.`), () => flash("That didn't save. Check your connection and try again."));
+  const usePlan = (p) => { setMode("lessons"); setForm({ ...blank(), title: p.title || "", notes: p.notes || "", homework: p.homework || "" }); window.scrollTo(0, 0); };
+  const opts = form && !groups.includes(form.group) ? [...groups, form.group] : groups;
+  const sorted = [...lessons].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  return (
+    <section>
+      <div className="h-row">
+        <h2 className="h">Lessons</h2>
+        {mode === "lessons" && !form && <button className="btn sm" onClick={() => setForm(blank())}><Icon name="plus" size={16} />New lesson</button>}
+      </div>
+      {lib.on && (
+        <div className="seg">
+          <button aria-pressed={mode === "lessons"} onClick={() => setMode("lessons")}>Lessons</button>
+          <button aria-pressed={mode === "library"} onClick={() => setMode("library")}>Library{lib.items.length ? ` (${lib.items.length})` : ""}</button>
+        </div>
+      )}
+      {mode === "library" ? <Library items={lib.items} onUse={usePlan} onRemove={(id) => lib.remove(id).catch(() => flash("That didn't save. Check your connection and try again."))} /> : (
+        <>
+          {form && (
+            <div className="form">
+              <AskClaude sample={sample} title="Draft with Claude" label="What's the lesson about?" placeholder="Present continuous for adult beginners" button="Draft"
+                makePrompt={lessonPrompt}
+                onResult={(d) => {
+                  if (!d || !d.title) return false;
+                  setForm((f) => ({ ...f, title: String(d.title), notes: String(d.notes || ""), homework: String(d.homework || "") }));
+                  return true;
+                }} />
+              <Field label="Title"><input id="lesson-title" className="inp" value={form.title} placeholder="Telling the time" onChange={upd("title")} /></Field>
+              <div className="grid2">
+                <Field label="Date"><input id="lesson-date" className="inp" type="date" value={form.date} onChange={upd("date")} /></Field>
+                <Field label="For">
+                  <select id="lesson-group" className="inp" value={form.group} onChange={upd("group")}>{opts.map((g) => <option key={g} value={g}>{g}</option>)}</select>
+                </Field>
+              </div>
+              <Field label="What we did"><textarea id="lesson-notes" className="inp" value={form.notes} placeholder="New words, a song, a short dialogue..." onChange={upd("notes")} /></Field>
+              <Field label="Homework (optional)"><textarea id="lesson-hw" className="inp" value={form.homework} placeholder="Write 5 sentences with the new words." onChange={upd("homework")} /></Field>
+              <Field label="Homework due (optional)"><input id="lesson-due" className="inp" type="date" value={form.due} onChange={upd("due")} /></Field>
+              <div className="form-actions">
+                <button className="btn" onClick={submit} disabled={!form.title.trim()}>Save lesson</button>
+                <button className="btn ghost" onClick={() => setForm(null)}>Cancel</button>
+              </div>
+            </div>
+          )}
+          {sorted.length === 0 ? (!form && <Empty text="Add your first lesson to give students their notes and homework." />) : (
+            <ol className="entries">
+              {sorted.map((l) => (
+                <LessonEntry key={l.id} lesson={l} teacher
+                  onEdit={() => { setForm({ ...l }); window.scrollTo(0, 0); }}
+                  onDelete={() => saveLessons(lessons.filter((x) => x.id !== l.id))}
+                  onSaveToLibrary={lib.on ? (level) => saveToLib(l, level) : null} />
+              ))}
+            </ol>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function HomeworkStudent({ lessons, me, done, onToggle }) {
+  const { t } = useT();
+  const list = lessons.filter((l) => forGroup(l.group, me.group)).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  return (
+    <section>
+      <h2 className="h">{t("homework")}</h2>
+      {list.length === 0 ? <Empty text={t("noLessons")} /> : (
+        <ol className="entries">
+          {list.map((l) => (
+            <LessonEntry key={l.id} lesson={l} isDone={!!done[l.id]} onToggle={() => onToggle(l.id)} />
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+/* ---------- announcements ---------- */
+const activeNotice = (n, today) => !n.until || n.until >= today;
+
+function StudentNotices({ notices, me }) {
+  const { t } = useT();
+  const today = todayISO();
+  const list = notices.filter((n) => forGroup(n.group, me.group) && activeNotice(n, today));
+  if (!list.length) return null;
+  return (
+    <div className="notices" role="region" aria-label={t("announcement")}>
+      {list.map((n) => <p key={n.id} className="notice"><Icon name="megaphone" size={18} /><span>{n.text}</span></p>)}
+    </div>
+  );
+}
+
+function NoticesTeacher({ notices, groups, saveNotices, flash }) {
+  const [form, setForm] = useState(null);
+  const today = todayISO();
+  const upd = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const submit = () => {
+    const text = form.text.trim();
+    if (!text) return;
+    saveNotices([{ id: uid(), text, group: form.group, until: form.until }, ...notices]);
+    setForm(null); flash("Announcement saved. Students see it now.");
+  };
+  return (
+    <section className="notices-teacher">
+      <div className="h-row">
+        <h2 className="h">Announcements</h2>
+        {!form && <button className="btn ghost sm" onClick={() => setForm({ text: "", group: EVERYONE, until: "" })}><Icon name="megaphone" size={16} />New</button>}
+      </div>
+      {form && (
+        <div className="form">
+          <Field label="Message"><textarea id="notice-text" className="inp" value={form.text} placeholder="No class on Wednesday. See you Saturday!" onChange={upd("text")} /></Field>
+          <div className="grid2">
+            <Field label="For"><select id="notice-group" className="inp" value={form.group} onChange={upd("group")}>{groups.map((g) => <option key={g} value={g}>{g}</option>)}</select></Field>
+            <Field label="Show until (optional)"><input id="notice-until" className="inp" type="date" min={today} value={form.until} onChange={upd("until")} /></Field>
+          </div>
+          <p className="hint">Students see it at the top of the app until that date, or until you delete it.</p>
+          <div className="form-actions">
+            <button className="btn" onClick={submit} disabled={!form.text.trim()}>Save announcement</button>
+            <button className="btn ghost" onClick={() => setForm(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {notices.length === 0 ? (!form && <p className="hint" style={{ marginTop: 0 }}>Post a short message students see at the top of the app, like "No class Wednesday".</p>) : (
+        <ul className="rows" style={{ marginBottom: 8 }}>
+          {notices.map((n) => (
+            <li key={n.id} className="notice-row">
+              <div className="row-main">
+                <span className="notes" style={{ marginTop: 0 }}>{n.text}</span>
+                <span className="row-sub">For {n.group || EVERYONE}, {!n.until ? "until you delete it" : activeNotice(n, today) ? `until ${fmtDate(n.until)}` : "ended"}</span>
+              </div>
+              <ConfirmButton iconOnly label="Delete announcement" onConfirm={() => saveNotices(notices.filter((x) => x.id !== n.id))} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/* ---------- classes ---------- */
+function Classes({ schedule, changes = [], saveChanges, notices = [], saveNotices, isTeacher = false, me, groups = [EVERYONE], saveSchedule, flash, roster = [], att, st, updated }) {
+  const { t, lang } = useT();
+  const [form, setForm] = useState(null);
+  const [formErr, setFormErr] = useState("");
+  const [changeFor, setChangeFor] = useState(null);
+  const today = todayISO();
+  const now = new Date();
+  const ti = (now.getDay() + 6) % 7;
+  const markable = isTeacher && att && att.on;
+  const slots = isTeacher ? schedule : schedule.filter((s) => forGroup(s.group, me.group));
+  const slotIds = new Set(slots.map((s) => s.id));
+  const myChanges = changes.filter((c) => slotIds.has(c.slot));
+  const next = upcomingClasses(slots, myChanges, now)[0];
+  const upd = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const placeOf = (s) => s.place || (s.link ? t("online") : t("placeNotSet"));
+  const fail = () => flash("That didn't save. Check your connection and try again.");
+  const submit = () => {
+    if (!form.start) return;
+    const link = form.link.trim();
+    if (link && !isLink(link)) { setFormErr("An online link must start with https:// and have no spaces."); return; }
+    const slot = { id: form.id || uid(), group: form.group, day: Number(form.day), start: form.start, minutes: Number(form.minutes) || 60, place: form.place.trim() };
+    if (link) slot.link = link;
+    saveSchedule(form.id ? schedule.map((x) => (x.id === form.id ? slot : x)) : [...schedule, slot]);
+    setForm(null); setFormErr(""); flash("Class saved.");
+  };
+  const isTaught = (key) => markable && att.taken.some((x) => x.slot === key && x.date === today);
+  const toggleTaught = (key, group, place) => {
+    if (isTaught(key)) { att.save(att.taken.filter((x) => !(x.slot === key && x.date === today))).then(() => flash("Class unmarked."), fail); return; }
+    const who = roster.filter((r) => forGroup(group, r.group));
+    att.save([...att.taken, ...who.map((r) => ({ id: uid(), studentId: r.id, date: today, slot: key, place }))])
+      .then(() => flash(`Logged a class for ${who.length} ${who.length === 1 ? "student" : "students"}.`), fail);
+  };
+  const taughtButton = (key, group, place) => (markable && roster.some((r) => forGroup(group, r.group)) ? (
+    <button className={"btn sm" + (isTaught(key) ? " done" : " ghost")} aria-pressed={isTaught(key)} onClick={() => toggleTaught(key, group, place)}>
+      {isTaught(key) ? <><Icon name="check" size={16} />Taught</> : "Mark taught"}
+    </button>
+  ) : null);
+  const saveChange = (s, existing, v) => {
+    const c = existing ? { ...existing, makeup: v.makeup } : { id: uid(), slot: s.id, date: v.date, note: v.note, makeup: v.makeup, resolved: false };
+    saveChanges(existing ? changes.map((x) => (x.id === c.id ? c : x)) : [...changes, c]);
+    const until = c.makeup && c.makeup.date > c.date ? c.makeup.date : c.date;
+    saveNotices([{ id: uid(), text: changeNotice(c, s), group: s.group, until, change: c.id }, ...notices.filter((n) => n.change !== c.id)]);
+    setChangeFor(null);
+    flash(c.makeup ? "Class moved, and the group has an announcement." : "Class cancelled, and the group has an announcement.");
+  };
+  const undoChange = (c) => { saveChanges(changes.filter((x) => x.id !== c.id)); saveNotices(notices.filter((n) => n.change !== c.id)); flash("Change removed."); };
+  const visibleChanges = myChanges.filter((c) => c.date >= today || (c.makeup && c.makeup.date >= today))
+    .sort((a, b) => (a.makeup && a.makeup.date >= today ? a.makeup.date : a.date).localeCompare(b.makeup && b.makeup.date >= today ? b.makeup.date : b.date));
+  const owed = isTeacher ? changes.filter((c) => !c.makeup && !c.resolved && slotIds.has(c.slot)) : [];
+  const dayOrder = [0, 1, 2, 3, 4, 5, 6].map((k) => (ti + k) % 7);
+  const thisMonth = monthKey(now);
+  const showSt = !isTeacher && st && st.m === thisMonth && st.total > 0;
+  const changeSlot = changeFor && schedule.find((s) => s.id === changeFor.slot);
+  return (
+    <section>
+      <div className="h-row">
+        <h2 className="h">{isTeacher ? "Classes" : t("myClasses")}</h2>
+        {isTeacher && !form && !changeFor && (
+          <button className="btn sm" onClick={() => { setFormErr(""); setForm({ id: null, group: groups[1] || EVERYONE, day: ti, start: "16:00", minutes: 60, place: "", link: "" }); }}>
+            <Icon name="plus" size={16} />Add class
+          </button>
+        )}
+      </div>
+      {form && (
+        <div className="form">
+          <div className="grid2">
+            <Field label="Group"><select id="class-group" className="inp" value={form.group} onChange={upd("group")}>{(groups.includes(form.group) ? groups : [...groups, form.group]).map((g) => <option key={g} value={g}>{g}</option>)}</select></Field>
+            <Field label="Day"><select id="class-day" className="inp" value={form.day} onChange={upd("day")}>{DAYS.en.map((d, k) => <option key={d} value={k}>{d}</option>)}</select></Field>
+            <Field label="Starts at"><input id="class-start" className="inp" type="time" value={form.start} onChange={upd("start")} /></Field>
+            <Field label="Minutes"><input id="class-min" className="inp" type="number" inputMode="numeric" min="15" step="15" value={form.minutes} onChange={upd("minutes")} /></Field>
+          </div>
+          <Field label="Where"><input id="class-place" className="inp" placeholder="School, home or online" value={form.place} onChange={upd("place")} /></Field>
+          <Field label="Online class link (optional)"><input id="class-link" className="inp" type="url" inputMode="url" placeholder="https://meet.google.com/..." value={form.link} onChange={upd("link")} /></Field>
+          <p className="hint">Paste a Google Meet or Zoom link and students get a Join button.</p>
+          {formErr && <p className="err" role="alert">{formErr}</p>}
+          <div className="form-actions">
+            <button className="btn" onClick={submit}>Save class</button>
+            <button className="btn ghost" onClick={() => { setForm(null); setFormErr(""); }}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {changeSlot && (
+        <ChangeForm key={changeFor.slot + (changeFor.change ? changeFor.change.id : "")} slot={changeSlot} change={changeFor.change}
+          onSave={(v) => saveChange(changeSlot, changeFor.change, v)} onCancel={() => setChangeFor(null)} />
+      )}
+      {showSt && (
+        <div className="status-card">
+          <strong className={st.left <= 0 ? "out" : ""}>{st.left >= 0 ? t("classesLeft", st.left, st.total, monthLabel(st.m, lang)) : t("extraClasses", -st.left, monthLabel(st.m, lang))}</strong>
+          {updated && <span className="muted small">{t("updatedOn", fmtShort(updated.slice(0, 10), lang))}</span>}
+        </div>
+      )}
+      {next ? (
+        <div className="seyes next">
+          <p className="muted small">{isTeacher ? "Next class" : t("nextClass")}{next.makeup ? ` (${isTeacher ? "make-up" : t("makeupLabel").toLowerCase()})` : ""}</p>
+          <p className="next-when">{whenLabel(next.at, t, lang)}</p>
+          <p className="muted">{[isTeacher ? next.s.group : null, placeOf(next.s)].filter(Boolean).join(", ")}</p>
+          {next.s.link && <a className="btn join" href={next.s.link} target="_blank" rel="noopener noreferrer"><Icon name="video" size={18} />{t("joinClass")}</a>}
+        </div>
+      ) : (!form && <Empty text={isTeacher ? "Add your weekly classes so you and your students always know what's next." : t("noClasses")} />)}
+      {visibleChanges.length > 0 && (
+        <div className="changes">
+          <p className="sub-h">{isTeacher ? "Cancelled and moved classes" : t("changesTitle")}</p>
+          <ul>
+            {visibleChanges.map((c) => {
+              const s = schedule.find((x) => x.id === c.slot);
+              if (!s) return null;
+              return (
+                <li key={c.id}>
+                  <div className="row-main">
+                    {isTeacher && <span className="row-title">{s.group}</span>}
+                    <span className={isTeacher ? "row-sub" : "change-line"}>{t("cancelledOn", fmtDate(c.date, lang), s.start)}</span>
+                    {c.makeup && <span className={isTeacher ? "row-sub" : "change-line"}>{t("makeupOn", fmtDate(c.makeup.date, lang), c.makeup.start)}</span>}
+                    {!isTeacher && c.note && <span className="row-sub">{c.note}</span>}
+                  </div>
+                  {isTeacher && (
+                    <span className="slot-actions">
+                      {c.makeup && c.makeup.date === today && taughtButton(c.id, s.group, placeName(s))}
+                      <ConfirmButton iconOnly label="Undo this change" onConfirm={() => undoChange(c)} />
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+      {owed.length > 0 && (
+        <div className="changes">
+          <p className="sub-h">Make-up classes you owe</p>
+          <ul>
+            {owed.map((c) => {
+              const s = schedule.find((x) => x.id === c.slot);
+              if (!s) return null;
+              return (
+                <li key={c.id}>
+                  <div className="row-main"><span className="row-title">{s.group}</span><span className="row-sub">Cancelled {fmtDate(c.date)} at {s.start}</span></div>
+                  <span className="slot-actions">
+                    <button className="btn ghost sm" onClick={() => { setForm(null); setChangeFor({ slot: s.id, change: c }); window.scrollTo(0, 0); }}>Schedule make-up</button>
+                    <button className="btn ghost sm" onClick={() => saveChanges(changes.map((x) => (x.id === c.id ? { ...x, resolved: true } : x)))}>Done</button>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+      {markable && slots.length > 0 && <p className="hint">Tap Mark taught after today's class to count it for everyone in that group. To log a class on another day, open the student in Students.</p>}
+      {dayOrder.map((d) => {
+        const list = slots.filter((s) => Number(s.day) === d).sort((a, b) => a.start.localeCompare(b.start));
+        if (!list.length) return null;
+        const dayName = isTeacher ? DAYS.en[d] : cap(DAYS[lang][d]);
+        return (
+          <div key={d} className="day-block">
+            <p className={"day-name" + (d === ti ? " today" : "")}>{d === ti ? t("todayDay", isTeacher ? DAYS.en[d] : DAYS[lang][d]) : dayName}</p>
+            {list.map((s) => {
+              const cancelledToday = d === ti && changes.some((c) => c.slot === s.id && c.date === today);
+              return (
+                <div key={s.id} className="slot">
+                  <span className="slot-time">{t("timeRange", s.start, addMin(s.start, s.minutes))}</span>
+                  <span className="slot-main">
+                    {isTeacher && <span className="row-title">{s.group}</span>}
+                    <span className="row-sub">{placeOf(s)}</span>
+                  </span>
+                  <span className="slot-actions">
+                    {s.link && <a className="btn ghost sm" href={s.link} target="_blank" rel="noopener noreferrer"><Icon name="video" size={16} />{t("join")}</a>}
+                    {d === ti && !cancelledToday && taughtButton(s.id, s.group, placeName(s))}
+                    {isTeacher && <button className="btn ghost sm" onClick={() => { setForm(null); setChangeFor({ slot: s.id, change: null }); window.scrollTo(0, 0); }}>Cancel or move</button>}
+                    {isTeacher && <button className="icon-btn sm-icon" aria-label="Edit class" onClick={() => { setChangeFor(null); setFormErr(""); setForm({ id: s.id, group: s.group, day: s.day, start: s.start, minutes: s.minutes, place: s.place || "", link: s.link || "" }); window.scrollTo(0, 0); }}><Icon name="pencil" size={15} /></button>}
+                    {isTeacher && <ConfirmButton iconOnly label="Delete class" onConfirm={() => saveSchedule(schedule.filter((x) => x.id !== s.id))} />}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+/* ---------- paying the teacher ---------- */
+const KINDS = ["Wave", "Orange Money", "MTN MoMo", "Moov Money", "Other"];
+
+function PayStudent({ pay, me, st }) {
+  const { t, lang } = useT();
+  const methods = pay.methods.filter((m) => m.number || m.link);
+  const guest = me.id === "guest";
+  const [name, setName] = useState(guest ? "" : me.name);
+  const [amount, setAmount] = useState(me.due ? String(me.due) : "");
+  const [method, setMethod] = useState(methods[0] ? methods[0].kind : "cash");
+  const wa = waDigits(pay.whatsapp);
+  const thisMonth = monthKey(new Date());
+  const month = monthLabel(thisMonth, lang);
+  const methodName = method === "cash" ? t("cash") : method;
+  const msg = t("payMsg", name.trim() || t("aStudent"), Number(amount) > 0 ? fcfa(amount) : t("myFee"), month, methodName);
+  const showSt = st && st.m === thisMonth && st.pay && st.pay !== "none";
+  return (
+    <section>
+      <h2 className="h">{t("payTitle")}</h2>
+      {showSt && <p className={"pay-status " + st.pay}>{t(st.pay, month)}</p>}
+      {me.due > 0 && (
+        <div className="seyes next">
+          <p className="muted small">{t("yourFee")}</p>
+          <p className="next-when">{fcfa(me.due)}</p>
+          <p className="muted">{t("eachMonth")}</p>
+        </div>
+      )}
+      {methods.length === 0 ? <Empty text={t("noPayDetails")} /> : (
+        <>
+          <p className="sub-h">{t("sendTo")}</p>
+          <ul className="rows" style={{ marginBottom: 16 }}>
+            {methods.map((m) => (
+              <li key={m.id} className="pay-method">
+                <div className="row-main">
+                  <span className="row-title">{m.kind}</span>
+                  {m.number && <span className="row-sub sel">{m.number}</span>}
+                  {pay.accountName && <span className="row-sub">{t("name", pay.accountName)}</span>}
+                </div>
+                <div className="pay-actions">
+                  {m.link && <a className="btn sm" href={m.link} target="_blank" rel="noopener noreferrer">{t("payWith", m.kind)}</a>}
+                  {m.number && <CopyButton text={m.number} label={`${t("copy")} ${m.kind}`} />}
+                </div>
+              </li>
+            ))}
+          </ul>
+          {pay.note && <p className="note">{pay.note}</p>}
+        </>
+      )}
+      {wa ? (
+        <div className="form">
+          <p className="form-title">{t("afterPay")}</p>
+          {guest && <Field label={t("yourName")}><input id="pay-me" className="inp" value={name} onChange={(e) => setName(e.target.value)} /></Field>}
+          <div className="grid2">
+            <Field label={t("amount")}><input id="pay-amount" className="inp" type="number" inputMode="numeric" min="0" step="500" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
+            <Field label={t("paidWith")}>
+              <select id="pay-method" className="inp" value={method} onChange={(e) => setMethod(e.target.value)}>
+                {[...new Set([...methods.map((m) => m.kind), "cash"])].map((k) => <option key={k} value={k}>{k === "cash" ? t("cash") : k}</option>)}
+              </select>
+            </Field>
+          </div>
+          <p className="msg sel">{msg}</p>
+          <div className="form-actions">
+            <a className="btn" href={`https://wa.me/${wa}?text=${encodeURIComponent(msg)}`} target="_blank" rel="noopener noreferrer"><Icon name="chat" size={16} />{t("sendWa")}</a>
+            <CopyButton text={msg} label={t("copyMsg")} />
+          </div>
+          <p className="hint" style={{ margin: "10px 0 0" }}>{t("waFallback", pay.whatsapp)}</p>
+        </div>
+      ) : methods.length > 0 && <p className="hint">{t("screenshot")}</p>}
+    </section>
+  );
+}
+
+function PaySettings({ pay, savePay, flash }) {
+  const [form, setForm] = useState(null);
+  const [err, setErr] = useState("");
+  const methods = pay.methods.filter((m) => m.number || m.link);
+  const start = () => {
+    setErr("");
+    setForm({ whatsapp: pay.whatsapp, accountName: pay.accountName, note: pay.note,
+      methods: methods.length ? methods.map((m) => ({ ...m })) : [{ id: uid(), kind: "Wave", number: "", link: "" }] });
+  };
+  const upd = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const updM = (id, k) => (e) => setForm({ ...form, methods: form.methods.map((m) => (m.id === id ? { ...m, [k]: e.target.value } : m)) });
+  const save = () => {
+    const list = form.methods.map((m) => ({ id: m.id, kind: m.kind, number: m.number.trim(), link: m.link.trim() })).filter((m) => m.number || m.link);
+    if (list.some((m) => m.link && !isLink(m.link))) { setErr("A payment link must start with https:// and have no spaces."); return; }
+    if (form.whatsapp.trim() && !waDigits(form.whatsapp)) { setErr("That WhatsApp number looks too short. Use the full number, like 07 00 00 00 00."); return; }
+    savePay({ whatsapp: form.whatsapp.trim(), accountName: form.accountName.trim(), note: form.note.trim(), methods: list });
+    setForm(null); flash("Payment details saved.");
+  };
+  return (
+    <section className="pay-settings">
+      <div className="h-row">
+        <h2 className="h">How students pay</h2>
+        {!form && <button className="btn ghost sm" onClick={start}><Icon name="pencil" size={15} />{methods.length || pay.whatsapp ? "Edit" : "Set up"}</button>}
+      </div>
+      <p className="hint">Students see these details on their Pay screen, and anyone with the app link can see them too. When a student tells you they've paid, record it above.</p>
+      {!form && (methods.length || pay.whatsapp ? (
+        <ul className="rows">
+          {methods.map((m) => (
+            <li key={m.id} className="pay-method"><div className="row-main"><span className="row-title">{m.kind}</span><span className="row-sub">{[m.number, m.link ? "Payment link added" : ""].filter(Boolean).join(", ")}</span></div></li>
+          ))}
+          {pay.whatsapp && <li className="pay-method"><div className="row-main"><span className="row-title">WhatsApp</span><span className="row-sub">{pay.whatsapp}</span></div></li>}
+        </ul>
+      ) : <Empty text="Add your Wave or mobile money number so students can pay you from the app." />)}
+      {form && (
+        <div className="form">
+          {form.methods.map((m) => (
+            <div key={m.id} className="method-edit">
+              <div className="grid2">
+                <Field label="Pay with">
+                  <select id={"pm-kind-" + m.id} className="inp" value={m.kind} onChange={updM(m.id, "kind")}>{KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</select>
+                </Field>
+                <Field label="Number"><input id={"pm-num-" + m.id} className="inp" type="tel" inputMode="tel" placeholder="07 00 00 00 00" value={m.number} onChange={updM(m.id, "number")} /></Field>
+              </div>
+              <Field label="Payment link (optional)"><input id={"pm-link-" + m.id} className="inp" type="url" inputMode="url" placeholder="https://" value={m.link} onChange={updM(m.id, "link")} /></Field>
+              {form.methods.length > 1 && <button className="btn ghost sm danger" onClick={() => setForm({ ...form, methods: form.methods.filter((x) => x.id !== m.id) })}><Icon name="trash" size={15} />Remove</button>}
+            </div>
+          ))}
+          <button className="btn ghost sm" style={{ marginBottom: 16 }} onClick={() => setForm({ ...form, methods: [...form.methods, { id: uid(), kind: "Orange Money", number: "", link: "" }] })}><Icon name="plus" size={16} />Add another way to pay</button>
+          <Field label="Name on the account"><input id="pay-name" className="inp" value={form.accountName} onChange={upd("accountName")} /></Field>
+          <Field label="Your WhatsApp number"><input id="pay-wa" className="inp" type="tel" inputMode="tel" placeholder="+225 07 00 00 00 00" value={form.whatsapp} onChange={upd("whatsapp")} /></Field>
+          <p className="hint">Students use it to tell you they've paid.</p>
+          <Field label="Note for students (optional)"><textarea id="pay-note" className="inp" placeholder="Please pay before the 5th of each month." value={form.note} onChange={upd("note")} /></Field>
+          {err && <p className="err" role="alert">{err}</p>}
+          <div className="form-actions">
+            <button className="btn" onClick={save}>Save payment details</button>
+            <button className="btn ghost" onClick={() => setForm(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ---------- students & payments ---------- */
+const STATUS = { paid: "Paid", partial: "Part paid", unpaid: "Not paid", none: "No fee" };
+
+function StudentReport({ r, month, lessons, decks }) {
+  const [comment, setComment] = useState("");
+  const text = reportText(r, month, lessons, decks, comment);
+  return (
+    <div className="report">
+      <p className="form-title">Report for {monthLabel(month)}{r.lang === "fr" ? ", in French" : ""}</p>
+      <Field label="Your comment (optional)"><textarea id={"report-note-" + r.id} className="inp" value={comment} placeholder={r.lang === "fr" ? "Très bons progrès ce mois-ci !" : "Great progress this month!"} onChange={(e) => setComment(e.target.value)} /></Field>
+      <p className="msg sel pre">{text}</p>
+      <div className="form-actions">
+        {r.phone && <WaButton phone={r.phone} text={text}>Send on WhatsApp</WaButton>}
+        <CopyButton text={text} label="Copy the report" caption="Copy report" />
+      </div>
+      {!r.phone && <p className="hint" style={{ margin: "10px 0 0" }}>Add their WhatsApp number with Edit student to send it in one tap.</p>}
+    </div>
+  );
+}
+
+function StudentDetail({ r, month, moneyOn, lessons, decks, placeOptions = [], defaultPlace = "", downloads, teacherName, onPay, onRemovePayment, onLogClass, onRemoveClass, onNewCode, onEdit, onRemove }) {
+  const [logPlace, setLogPlace] = useState(defaultPlace);
+  const [showCert, setShowCert] = useState(false);
+  const [min, max] = monthRange(month);
+  const [logDate, setLogDate] = useState(() => { const t = todayISO(); return t >= min && t <= max ? t : min; });
+  const logOk = logDate >= min && logDate <= max;
+  const [armed, setArmed] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  useEffect(() => { if (!armed) return undefined; const t = setTimeout(() => setArmed(false), 3000); return () => clearTimeout(t); }, [armed]);
+  const remaining = Math.max(0, r.fee - r.paid);
+  const [amount, setAmount] = useState(remaining ? String(remaining) : "");
+  const [date, setDate] = useState(todayISO());
+  const valid = Number(amount) > 0;
+  const save = () => { if (!valid) return; onPay(Number(amount), date); setAmount(""); };
+  return (
+    <div className="expand">
+      <div className="code-box">
+        <div className="code-main"><span className="muted small">Code</span><span className="code-big sel">{r.code}</span></div>
+        <div className="pay-actions">
+          {r.phone && <WaButton phone={r.phone} text={codeText(r, r.lang)} ghost>Send code</WaButton>}
+          <CopyButton text={codeText(r, r.lang)} label={`Copy a message with the code for ${r.name}`} caption="Copy message" />
+          <button type="button" className="btn ghost sm" onClick={() => { if (armed) { setArmed(false); onNewCode(); } else setArmed(true); }}>{armed ? "Tap again for a new code" : "New code"}</button>
+        </div>
+      </div>
+      <p className="hint" style={{ marginTop: 0 }}>A new code signs them out on every phone straight away.</p>
+      {moneyOn && (
+        <>
+          <div className="code-box">
+            <div className="code-main">
+              <span className="muted small">Classes in {monthLabel(month)}</span>
+              <span className="count-big">{r.classes ? `${Math.max(r.left, 0)} left` : `${r.used} taken`}</span>
+              {r.classes > 0 && <span className="muted small">{r.used} of {r.classes} taken{r.left < 0 ? `, ${-r.left} extra` : ""}</span>}
+            </div>
+            <div className="pay-actions">
+              <input id={"log-date-" + r.id} className="inp log-date" type="date" min={min} max={max} aria-label="Class date" value={logDate} onChange={(e) => setLogDate(e.target.value)} />
+              {placeOptions.length > 1 && <select id={"log-place-" + r.id} className="inp log-date" aria-label="Where" value={logPlace} onChange={(e) => setLogPlace(e.target.value)}>{placeOptions.map((p) => <option key={p} value={p}>{p}</option>)}</select>}
+              <button type="button" className="btn sm" disabled={!logOk} onClick={() => onLogClass(logDate, logPlace)}><Icon name="plus" size={16} />Log a class</button>
+            </div>
+            {r.takenList.length > 0 && (
+              <ul className="pay-list taken-list" aria-label="Classes taken">
+                {r.takenList.map((x) => (
+                  <li key={x.id}>
+                    <span>{fmtDate(x.date)}</span>
+                    <ConfirmButton iconOnly label={`Remove the class on ${fmtDate(x.date)}`} onConfirm={() => onRemoveClass(x.id)} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {!r.classes && <p className="hint" style={{ marginTop: 0 }}>Classes per month is set to 0 for this student. Change it with Edit student to see how many are left.</p>}
+          <p className="sub-h" style={{ marginTop: 14 }}>Payments in {monthLabel(month)}</p>
+        </>
+      )}
+      {moneyOn && r.pays.length > 0 && (
+        <ul className="pay-list">
+          {r.pays.map((p) => (
+            <li key={p.id}>
+              <span>{fmtDate(p.date)}</span>
+              <strong>{fcfa(p.amount)}</strong>
+              {r.phone ? <WaButton phone={r.phone} text={receiptText(r, p, month)} ghost>Receipt</WaButton> : <CopyButton text={receiptText(r, p, month)} label="Copy the receipt" caption="Copy receipt" />}
+              <ConfirmButton iconOnly label="Delete payment" onConfirm={() => onRemovePayment(p.id)} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {moneyOn && (
+        <>
+          <div className="grid2">
+            <Field label="Amount (FCFA)"><input id={"pay-amt-" + r.id} className="inp" type="number" inputMode="numeric" min="0" step="500" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
+            <Field label="Date paid"><input id={"pay-date-" + r.id} className="inp" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+          </div>
+          <p className="hint">This payment counts toward {monthLabel(month)}.</p>
+        </>
+      )}
+      <div className="form-actions">
+        {moneyOn && <button className="btn" onClick={save} disabled={!valid}>Save payment</button>}
+        {moneyOn && <button className="btn ghost sm" aria-expanded={showReport} onClick={() => setShowReport((s) => !s)}><Icon name="report" size={15} />{showReport ? "Hide report" : "Monthly report"}</button>}
+        <button className="btn ghost sm" aria-expanded={showCert} onClick={() => setShowCert((s) => !s)}><Icon name="spark" size={15} />{showCert ? "Hide certificate" : "Certificate"}</button>
+        <button className="btn ghost sm" onClick={onEdit}><Icon name="pencil" size={15} />Edit student</button>
+        <ConfirmButton label="Remove student" onConfirm={onRemove} />
+      </div>
+      {moneyOn && showReport && <StudentReport r={r} month={month} lessons={lessons} decks={decks} />}
+      {showCert && <CertificatePanel r={r} teacherName={teacherName} downloads={downloads} />}
+    </div>
+  );
+}
+
+function StudentsTeacher({ roster, saveRoster, pay, savePay, settings, saveSettings, lessons, decks, schedule = [], changes = [], places = [], downloads, teacherName, db, userId, flash }) {
+  const [month, setMonth] = useState(monthKey(new Date()));
+  const [form, setForm] = useState(null);
+  const [openId, setOpenId] = useState(null);
+  const money = useMoney(db, userId, month);
+  const moneyOn = money.enabled && !money.failed;
+  const att = useAttendance(moneyOn ? db : null, userId, month);
+  const saveFailed = (e) => flash(e && e.code === "quota_exceeded" ? "Your private storage is full. Delete some old records, then try again." : "That didn't save. Check your connection and try again.");
+  const groupNames = [...new Set(roster.map((r) => r.group).filter((g) => g && g !== EVERYONE))];
+  const ctx = { schedule, changes, places };
+  const rows = roster.map((s) => ({ ...s, ...studentMonth(s, money.fees, money.pays, att.taken, ctx) })).sort((a, b) => a.name.localeCompare(b.name));
+  const placeOptions = useMemo(() => {
+    const m = new Map();
+    [...schedule.map(placeName), ...places.map((p) => p.name), "Home"].forEach((n) => { if (n && !m.has(placeKey(n))) m.set(placeKey(n), n); });
+    return [...m.values()];
+  }, [schedule, places]);
+  const defaultPlaceOf = (r) => placeName(schedule.find((s) => s.group === r.group)) || placeOptions[0] || "";
+  const expected = rows.reduce((a, r) => a + r.fee, 0);
+  const collected = rows.reduce((a, r) => a + r.paid, 0);
+  const owed = rows.reduce((a, r) => a + Math.max(0, r.fee - r.paid), 0);
+  const cutTotals = {};
+  rows.forEach((r) => Object.keys(r.cutByPlace).forEach((p) => { cutTotals[p] = (cutTotals[p] || 0) + r.cutByPlace[p]; }));
+  const totalCut = Object.values(cutTotals).reduce((a, v) => a + v, 0);
+  const pct = expected ? Math.min(100, Math.round((collected / expected) * 100)) : 0;
+  const toPay = rows.filter((r) => r.fee > 0 && r.paid < r.fee);
+  const upd = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+  const submit = () => {
+    const name = form.name.trim();
+    if (!name) return;
+    if (form.phone.trim() && !waDigits(form.phone)) { flash("That WhatsApp number looks too short. Use the full number."); return; }
+    const id = form.id || uid();
+    const fee = Number(form.fee) || 0;
+    const prev = roster.find((r) => r.id === id);
+    const code = (prev && prev.code) || newCode(roster, id);
+    const entry = { id, name, group: form.group.trim() || name, code };
+    if (form.level) entry.level = form.level;
+    if (form.show && fee > 0) entry.due = fee;
+    saveRoster(form.id ? roster.map((r) => (r.id === id ? entry : r)) : [...roster, entry]);
+    if (moneyOn) {
+      const fees = { ...money.fees, [id]: {
+        fee, share: (money.fees[id] && Number(money.fees[id].share)) || 0,
+        classes: String(form.classes).trim() === "" ? null : Math.max(0, Math.round(Number(form.classes) || 0)),
+        phone: form.phone.trim(), lang: form.lang,
+      } };
+      money.saveFees(fees).catch(saveFailed);
+    }
+    setForm(null); flash(prev ? "Student saved." : `Saved. ${name}'s code is ${code}.`);
+  };
+  const removeStudent = (id) => {
+    saveRoster(roster.filter((r) => r.id !== id));
+    if (moneyOn && money.fees[id]) { const fees = { ...money.fees }; delete fees[id]; money.saveFees(fees).catch(saveFailed); }
+    setOpenId(null);
+  };
+  const addPayment = (studentId, amount, date) => {
+    money.savePays([...money.pays, { id: uid(), studentId, amount, date }]).then(() => flash("Payment saved."), saveFailed);
+  };
+  const editStudent = (r) => {
+    setForm({ id: r.id, name: r.name, group: r.group, fee: String(r.fee || r.due || ""), classes: r.classesCustom ? String(r.classes) : "", level: r.level || "", show: !!r.due, phone: r.phone, lang: r.lang });
+    setOpenId(null); window.scrollTo(0, 0);
+  };
+
+  return (
+    <section>
+      <div className="h-row">
+        <h2 className="h">Students</h2>
+        {!form && <button className="btn sm" onClick={() => setForm({ id: null, name: "", group: "", fee: "", classes: "", level: "", show: true, phone: "", lang: "fr" })}><Icon name="plus" size={16} />Add student</button>}
+      </div>
+      {!moneyOn && (
+        <p className="note">{money.enabled ? "Payments can't be loaded right now. Reload the page to try again." : "Sign in as the teacher to track fees and payments."}</p>
+      )}
+      {form && (
+        <div className="form">
+          <Field label="Name"><input id="st-name" className="inp" value={form.name} onChange={upd("name")} /></Field>
+          <Field label="Group"><input id="st-group" className="inp" list="bm-groups" value={form.group} placeholder="Family class, Online group A..." onChange={upd("group")} /></Field>
+          <datalist id="bm-groups">{groupNames.map((g) => <option key={g} value={g} />)}</datalist>
+          <p className="hint">Leave it empty for one-on-one classes. The student gets a group of their own. Each student gets a 4-number code to open the app.</p>
+          <div className="grid2">
+            <Field label="Monthly fee (FCFA)"><input id="st-fee" className="inp" type="number" inputMode="numeric" min="0" step="500" placeholder="50000" value={form.fee} onChange={upd("fee")} /></Field>
+            <Field label="Classes per month"><input id="st-classes" className="inp" type="number" inputMode="numeric" min="0" step="1" placeholder={String(DEFAULT_CLASSES)} value={form.classes} disabled={!moneyOn} onChange={upd("classes")} /></Field>
+          </div>
+          <p className="hint">Leave classes empty for {DEFAULT_CLASSES} a month (twice a week). Shares for places like the school are set in Business, then Settings.</p>
+          <Field label="Level"><select id="st-level" className="inp" value={form.level} onChange={upd("level")}><option value="">Not set</option>{LEVELS.map((l) => <option key={l.id} value={l.id}>{l.en}</option>)}</select></Field>
+          <div className="grid2">
+            <Field label="WhatsApp number (private)"><input id="st-phone" className="inp" type="tel" inputMode="tel" placeholder="07 00 00 00 00" value={form.phone} disabled={!moneyOn} onChange={upd("phone")} /></Field>
+            <Field label="Messages in">
+              <select id="st-lang" className="inp" value={form.lang} disabled={!moneyOn} onChange={upd("lang")}><option value="fr">French</option><option value="en">English</option></select>
+            </Field>
+          </div>
+          <p className="hint">For reminders, codes and monthly reports. Use the parent's number for children. Only you can see it.</p>
+          <label className="check"><input id="st-show" type="checkbox" checked={form.show} onChange={(e) => setForm({ ...form, show: e.target.checked })} />Show this fee on their Pay screen</label>
+          <p className="hint">The student sees their own fee. Anyone with the app link could find it in the page, so leave this off for fees you'd rather keep private.</p>
+          <div className="form-actions">
+            <button className="btn" onClick={submit} disabled={!form.name.trim()}>Save student</button>
+            <button className="btn ghost" onClick={() => setForm(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {roster.length === 0 ? (!form && <Empty text="Add your students. Each one gets a code to open the app, and you track their payments here." />) : (
+        <>
+          {moneyOn && (
+            <>
+              <div className="month-nav">
+                <button className="icon-btn" aria-label="Previous month" onClick={() => { setMonth((m) => shiftMonth(m, -1)); setOpenId(null); }}><Icon name="left" size={20} /></button>
+                <strong>{monthLabel(month)}</strong>
+                <button className="icon-btn" aria-label="Next month" onClick={() => { setMonth((m) => shiftMonth(m, 1)); setOpenId(null); }}><Icon name="right" size={20} /></button>
+              </div>
+              <div className="sum">
+                <p className="muted small">Collected{money.ready ? "" : " (loading)"}</p>
+                <p className="sum-big">{fcfa(collected)}</p>
+                <p className="muted small">of {fcfa(expected)} expected</p>
+                <div className="bar" role="img" aria-label={`${pct}% collected`}><i style={{ width: pct + "%" }} /></div>
+                <div className="sum-line"><span>Still owed</span><strong>{fcfa(owed)}</strong></div>
+                {Object.keys(cutTotals).map((p) => <div key={p} className="sum-line"><span>Share for {p}</span><strong>{fcfa(cutTotals[p])}</strong></div>)}
+                {totalCut > 0 && <div className="sum-line"><span>Yours after shares</span><strong>{fcfa(collected - totalCut)}</strong></div>}
+                {money.slow && <p className="hint" style={{ margin: "8px 0 0" }}>Payments can't be reached yet. What you see may be out of date.</p>}
+              </div>
+              {money.ready && toPay.length > 0 && (
+                <div className="remind">
+                  <p className="sub-h">Still to pay in {monthLabel(month)}</p>
+                  <ul>
+                    {toPay.map((r) => (
+                      <li key={r.id}>
+                        <span className="row-main"><span className="row-title">{r.name}</span><span className="row-sub">{fcfa(r.fee - r.paid)} left to pay</span></span>
+                        {r.phone
+                          ? <WaButton phone={r.phone} text={reminderText(r, month, pay)}>Remind</WaButton>
+                          : <button className="btn ghost sm" onClick={() => editStudent(r)}>Add number</button>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+          <ul className="rows">
+            {rows.map((r) => (
+              <li key={r.id}>
+                <button className="row-btn" aria-expanded={openId === r.id} onClick={() => setOpenId(openId === r.id ? null : r.id)}>
+                  <span className="row-main">
+                    <span className="row-title">{r.name}</span>
+                    <span className="row-sub">{r.group}, code {r.code}</span>
+                    {moneyOn && r.classes > 0 && (
+                      <span className={"left-line" + (r.left <= 0 ? " out" : r.left <= 2 ? " low" : "")}>
+                        {r.left >= 0 ? `${r.left} of ${r.classes} ${classWord(r.classes)} left` : `${-r.left} extra ${classWord(-r.left)} this month`}
+                      </span>
+                    )}
+                  </span>
+                  {moneyOn && (
+                    <span className="amt">
+                      <span className={"pill " + r.status}>{STATUS[r.status]}</span>
+                      <span className="row-sub">{num(r.paid)}{r.fee ? ` of ${num(r.fee)}` : ""}</span>
+                    </span>
+                  )}
+                </button>
+                {openId === r.id && (
+                  <StudentDetail key={r.id + month} r={r} month={month} moneyOn={moneyOn} lessons={lessons} decks={decks}
+                    placeOptions={placeOptions} defaultPlace={defaultPlaceOf(r)} downloads={downloads} teacherName={teacherName}
+                    onPay={(amount, date) => addPayment(r.id, amount, date)}
+                    onRemovePayment={(pid) => money.savePays(money.pays.filter((p) => p.id !== pid)).catch(saveFailed)}
+                    onLogClass={(date, place) => att.save([...att.taken, { id: uid(), studentId: r.id, date, place }]).then(() => flash("Class logged."), saveFailed)}
+                    onRemoveClass={(tid) => att.save(att.taken.filter((x) => x.id !== tid)).catch(saveFailed)}
+                    onNewCode={() => { const c = newCode(roster, r.id); saveRoster(roster.map((x) => (x.id === r.id ? { ...x, code: c } : x))); flash(`New code for ${r.name}: ${c}.`); }}
+                    onEdit={() => editStudent(r)}
+                    onRemove={() => removeStudent(r.id)} />
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <section className="pay-settings">
+        <h2 className="h">What students see</h2>
+        <label className="check"><input id="show-status" type="checkbox" checked={settings.showStatus} onChange={(e) => saveSettings({ ...settings, showStatus: e.target.checked })} />Show students their classes left and whether they've paid</label>
+        <p className="hint">They see it in Classes and Pay. It updates whenever you open the app, and anyone with a student's code can see that student's numbers.</p>
+      </section>
+      <PaySettings pay={pay} savePay={savePay} flash={flash} />
+    </section>
+  );
+}
+
+/* ---------- business records (private to the teacher) ---------- */
+function useBiz(db, userId) {
+  const path = db && userId ? "data/users/" + userId + "/biz" : "";
+  const [biz, setBiz] = useState({ places: [], schools: [], teacher: { name: "", phone: "" } });
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (!path) return undefined;
+    let un = () => {};
+    try {
+      un = db.doc(path).onSnapshot((s) => {
+        const d = (s.exists && s.data()) || {};
+        setBiz({ places: arr(d.places), schools: arr(d.schools), teacher: d.teacher && typeof d.teacher === "object" ? { name: d.teacher.name || "", phone: d.teacher.phone || "" } : { name: "", phone: "" } });
+        setReady(true);
+      }, () => setReady(true));
+    } catch (e) { setReady(true); }
+    return () => un();
+  }, [path]);
+  const save = (next) => { setBiz(next); return queuedSet(db.doc(path), next); };
+  return { on: !!path, ready, biz, save };
+}
+
+function useVisits(db, userId, month) {
+  const path = db && userId ? "data/users/" + userId + "/money/visits/" + month : "";
+  const [data, setData] = useState({ visits: [], paid: [] });
+  useEffect(() => {
+    if (!path) return undefined;
+    setData({ visits: [], paid: [] });
+    let un = () => {};
+    try {
+      un = db.doc(path).onSnapshot((s) => {
+        const d = (s.exists && s.data()) || {};
+        setData({ visits: arr(d.visits), paid: arr(d.paid) });
+      }, () => {});
+    } catch (e) { /* unavailable */ }
+    return () => un();
+  }, [path]);
+  const save = (next) => { setData(next); return queuedSet(db.doc(path), next); };
+  return { on: !!path, data, save };
+}
+
+function useLibrary(db, userId) {
+  const path = db && userId ? "data/users/" + userId + "/money" : "";
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    if (!path) return undefined;
+    let un = () => {};
+    try {
+      un = db.doc(path).collection("library").onSnapshot((qs) => setItems(qs.docs.map((d) => ({ id: d.id, ...d.data() }))), () => {});
+    } catch (e) { /* unavailable */ }
+    return () => un();
+  }, [path]);
+  const save = (plan) => db.doc(path).collection("library").doc(plan.id).set({ title: plan.title, level: plan.level, notes: plan.notes, homework: plan.homework, saved: todayISO() });
+  const remove = (id) => db.doc(path).collection("library").doc(id).delete();
+  return { on: !!path, items, save, remove };
+}
+
+/* ---------- Claude as a teaching helper (teacher only) ---------- */
+const listPrompt = (topic) => `You help an English teacher in Côte d'Ivoire make vocabulary lists for French-speaking students.
+Request: ${topic}
+Make 12 useful English words or short phrases for this request, unless it asks for a different number (at most 25). For each, give the French meaning (with the article for nouns) and one short, simple English example sentence that suits these learners.
+Reply with only JSON in this shape: {"title": "short list name in English", "words": [{"en": "kitchen", "fr": "la cuisine", "ex": "We cook in the kitchen."}]}`;
+const lessonPrompt = (topic) => `You help an English teacher in Côte d'Ivoire plan a lesson of about one hour for French-speaking learners.
+Request: ${topic}
+Write a short lesson title; lesson notes the students will read after class (key words with their French meaning, two or three example sentences, and one short dialogue or activity), under 130 words; and a homework task that takes about 15 minutes. For a conversation lesson, make the notes a list of discussion questions with useful phrases.
+Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework": "..."}`;
+
+function AskClaude({ sample, title, label, placeholder, button, makePrompt, onResult }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [gone, setGone] = useState(false);
+  const ctl = useRef(null);
+  if (!sample) return null;
+  if (gone) return <p className="hint">Claude isn't available in this view. Reload the page to be asked again.</p>;
+  const run = async () => {
+    if (!text.trim() || busy) return;
+    setBusy(true); setMsg("Thinking. This can take up to a minute.");
+    ctl.current = new AbortController();
+    try {
+      const data = await sample.json(makePrompt(text.trim()), { signal: ctl.current.signal, cache: false });
+      if (onResult(data) === false) setMsg("Claude's answer didn't come out right. Try again, or change the request.");
+      else { setMsg(""); setText(""); }
+    } catch (e) {
+      const code = e && e.code;
+      if (code === "cancelled") setMsg("");
+      else if (["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed"].includes(code)) setGone(true);
+      else if (code === "rate_limited") setMsg("Claude is busy, or you've reached your usage limit. Try again later.");
+      else if (["invalid_json", "empty_completion", "refused"].includes(code)) setMsg("Claude's answer didn't come out right. Try again, or change the request.");
+      else setMsg("Something went wrong. Check your connection and try again.");
+    } finally { setBusy(false); }
+  };
+  return (
+    <div className="ask">
+      <p className="form-title"><Icon name="spark" size={16} />{title}</p>
+      <div className="inline-add" style={{ marginBottom: msg ? 8 : 0 }}>
+        <input className="inp" aria-label={label} placeholder={placeholder} value={text} disabled={busy}
+          onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && run()} />
+        {busy
+          ? <button className="btn ghost" onClick={() => ctl.current && ctl.current.abort()}>Stop</button>
+          : <button className="btn" onClick={run} disabled={!text.trim()}>{button}</button>}
+      </div>
+      {msg && <p className="hint" role="status" style={{ margin: 0 }}>{msg}</p>}
+    </div>
+  );
+}
+
+/* ---------- lesson library ---------- */
+function Library({ items, onUse, onRemove }) {
+  if (!items.length) return <Empty text="Your library is empty. Open a lesson and tap Save to library, then reuse it with any group." />;
+  const levelOf = (p) => (AUDIENCES.includes(p.level) ? p.level : "Other");
+  return (
+    <>
+      {[...AUDIENCES, "Other"].map((level) => {
+        const list = items.filter((p) => levelOf(p) === level).sort((a, b) => String(a.title).localeCompare(String(b.title)));
+        if (!list.length) return null;
+        return (
+          <div key={level} className="day-block">
+            <p className="day-name">{level}</p>
+            <ul className="rows">
+              {list.map((p) => (
+                <li key={p.id} className="lib-row">
+                  <div className="row-main">
+                    <span className="row-title">{p.title}</span>
+                    {p.notes && <span className="row-sub clamp">{p.notes}</span>}
+                  </div>
+                  <div className="pay-actions">
+                    <button className="btn sm" onClick={() => onUse(p)}>Use</button>
+                    <ConfirmButton iconOnly label={`Delete ${p.title}`} onConfirm={() => onRemove(p.id)} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+/* ---------- cancelling and moving a class ---------- */
+function upcomingClasses(slots, changes, now, days = 14) {
+  const out = [];
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  for (let k = 0; k < days; k++) {
+    const d = new Date(start); d.setDate(start.getDate() + k);
+    const iso = isoOf(d);
+    const wd = (d.getDay() + 6) % 7;
+    slots.forEach((s) => {
+      if (Number(s.day) !== wd) return;
+      if (changes.some((c) => c.slot === s.id && c.date === iso)) return;
+      const [h, m] = (s.start || "00:00").split(":").map(Number);
+      const at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m);
+      if (at.getTime() + (Number(s.minutes) || 60) * 60000 <= now.getTime()) return;
+      out.push({ s, at, date: iso, key: s.id });
+    });
+  }
+  changes.forEach((c) => {
+    if (!c.makeup) return;
+    const s = slots.find((x) => x.id === c.slot);
+    if (!s) return;
+    const [h, m] = (c.makeup.start || "00:00").split(":").map(Number);
+    const md = parseISO(c.makeup.date);
+    const at = new Date(md.getFullYear(), md.getMonth(), md.getDate(), h, m);
+    if (at.getTime() + (Number(s.minutes) || 60) * 60000 <= now.getTime()) return;
+    out.push({ s, at, date: c.makeup.date, key: c.id, makeup: true });
+  });
+  return out.sort((a, b) => a.at - b.at);
+}
+function nextDatesOf(slot, count = 6) {
+  const out = [];
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  for (let k = 0; k < 60 && out.length < count; k++) {
+    if ((d.getDay() + 6) % 7 === Number(slot.day)) out.push(isoOf(d));
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
+function changeNotice(c, s) {
+  const fr = `Cours du ${fmtDate(c.date, "fr")} à ${s.start} annulé.` + (c.makeup ? ` Rattrapage le ${fmtDate(c.makeup.date, "fr")} à ${c.makeup.start}.` : "");
+  const en = `The class on ${fmtDate(c.date, "en")} at ${s.start} is cancelled.` + (c.makeup ? ` Make-up class on ${fmtDate(c.makeup.date, "en")} at ${c.makeup.start}.` : "");
+  return fr + "\n" + en + (c.note ? "\n" + c.note : "");
+}
+
+function ChangeForm({ slot, change, onSave, onCancel }) {
+  const dates = change ? [change.date] : nextDatesOf(slot);
+  const [date, setDate] = useState(dates[0]);
+  const [note, setNote] = useState(change ? change.note || "" : "");
+  const [withMakeup, setWithMakeup] = useState(!!change);
+  const [mDate, setMDate] = useState(change && change.makeup ? change.makeup.date : "");
+  const [mStart, setMStart] = useState(change && change.makeup ? change.makeup.start : slot.start);
+  const [err, setErr] = useState("");
+  const save = () => {
+    if (withMakeup && (!mDate || mDate < todayISO() || !mStart)) { setErr("Pick a make-up date from today on, and a start time."); return; }
+    onSave({ date, note: note.trim(), makeup: withMakeup ? { date: mDate, start: mStart } : null });
+  };
+  return (
+    <div className="form">
+      <p className="form-title">{change ? "Schedule the make-up class" : "Cancel or move a class"}: {slot.group}, {DAYS.en[slot.day]} {slot.start}</p>
+      {!change && (
+        <Field label="Which class">
+          <select id="chg-date" className="inp" value={date} onChange={(e) => setDate(e.target.value)}>{dates.map((d) => <option key={d} value={d}>{fmtDate(d)}</option>)}</select>
+        </Field>
+      )}
+      {!change && <Field label="Note for students (optional)"><input id="chg-note" className="inp" value={note} placeholder="Sorry, I have a football match." onChange={(e) => setNote(e.target.value)} /></Field>}
+      {!change && <label className="check"><input id="chg-makeup" type="checkbox" checked={withMakeup} onChange={(e) => setWithMakeup(e.target.checked)} />Move it: schedule a make-up class now</label>}
+      {withMakeup && (
+        <div className="grid2">
+          <Field label="Make-up date"><input id="chg-mdate" className="inp" type="date" min={todayISO()} value={mDate} onChange={(e) => setMDate(e.target.value)} /></Field>
+          <Field label="Starts at"><input id="chg-mstart" className="inp" type="time" value={mStart} onChange={(e) => setMStart(e.target.value)} /></Field>
+        </div>
+      )}
+      {!change && !withMakeup && <p className="hint">The class goes on your list of make-ups you owe. Students won't be counted for it.</p>}
+      <p className="hint">The group gets an announcement in French and English automatically.</p>
+      {err && <p className="err" role="alert">{err}</p>}
+      <div className="form-actions">
+        <button className="btn" onClick={save}>{change ? "Save make-up class" : withMakeup ? "Move class" : "Cancel class"}</button>
+        <button className="btn ghost" onClick={onCancel}>Go back</button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- receipts, school invoices, certificates ---------- */
+function receiptText(r, p, month) {
+  const fr = r.lang === "fr";
+  const m = monthLabel(month, r.lang);
+  const rest = Math.max(0, r.fee - r.paid);
+  const no = `${month.replace("-", "")}-${String(p.id).slice(0, 4).toUpperCase()}`;
+  if (fr) return [`Reçu Bright Minds N° ${no}`, `Élève : ${r.name}`, `Montant reçu : ${fcfa(p.amount)}`, `Pour : ${m}`, `Date : ${fmtDate(p.date, "fr")}`, r.fee ? (rest > 0 ? `Reste à payer : ${fcfa(rest)}` : `${cap(m)} réglé.`) : "", "Merci !"].filter(Boolean).join("\n");
+  return [`Bright Minds receipt No. ${no}`, `Student: ${r.name}`, `Amount received: ${fcfa(p.amount)}`, `For: ${m}`, `Date: ${fmtDate(p.date, "en")}`, r.fee ? (rest > 0 ? `Still to pay: ${fcfa(rest)}` : `${cap(m)} is fully paid.`) : "", "Thank you!"].filter(Boolean).join("\n");
+}
+function schoolSummary(r, month) {
+  const fr = r.lang !== "en";
+  const m = monthLabel(month, fr ? "fr" : "en");
+  const who = r.contact || r.name;
+  const rest = Math.max(0, r.due - r.paid);
+  if (fr) return `Bonjour ${who}, voici le récapitulatif des cours d'anglais Bright Minds pour ${m} : ${r.vs.length} séance${r.vs.length > 1 ? "s" : ""}, ${plainNum(r.hours, 2)} heure${r.hours > 1 ? "s" : ""}. Total : ${fcfa(r.due)}${r.paid > 0 ? `, déjà payé ${fcfa(r.paid)}, reste ${fcfa(rest)}` : ""}. Je vous envoie la facture N° ${r.number}. Merci !`;
+  return `Hello ${who}, here is the Bright Minds English classes summary for ${m}: ${r.vs.length} visit${r.vs.length === 1 ? "" : "s"}, ${plainNum(r.hours, 2)} hours. Total: ${fcfa(r.due)}${r.paid > 0 ? `, already paid ${fcfa(r.paid)}, balance ${fcfa(rest)}` : ""}. I'm sending invoice No. ${r.number}. Thank you!`;
+}
+function winAnsi(s) {
+  return Array.from(String(s)).map((ch) => {
+    const c = ch.charCodeAt(0);
+    if (c < 256) return ch;
+    if (c === 0x2018 || c === 0x2019) return "'";
+    if (c === 0x201c || c === 0x201d) return '"';
+    if (c === 0x2013 || c === 0x2014) return "-";
+    if (c === 0x2026) return "...";
+    if (c === 0x202f || c === 0x2009) return " ";
+    return "?";
+  }).join("");
+}
+async function invoicePdf({ school, visits, hours, due, paid, month, number, teacher, pay }) {
+  const PDFLib = await loadScript(PDF_LIB, "PDFLib");
+  const { PDFDocument, StandardFonts, rgb } = PDFLib;
+  const L = school.lang === "en" ? "en" : "fr";
+  const fr = L === "fr";
+  const doc = await PDFDocument.create();
+  doc.setTitle(winAnsi(`${fr ? "Facture" : "Invoice"} ${number}`));
+  const W = 595.28, H = 841.89;
+  const page = doc.addPage([W, H]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const ink = rgb(0.11, 0.16, 0.42), soft = rgb(0.35, 0.38, 0.55), red = rgb(0.86, 0.23, 0.33), rule = rgb(0.85, 0.86, 0.94), band = rgb(0.95, 0.96, 0.99);
+  const text = (s, x, y, size = 11, f = font, color = ink) => page.drawText(winAnsi(s), { x, y, size, font: f, color });
+  const right = (s, xr, y, size = 11, f = font, color = ink) => text(s, xr - f.widthOfTextAtSize(winAnsi(s), size), y, size, f, color);
+  const wrap = (s, x, y, maxW, size = 10, f = font, color = ink) => {
+    let line = "", yy = y;
+    winAnsi(s).split(" ").forEach((w) => {
+      const tryLine = line ? line + " " + w : w;
+      if (f.widthOfTextAtSize(tryLine, size) > maxW && line) { text(line, x, yy, size, f, color); yy -= size + 4; line = w; } else line = tryLine;
+    });
+    if (line) { text(line, x, yy, size, f, color); yy -= size + 4; }
+    return yy;
+  };
+  const X = 78, R = W - 52;
+  page.drawRectangle({ x: 58, y: 0, width: 1.5, height: H, color: red });
+  let y = H - 64;
+  text("Bright Minds", X, y, 24, bold);
+  right(fr ? "FACTURE" : "INVOICE", R, y + 2, 18, bold);
+  y -= 18;
+  text(fr ? "Cours d'anglais" : "English classes", X, y, 11, font, soft);
+  right(`${fr ? "N°" : "No."} ${number}`, R, y, 11);
+  y -= 16;
+  if (teacher.name) text(teacher.name, X, y);
+  right(`Date : ${new Date().toLocaleDateString(LOCALE[L], { day: "numeric", month: "long", year: "numeric" })}`, R, y);
+  y -= 14;
+  if (teacher.phone) text(teacher.phone, X, y);
+  y -= 42;
+  text(fr ? "Facturé à" : "Billed to", X, y, 10, bold, soft);
+  y -= 17; text(school.name, X, y, 13, bold);
+  if (school.contact) { y -= 15; text(`${fr ? "À l'attention de" : "Attention:"} ${school.contact}`, X, y); }
+  y -= 26;
+  text(`${fr ? "Période :" : "Period:"} ${monthLabel(month, L)}`, X, y, 11, bold);
+  y -= 34;
+  page.drawRectangle({ x: X - 8, y: y - 7, width: R - X + 14, height: 24, color: band });
+  text("Description", X, y, 10, bold);
+  right(fr ? "Quantité" : "Quantity", 350, y, 10, bold);
+  right(fr ? "Prix (FCFA)" : "Price (FCFA)", 445, y, 10, bold);
+  right("Total (FCFA)", R, y, 10, bold);
+  y -= 26;
+  const row = (desc, qty, price, total) => {
+    text(desc, X, y); right(qty, 350, y); right(price, 445, y); right(total, R, y);
+    y -= 9; page.drawLine({ start: { x: X - 8, y }, end: { x: R + 6, y }, thickness: 0.6, color: rule }); y -= 17;
+  };
+  row(fr ? "Cours d'anglais (heures)" : "English classes (hours)", plainNum(hours, 2), plainNum(school.rate), plainNum(hours * school.rate));
+  if (school.transport) row(fr ? "Transport (déplacements)" : "Transport (visits)", String(visits.length), plainNum(school.transport), plainNum(visits.length * school.transport));
+  y -= 4;
+  right(`TOTAL : ${plainNum(due)} FCFA`, R, y, 13, bold);
+  if (paid > 0) {
+    y -= 18; right(`${fr ? "Déjà payé :" : "Already paid:"} ${plainNum(paid)} FCFA`, R, y, 11, font, soft);
+    y -= 16; right(`${fr ? "Reste à payer :" : "Balance due:"} ${plainNum(Math.max(0, due - paid))} FCFA`, R, y, 11, bold);
+  }
+  y -= 36;
+  text(fr ? "Détail des séances" : "Sessions", X, y, 10, bold, soft);
+  y -= 16;
+  y = wrap(visits.map((x) => `${fmtShort(x.date, L)} (${plainNum(x.hours, 2)} h)`).join(", ") || "-", X, y, R - X);
+  const methods = pay.methods.filter((m) => m.number);
+  if (methods.length) {
+    y -= 18; text(fr ? "Paiement" : "Payment", X, y, 10, bold, soft); y -= 16;
+    methods.forEach((m) => { text(`${m.kind} : ${m.number}${pay.accountName ? ` (${fr ? "au nom de" : "name:"} ${pay.accountName})` : ""}`, X, y, 10); y -= 14; });
+  }
+  y -= 22;
+  text(fr ? "Merci pour votre confiance." : "Thank you for your trust.", X, y, 11, font, soft);
+  const bytes = await doc.save();
+  return new Blob([bytes], { type: "application/pdf" });
+}
+
+async function drawCertificate({ name, level, lang, teacher }) {
+  const W = 1600, H = 1131;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const g = c.getContext("2d");
+  try { await Promise.all([document.fonts.load('60px "Playwrite FR Moderne"'), document.fonts.load('bold 90px "Atkinson Hyperlegible"'), document.fonts.load('34px "Atkinson Hyperlegible"')]); } catch (e) { /* fallback fonts */ }
+  const fr = lang === "fr";
+  const ink = "#1C2A6B", soft = "#59628C";
+  g.fillStyle = "#FBFBFE"; g.fillRect(0, 0, W, H);
+  for (let y = 70; y < H - 60; y += 16) { g.fillStyle = (y - 70) % 64 === 0 ? "#CDD0F0" : "#E7E9F8"; g.fillRect(70, y, W - 140, 1.5); }
+  g.fillStyle = "#DB3B55"; g.fillRect(200, 62, 4, H - 124);
+  g.strokeStyle = ink; g.lineWidth = 12; g.strokeRect(34, 34, W - 68, H - 68);
+  g.lineWidth = 2; g.strokeRect(62, 62, W - 124, H - 124);
+  const cx = (W + 204) / 2;
+  g.textAlign = "center"; g.textBaseline = "alphabetic";
+  g.fillStyle = ink; g.font = '62px "Playwrite FR Moderne", "Segoe Script", cursive';
+  g.fillText(fr ? "Certificat de réussite" : "Certificate of Achievement", cx, 260);
+  g.fillStyle = soft; g.font = 'bold 30px "Atkinson Hyperlegible", sans-serif';
+  g.fillText("Bright Minds", cx, 330);
+  g.font = '34px "Atkinson Hyperlegible", sans-serif';
+  g.fillText(fr ? "Nous certifions que" : "This certifies that", cx, 430);
+  let size = 100;
+  g.font = `bold ${size}px "Atkinson Hyperlegible", sans-serif`;
+  while (g.measureText(name).width > W - 520 && size > 48) { size -= 4; g.font = `bold ${size}px "Atkinson Hyperlegible", sans-serif`; }
+  const nw = g.measureText(name).width;
+  g.fillStyle = "#FFE45C"; g.fillRect(cx - nw / 2 - 16, 560 - size * 0.34, nw + 32, size * 0.4);
+  g.fillStyle = ink; g.fillText(name, cx, 560);
+  g.font = '38px "Atkinson Hyperlegible", sans-serif';
+  g.fillText(fr ? `a terminé avec succès le niveau ${level} en anglais.` : `has successfully completed the ${level} level in English.`, cx, 660);
+  g.textAlign = "left"; g.fillStyle = soft; g.font = '30px "Atkinson Hyperlegible", sans-serif';
+  const dateText = new Date().toLocaleDateString(LOCALE[lang], { day: "numeric", month: "long", year: "numeric" });
+  g.fillText(fr ? `Fait le ${dateText}` : `Date: ${dateText}`, 260, 930);
+  g.textAlign = "center";
+  g.fillStyle = ink; g.fillRect(1020, 900, 420, 2);
+  g.font = 'bold 32px "Atkinson Hyperlegible", sans-serif';
+  if (teacher) g.fillText(teacher, 1230, 950);
+  g.fillStyle = soft; g.font = '28px "Atkinson Hyperlegible", sans-serif';
+  g.fillText(fr ? "Professeur d'anglais" : "English teacher", 1230, teacher ? 990 : 950);
+  return c;
+}
+
+function CertificatePanel({ r, teacherName, downloads }) {
+  const [level, setLevel] = useState(r.level || "beginner");
+  const [lang, setLang] = useState(r.lang);
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const canvas = useRef(null);
+  const make = async () => {
+    setBusy(true); setMsg("");
+    try { const c = await drawCertificate({ name: r.name, level: levelName(level, lang), lang, teacher: teacherName }); canvas.current = c; setUrl(c.toDataURL("image/png")); }
+    catch (e) { setMsg("The certificate couldn't be made. Try again."); }
+    setBusy(false);
+  };
+  const save = () => {
+    if (!canvas.current) return;
+    if (!downloads) { setMsg("Saving files isn't available in this view. Press and hold the picture to save it."); return; }
+    canvas.current.toBlob(async (blob) => {
+      try { await downloads.save({ filename: `Certificate-${fileSafe(r.name)}.png`, data: blob }); setMsg("Saved. Send it to the family on WhatsApp."); }
+      catch (e) { setMsg(e && e.code === "declined" ? "" : "The picture couldn't be saved. Try again."); }
+    }, "image/png");
+  };
+  return (
+    <div className="report">
+      <p className="form-title">Certificate</p>
+      <div className="grid2">
+        <Field label="Level completed"><select id={"cert-level-" + r.id} className="inp" value={level} onChange={(e) => { setLevel(e.target.value); setUrl(""); }}>{LEVELS.map((l) => <option key={l.id} value={l.id}>{l.en}</option>)}</select></Field>
+        <Field label="Language"><select id={"cert-lang-" + r.id} className="inp" value={lang} onChange={(e) => { setLang(e.target.value); setUrl(""); }}><option value="fr">French</option><option value="en">English</option></select></Field>
+      </div>
+      {!teacherName && <p className="hint">Add your name in Business, then Settings, to sign the certificate.</p>}
+      <div className="form-actions">
+        <button className="btn" onClick={make} disabled={busy}>{busy ? "Making..." : url ? "Make it again" : "Make certificate"}</button>
+        {url && <button className="btn ghost" onClick={save}>Save picture</button>}
+      </div>
+      {url && <img className="cert-img" src={url} alt={`Certificate for ${r.name}`} />}
+      {msg && <p className="hint" role="status" style={{ margin: "10px 0 0" }}>{msg}</p>}
+    </div>
+  );
+}
+
+/* ---------- Business tab: schools ---------- */
+function SchoolDetail({ r, month, v, teacher, pay, downloads, flash, fail, onEdit, onRemove }) {
+  const [min, max] = monthRange(month);
+  const [date, setDate] = useState(() => { const t = todayISO(); return t >= min && t <= max ? t : min; });
+  const [hours, setHours] = useState("1.5");
+  const rest = Math.max(0, r.due - r.paid);
+  const [amountIn, setAmount] = useState(null);
+  const amount = amountIn === null ? (rest ? String(rest) : "") : amountIn;
+  const [busy, setBusy] = useState(false);
+  const lang = r.lang === "en" ? "en" : "fr";
+  const h = Number(String(hours).replace(",", "."));
+  const logVisit = () => {
+    if (!(h > 0) || date < min || date > max) return;
+    v.save({ ...v.data, visits: [...v.data.visits, { id: uid(), schoolId: r.id, date, hours: h }] }).then(() => flash("Visit logged."), fail);
+  };
+  const recordPay = () => {
+    const a = Number(amount);
+    if (!(a > 0)) return;
+    v.save({ ...v.data, paid: [...v.data.paid, { id: uid(), schoolId: r.id, amount: a, date: todayISO() }] }).then(() => { flash("Payment recorded."); setAmount(null); }, fail);
+  };
+  const invoice = async () => {
+    if (!downloads) { flash("Saving files isn't available in this browser."); return; }
+    setBusy(true);
+    try {
+      const blob = await invoicePdf({ school: r, visits: r.vs, hours: r.hours, due: r.due, paid: r.paid, month, number: r.number, teacher, pay });
+      await downloads.save({ filename: `${lang === "fr" ? "Facture" : "Invoice"}-${fileSafe(r.name)}-${month}.pdf`, data: blob });
+      flash("Invoice saved. Send it to the school on WhatsApp.");
+    } catch (e) {
+      if (!(e && e.code === "declined")) flash(e && e.message === "load failed" ? "The invoice maker couldn't load. Check your connection and try again." : "The invoice couldn't be made. Try again.");
+    }
+    setBusy(false);
+  };
+  const summary = schoolSummary(r, month);
+  return (
+    <div className="expand">
+      <p className="hint" style={{ marginTop: 0 }}>{fcfa(r.rate)} an hour{r.transport ? `, plus ${fcfa(r.transport)} transport per visit` : ""}. Invoices in {lang === "fr" ? "French" : "English"}.</p>
+      <div className="code-box">
+        <div className="code-main">
+          <span className="muted small">Visits in {monthLabel(month)}</span>
+          <span className="count-big">{fcfa(r.due)}</span>
+          <span className="muted small">{r.vs.length} {r.vs.length === 1 ? "visit" : "visits"}, {plainNum(r.hours, 2)} hours{r.paid ? `, ${fcfa(r.paid)} paid` : ""}</span>
+        </div>
+        <div className="pay-actions">
+          <input id={"visit-date-" + r.id} className="inp log-date" type="date" min={min} max={max} aria-label="Visit date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <input id={"visit-hours-" + r.id} className="inp log-date hours-inp" type="number" inputMode="decimal" min="0.5" step="0.5" aria-label="Hours" value={hours} onChange={(e) => setHours(e.target.value)} />
+          <button type="button" className="btn sm" disabled={!(h > 0)} onClick={logVisit}><Icon name="plus" size={16} />Log visit</button>
+        </div>
+        {r.vs.length > 0 && (
+          <ul className="pay-list taken-list" aria-label="Visits">
+            {r.vs.map((x) => (
+              <li key={x.id}><span>{fmtDate(x.date)}</span><strong>{plainNum(x.hours, 2)} h</strong>
+                <ConfirmButton iconOnly label={`Remove the visit on ${fmtDate(x.date)}`} onConfirm={() => v.save({ ...v.data, visits: v.data.visits.filter((y) => y.id !== x.id) }).catch(fail)} /></li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="form-actions" style={{ marginBottom: 14 }}>
+        <button className="btn" onClick={invoice} disabled={busy || !r.vs.length}><Icon name="report" size={16} />{busy ? "Making invoice..." : "Invoice (PDF)"}</button>
+        {r.phone ? <WaButton phone={r.phone} text={summary} ghost>Send summary</WaButton> : <CopyButton text={summary} label="Copy the summary" caption="Copy summary" />}
+      </div>
+      <p className="sub-h">Payments from the school</p>
+      {r.pays.length > 0 && (
+        <ul className="pay-list">
+          {r.pays.map((p) => (
+            <li key={p.id}><span>{fmtDate(p.date)}</span><strong>{fcfa(p.amount)}</strong>
+              <ConfirmButton iconOnly label="Delete payment" onConfirm={() => v.save({ ...v.data, paid: v.data.paid.filter((y) => y.id !== p.id) }).catch(fail)} /></li>
+          ))}
+        </ul>
+      )}
+      <div className="inline-add">
+        <input id={"school-pay-" + r.id} className="inp" type="number" inputMode="numeric" min="0" step="500" aria-label="Amount paid (FCFA)" placeholder="Amount (FCFA)" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        <button className="btn" onClick={recordPay} disabled={!(Number(amount) > 0)}>Record payment</button>
+      </div>
+      <div className="form-actions">
+        <button className="btn ghost sm" onClick={onEdit}><Icon name="pencil" size={15} />Edit school</button>
+        <ConfirmButton label="Remove school" onConfirm={onRemove} />
+      </div>
+    </div>
+  );
+}
+
+function SchoolsSection({ biz, saveBiz, db, userId, flash, pay, downloads }) {
+  const [month, setMonth] = useState(monthKey(new Date()));
+  const v = useVisits(db, userId, month);
+  const [form, setForm] = useState(null);
+  const [err, setErr] = useState("");
+  const [openId, setOpenId] = useState(null);
+  const fail = () => flash("That didn't save. Check your connection and try again.");
+  const teacher = { name: biz.teacher.name || pay.accountName, phone: biz.teacher.phone || pay.whatsapp };
+  const upd = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const submit = () => {
+    const name = form.name.trim();
+    if (!name) { setErr("Add the school's name."); return; }
+    if (!(Number(form.rate) > 0)) { setErr("Add the hourly rate in FCFA."); return; }
+    if (form.phone.trim() && !waDigits(form.phone)) { setErr("That WhatsApp number looks too short. Use the full number."); return; }
+    const s = { id: form.id || uid(), name, contact: form.contact.trim(), phone: form.phone.trim(), rate: Number(form.rate), transport: Number(form.transport) || 0, lang: form.lang };
+    saveBiz({ ...biz, schools: form.id ? biz.schools.map((x) => (x.id === s.id ? s : x)) : [...biz.schools, s] }).then(() => flash("School saved."), fail);
+    setForm(null); setErr("");
+  };
+  const rows = biz.schools.map((s, i) => {
+    const vs = v.data.visits.filter((x) => x.schoolId === s.id).sort((a, b) => a.date.localeCompare(b.date));
+    const hours = vs.reduce((a, x) => a + (Number(x.hours) || 0), 0);
+    const due = hours * s.rate + vs.length * (s.transport || 0);
+    const pays = v.data.paid.filter((x) => x.schoolId === s.id);
+    const paid = pays.reduce((a, x) => a + (Number(x.amount) || 0), 0);
+    return { ...s, vs, hours, due, paid, pays, number: `BM-${month.replace("-", "")}-${pad(i + 1)}` };
+  });
+  const totalDue = rows.reduce((a, r) => a + r.due, 0);
+  const totalPaid = rows.reduce((a, r) => a + r.paid, 0);
+  return (
+    <div>
+      <div className="h-row">
+        <p className="sub-h" style={{ margin: 0 }}>Schools you visit</p>
+        {!form && <button className="btn sm" onClick={() => { setErr(""); setForm({ id: null, name: "", contact: "", phone: "", rate: "", transport: "", lang: "fr" }); }}><Icon name="plus" size={16} />Add school</button>}
+      </div>
+      {form && (
+        <div className="form">
+          <Field label="School name"><input id="sc-name" className="inp" value={form.name} onChange={upd("name")} /></Field>
+          <div className="grid2">
+            <Field label="Contact person"><input id="sc-contact" className="inp" value={form.contact} placeholder="The director" onChange={upd("contact")} /></Field>
+            <Field label="Their WhatsApp"><input id="sc-phone" className="inp" type="tel" inputMode="tel" placeholder="07 00 00 00 00" value={form.phone} onChange={upd("phone")} /></Field>
+            <Field label="Rate per hour (FCFA)"><input id="sc-rate" className="inp" type="number" inputMode="numeric" min="0" step="500" placeholder="12500" value={form.rate} onChange={upd("rate")} /></Field>
+            <Field label="Transport per visit (FCFA)"><input id="sc-transport" className="inp" type="number" inputMode="numeric" min="0" step="500" placeholder="0" value={form.transport} onChange={upd("transport")} /></Field>
+          </div>
+          <Field label="Invoice language"><select id="sc-lang" className="inp" value={form.lang} onChange={upd("lang")}><option value="fr">French</option><option value="en">English</option></select></Field>
+          {err && <p className="err" role="alert">{err}</p>}
+          <div className="form-actions">
+            <button className="btn" onClick={submit}>Save school</button>
+            <button className="btn ghost" onClick={() => { setForm(null); setErr(""); }}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {rows.length === 0 ? (!form && <Empty text="Add a school you teach at. Log each visit, and the app makes the monthly invoice for you." />) : (
+        <>
+          <div className="month-nav">
+            <button className="icon-btn" aria-label="Previous month" onClick={() => { setMonth((m) => shiftMonth(m, -1)); setOpenId(null); }}><Icon name="left" size={20} /></button>
+            <strong>{monthLabel(month)}</strong>
+            <button className="icon-btn" aria-label="Next month" onClick={() => { setMonth((m) => shiftMonth(m, 1)); setOpenId(null); }}><Icon name="right" size={20} /></button>
+          </div>
+          <div className="sum">
+            <p className="muted small">Due from schools</p>
+            <p className="sum-big">{fcfa(totalDue)}</p>
+            <div className="sum-line"><span>Paid so far</span><strong>{fcfa(totalPaid)}</strong></div>
+          </div>
+          <ul className="rows">
+            {rows.map((r) => (
+              <li key={r.id}>
+                <button className="row-btn" aria-expanded={openId === r.id} onClick={() => setOpenId(openId === r.id ? null : r.id)}>
+                  <span className="row-main"><span className="row-title">{r.name}</span><span className="row-sub">{r.vs.length} {r.vs.length === 1 ? "visit" : "visits"}, {plainNum(r.hours, 2)} hours</span></span>
+                  <span className="amt">
+                    <span className={"pill " + (r.due === 0 ? "none" : r.paid >= r.due ? "paid" : r.paid > 0 ? "partial" : "unpaid")}>{r.due === 0 ? "No visits" : r.paid >= r.due ? "Paid" : r.paid > 0 ? "Part paid" : "Not paid"}</span>
+                    <span className="row-sub">{num(r.due)} FCFA</span>
+                  </span>
+                </button>
+                {openId === r.id && (
+                  <SchoolDetail key={r.id + month} r={r} month={month} v={v} teacher={teacher} pay={pay} downloads={downloads} flash={flash} fail={fail}
+                    onEdit={() => { setErr(""); setForm({ id: r.id, name: r.name, contact: r.contact || "", phone: r.phone || "", rate: String(r.rate), transport: r.transport ? String(r.transport) : "", lang: r.lang || "fr" }); setOpenId(null); window.scrollTo(0, 0); }}
+                    onRemove={() => { saveBiz({ ...biz, schools: biz.schools.filter((x) => x.id !== r.id) }).catch(fail); setOpenId(null); }} />
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Business tab: income ---------- */
+const SERIES = [{ k: "priv", label: "Private classes", cls: "c1" }, { k: "online", label: "Online groups", cls: "c2" }, { k: "schools", label: "Schools", cls: "c3" }];
+const shortMoney = (v) => (v >= 1e6 ? `${plainNum(v / 1e6, 1)} M` : v >= 1000 ? `${Math.round(v / 1000)} k` : String(Math.round(v)));
+function niceStep(x) { const p = Math.pow(10, Math.floor(Math.log10(Math.max(x, 1)))); const n = x / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
+
+function IncomeChart({ months }) {
+  const [hover, setHover] = useState(months.length - 1);
+  const W = 520, H = 230, padL = 46, padR = 8, padT = 12, padB = 30;
+  const max = Math.max(1, ...months.map((m) => m.total));
+  const step = niceStep(max / 3);
+  const top = Math.ceil(max / step) * step;
+  const ticks = [];
+  for (let v = 0; v <= top + 1; v += step) ticks.push(v);
+  const bw = (W - padL - padR) / months.length;
+  const barW = Math.min(46, bw * 0.56);
+  const y = (v) => padT + (H - padT - padB) * (1 - v / top);
+  const h = months[hover];
+  return (
+    <div className="chart">
+      <div className="legend">{SERIES.map((s) => <span key={s.k}><i className={"sw " + s.cls} />{s.label}</span>)}</div>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Money collected each month for the last 6 months, by type of class">
+        {ticks.map((v) => (
+          <g key={v}>
+            <line x1={padL} x2={W - padR} y1={y(v)} y2={y(v)} className="grid" />
+            <text x={padL - 8} y={y(v) + 4} className="tick" textAnchor="end">{shortMoney(v)}</text>
+          </g>
+        ))}
+        {months.map((m, i) => {
+          const cx = padL + bw * i + bw / 2;
+          let acc = 0;
+          const segs = SERIES.map((s) => { const val = m[s.k]; const y0 = y(acc); acc += val; return val > 0 ? { s, y0, y1: y(acc) } : null; }).filter(Boolean);
+          return (
+            <g key={m.m} className={"col" + (hover === i ? " on" : "")} tabIndex={0} role="button" aria-label={`${monthLabel(m.m)}: ${fcfa(m.total)} collected`}
+              onMouseEnter={() => setHover(i)} onFocus={() => setHover(i)} onClick={() => setHover(i)}>
+              <rect x={padL + bw * i} y={padT} width={bw} height={H - padT - padB} className="hit" />
+              {segs.map((g, j) => (
+                <rect key={g.s.k} x={cx - barW / 2} y={g.y1} width={barW} height={Math.max(1, g.y0 - g.y1 - (j > 0 ? 2 : 0))} rx={j === segs.length - 1 ? 4 : 0} className={"seg-bar " + g.s.cls} />
+              ))}
+              <text x={cx} y={H - 10} textAnchor="middle" className={"tick" + (hover === i ? " strong" : "")}>{parseISO(m.m + "-01").toLocaleDateString("en-US", { month: "short" })}</text>
+            </g>
+          );
+        })}
+      </svg>
+      {h && (
+        <div className="chart-detail" role="status">
+          <strong>{monthLabel(h.m)}</strong>
+          {SERIES.map((s) => <span key={s.k}><i className={"sw " + s.cls} />{s.label}: {fcfa(h[s.k])}</span>)}
+          <span>Total {fcfa(h.total)}, yours after shares {fcfa(h.yours)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function IncomeSection({ db, userId, roster, schedule, changes, places }) {
+  const [state, setState] = useState({ loading: true, slow: false, months: [] });
+  useEffect(() => {
+    if (!db || !userId) return undefined;
+    let alive = true;
+    const slowTimer = setTimeout(() => alive && setState((s) => ({ ...s, slow: true })), 10000);
+    const base = "data/users/" + userId + "/money";
+    const keys = [5, 4, 3, 2, 1, 0].map((k) => shiftMonth(monthKey(new Date()), -k));
+    const get = (p) => db.doc(p).get().then((s) => (s.exists && s.data()) || {}).catch(() => ({}));
+    Promise.all([get(base), ...keys.flatMap((m) => [get(base + "/months/" + m), get(base + "/attendance/" + m), get(base + "/visits/" + m)])]).then(([feesDoc, ...rest]) => {
+      if (!alive) return;
+      clearTimeout(slowTimer);
+      const fees = feesDoc.fees || {};
+      const ctx = { schedule, changes, places };
+      const months = keys.map((m, i) => {
+        const pays = arr(rest[i * 3].payments), taken = arr(rest[i * 3 + 1].taken), visits = rest[i * 3 + 2];
+        let priv = 0, online = 0, cut = 0;
+        const seen = new Set();
+        roster.forEach((r) => {
+          const sm = studentMonth(r, fees, pays, taken, ctx);
+          seen.add(r.id);
+          if (sm.online) online += sm.paid; else priv += sm.paid;
+          cut += sm.cut;
+        });
+        pays.forEach((p) => { if (!seen.has(p.studentId)) priv += Number(p.amount) || 0; });
+        const schools = arr(visits.paid).reduce((a, p) => a + (Number(p.amount) || 0), 0);
+        const total = priv + online + schools;
+        return { m, priv, online, schools, total, cut, yours: total - cut };
+      });
+      setState({ loading: false, slow: false, months });
+    });
+    return () => { alive = false; clearTimeout(slowTimer); };
+  }, [db, userId]);
+  if (state.loading) return <p className="empty" role="status">{state.slow ? "Your records can't be reached yet. Check your connection." : "Adding up your last 6 months..."}</p>;
+  const sum = state.months.reduce((a, m) => a + m.yours, 0);
+  return (
+    <div>
+      <div className="sum">
+        <p className="muted small">Yours after shares, last 6 months</p>
+        <p className="sum-big">{fcfa(sum)}</p>
+        <p className="muted small">About {fcfa(sum / 6)} a month</p>
+      </div>
+      <IncomeChart months={state.months} />
+      <div className="table-wrap">
+        <table className="tbl">
+          <thead><tr><th scope="col">Month</th><th scope="col">Collected</th><th scope="col">Shares</th><th scope="col">Yours</th></tr></thead>
+          <tbody>
+            {[...state.months].reverse().map((m) => (
+              <tr key={m.m}><th scope="row">{monthLabel(m.m)}</th><td>{num(m.total)}</td><td>{num(m.cut)}</td><td><strong>{num(m.yours)}</strong></td></tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="hint" style={{ marginTop: 10 }}>Amounts in FCFA, from the payments you record. Online groups are students whose classes have an online link or take place online.</p>
+    </div>
+  );
+}
+
+/* ---------- Business tab: settings ---------- */
+function BizSettings({ biz, saveBiz, schedule, pay, flash }) {
+  const names = useMemo(() => {
+    const seen = new Map();
+    [...schedule.map((s) => placeName(s)), ...biz.places.map((p) => p.name), "Home"].forEach((n) => { if (n && !seen.has(placeKey(n))) seen.set(placeKey(n), n); });
+    return [...seen.values()];
+  }, [schedule, biz.places]);
+  const [name, setName] = useState(biz.teacher.name || pay.accountName || "");
+  const [phone, setPhone] = useState(biz.teacher.phone || pay.whatsapp || "");
+  const [pcts, setPcts] = useState(() => {
+    const o = {};
+    names.forEach((n) => {
+      const p = biz.places.find((x) => placeKey(x.name) === placeKey(n));
+      o[n] = p ? String(p.pct) : !biz.places.length && placeKey(n) === "school" ? "40" : "";
+    });
+    return o;
+  });
+  const save = () => {
+    const places = names.map((n) => ({ name: n, pct: Math.min(100, Math.max(0, Number(pcts[n]) || 0)) })).filter((p) => p.pct > 0);
+    saveBiz({ ...biz, teacher: { name: name.trim(), phone: phone.trim() }, places }).then(() => flash("Settings saved."), () => flash("That didn't save. Check your connection and try again."));
+  };
+  return (
+    <div>
+      <p className="sub-h">Your details</p>
+      <p className="hint" style={{ marginTop: 0 }}>Shown on invoices and certificates.</p>
+      <div className="grid2">
+        <Field label="Your name"><input id="me-name" className="inp" value={name} onChange={(e) => setName(e.target.value)} /></Field>
+        <Field label="Your phone"><input id="me-phone" className="inp" type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></Field>
+      </div>
+      <p className="sub-h" style={{ marginTop: 14 }}>Shares by place</p>
+      <p className="hint" style={{ marginTop: 0 }}>The part of a student's fee that goes to the place where the class happens. The app works it out from where each class was actually taught.</p>
+      <ul className="rows" style={{ marginBottom: 16 }}>
+        {names.map((n) => (
+          <li key={n} className="place-row">
+            <span className="row-title">{n}</span>
+            <span className="pct"><input id={"pct-" + placeKey(n).replace(/[^a-z0-9]+/g, "-")} className="inp" type="number" inputMode="numeric" min="0" max="100" aria-label={`Share for ${n} (%)`} placeholder="0" value={pcts[n] || ""} onChange={(e) => setPcts({ ...pcts, [n]: e.target.value })} />%</span>
+          </li>
+        ))}
+      </ul>
+      <button className="btn" onClick={save}>Save settings</button>
+      <ImportBackup />
+    </div>
+  );
+}
+
+/* ---------- join page ---------- */
+const DEFAULT_OFFERS = [
+  { title: "Cours particuliers", price: 50000, per: "month", note: "2 cours par semaine, 1 heure, à domicile ou à l'école" },
+  { title: "Groupe en ligne (3 à 4 personnes)", price: 30000, per: "month", note: "2 cours par semaine, par personne" },
+  { title: "Cours individuel en ligne", price: 40000, per: "month", note: "2 cours par semaine" },
+];
+function JoinSettings({ join, saveJoin, groups, roster, pay, flash }) {
+  const [form, setForm] = useState(() => ({
+    intro: join.intro, contact: join.contact,
+    offers: (join.offers.length ? join.offers : DEFAULT_OFFERS).map((o) => ({ id: o.id || uid(), title: o.title, price: String(o.price || ""), per: o.per || "month", note: o.note || "" })),
+    groups: groups.filter((g) => g !== EVERYONE).map((g) => { const j = join.groups.find((x) => x.group === g); return { group: g, show: !!j, capacity: j ? String(j.capacity) : "4" }; }),
+  }));
+  const [err, setErr] = useState("");
+  const updO = (id, k) => (e) => setForm({ ...form, offers: form.offers.map((o) => (o.id === id ? { ...o, [k]: e.target.value } : o)) });
+  const updG = (g, k, val) => setForm({ ...form, groups: form.groups.map((x) => (x.group === g ? { ...x, [k]: val } : x)) });
+  const save = () => {
+    if (form.contact.trim() && !waDigits(form.contact)) { setErr("That WhatsApp number looks too short. Use the full number."); return; }
+    setErr("");
+    saveJoin({
+      intro: form.intro.trim(), contact: form.contact.trim(),
+      offers: form.offers.filter((o) => o.title.trim()).map((o) => ({ id: o.id, title: o.title.trim(), price: Number(o.price) || 0, per: o.per, note: o.note.trim() })),
+      groups: form.groups.filter((g) => g.show).map((g) => ({ group: g.group, capacity: Math.max(1, Number(g.capacity) || 1) })),
+    });
+    flash("Join page saved.");
+  };
+  return (
+    <div>
+      <p className="hint" style={{ marginTop: 0 }}>A page for new families: your classes, prices, open spots and a button to book a free trial on WhatsApp. Anyone with your app link can open it from the first screen with "New student? See classes and prices". You can also add #join to the end of the link to open it directly.</p>
+      <Field label="Welcome message"><textarea id="join-intro" className="inp" value={form.intro} placeholder={STR.fr.joinTagline} onChange={(e) => setForm({ ...form, intro: e.target.value })} /></Field>
+      <Field label="WhatsApp for trial bookings"><input id="join-contact" className="inp" type="tel" inputMode="tel" placeholder={pay.whatsapp || "07 00 00 00 00"} value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} /></Field>
+      <p className="hint">Leave it empty to use the number from How students pay.</p>
+      <p className="sub-h" style={{ marginTop: 14 }}>Classes and prices</p>
+      {form.offers.map((o) => (
+        <div key={o.id} className="method-edit">
+          <Field label="Class"><input id={"of-title-" + o.id} className="inp" value={o.title} onChange={updO(o.id, "title")} /></Field>
+          <div className="grid2">
+            <Field label="Price (FCFA)"><input id={"of-price-" + o.id} className="inp" type="number" inputMode="numeric" min="0" step="500" value={o.price} onChange={updO(o.id, "price")} /></Field>
+            <Field label="Per"><select id={"of-per-" + o.id} className="inp" value={o.per} onChange={updO(o.id, "per")}><option value="month">Month</option><option value="class">Class</option><option value="hour">Hour</option></select></Field>
+          </div>
+          <Field label="Details (optional)"><input id={"of-note-" + o.id} className="inp" value={o.note} onChange={updO(o.id, "note")} /></Field>
+          <button className="btn ghost sm danger" onClick={() => setForm({ ...form, offers: form.offers.filter((x) => x.id !== o.id) })}><Icon name="trash" size={15} />Remove</button>
+        </div>
+      ))}
+      <button className="btn ghost sm" style={{ marginBottom: 16 }} onClick={() => setForm({ ...form, offers: [...form.offers, { id: uid(), title: "", price: "", per: "month", note: "" }] })}><Icon name="plus" size={16} />Add a class type</button>
+      <p className="sub-h">Groups with open spots</p>
+      {form.groups.length === 0 ? <p className="hint" style={{ marginTop: 0 }}>Add students with a group name, and the groups show up here.</p> : (
+        <ul className="rows" style={{ marginBottom: 16 }}>
+          {form.groups.map((g) => {
+            const count = roster.filter((r) => r.group === g.group).length;
+            return (
+              <li key={g.group} className="place-row">
+                <label className="check" style={{ margin: 0 }}><input type="checkbox" checked={g.show} onChange={(e) => updG(g.group, "show", e.target.checked)} />{g.group}<span className="muted small">{count} now</span></label>
+                <span className="pct"><input className="inp" type="number" inputMode="numeric" min="1" aria-label={`Places in ${g.group}`} value={g.capacity} disabled={!g.show} onChange={(e) => updG(g.group, "capacity", e.target.value)} />places</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {err && <p className="err" role="alert">{err}</p>}
+      <button className="btn" onClick={save}>Save join page</button>
+    </div>
+  );
+}
+
+function JoinPage({ join, pay, schedule, counts = {}, onBack, onLang }) {
+  const { t, lang } = useT();
+  const contact = join.contact || pay.whatsapp;
+  const per = { month: t("perMonth"), class: t("perClass"), hour: t("perHour") };
+  const groups = join.groups.map((g) => {
+    const slots = schedule.filter((s) => s.group === g.group).sort((a, b) => a.day - b.day);
+    const left = Math.max(0, (Number(g.capacity) || 0) - (Number(counts[g.group]) || 0));
+    return { ...g, slots, left };
+  });
+  return (
+    <div className="welcome">
+      <div className="welcome-lang between">
+        <button className="link" onClick={onBack}>{t("haveCode")}</button>
+        <button className="link" onClick={onLang} aria-label={t("otherLangName")}>{t("otherLang")}</button>
+      </div>
+      <div className="seyes welcome-page">
+        <h1 className="welcome-title">Bright Minds</h1>
+        <p className="welcome-sub">{join.intro || t("joinTagline")}</p>
+      </div>
+      {join.offers.length > 0 && (
+        <>
+          <h2 className="h">{t("classesPrices")}</h2>
+          <ul className="rows" style={{ marginBottom: 20 }}>
+            {join.offers.map((o) => (
+              <li key={o.id} className="offer">
+                <div className="row-main"><span className="row-title">{o.title}</span>{o.note && <span className="row-sub">{o.note}</span>}</div>
+                <span className="offer-price"><strong>{fcfa(o.price)}</strong><span className="muted small">{per[o.per] || ""}</span></span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {groups.length > 0 && (
+        <>
+          <h2 className="h">{t("openGroups")}</h2>
+          <ul className="rows" style={{ marginBottom: 20 }}>
+            {groups.map((g) => (
+              <li key={g.group} className="offer">
+                <div className="row-main"><span className="row-title">{g.group}</span><span className="row-sub">{g.slots.map((s) => `${cap(DAYS[lang][s.day])} ${s.start}`).join(", ")}</span></div>
+                <span className={"pill " + (g.left > 0 ? "paid" : "unpaid")}>{g.left > 0 ? t("spotsLeft", g.left) : t("full")}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {contact && (
+        <div className="join-cta">
+          <a className="btn" href={waLink(contact, t("trialMsg"))} target="_blank" rel="noopener noreferrer"><Icon name="chat" size={18} />{t("bookTrial")}</a>
+          <p className="hint" style={{ margin: "8px 0 0" }}>{t("trialHint")}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BusinessTeacher({ bizH, db, userId, flash, pay, downloads, roster, schedule, changes, join, saveJoin, groups }) {
+  const [mode, setMode] = useState("schools");
+  const modes = [["schools", "Schools"], ["income", "Income"], ["join", "Join page"], ["settings", "Settings"]];
+  const placesNeedDb = mode !== "join" && !bizH.on;
+  return (
+    <section>
+      <h2 className="h">Business</h2>
+      <div className="seg seg-wrap">
+        {modes.map(([id, label]) => <button key={id} aria-pressed={mode === id} onClick={() => setMode(id)}>{label}</button>)}
+      </div>
+      {placesNeedDb ? <p className="note">Sign in as the teacher to use this.</p>
+        : !bizH.ready && mode !== "join" ? <p className="empty" role="status">Loading...</p>
+        : mode === "schools" ? <SchoolsSection biz={bizH.biz} saveBiz={bizH.save} db={db} userId={userId} flash={flash} pay={pay} downloads={downloads} />
+        : mode === "income" ? <IncomeSection db={db} userId={userId} roster={roster} schedule={schedule} changes={changes} places={bizH.biz.places} />
+        : mode === "join" ? <JoinSettings join={join} saveJoin={saveJoin} groups={groups} roster={roster} pay={pay} flash={flash} />
+        : <BizSettings biz={bizH.biz} saveBiz={bizH.save} schedule={schedule} pay={pay} flash={flash} />}
+    </section>
+  );
+}
+
+/* ---------- live data from the database ---------- */
+function useContent(on) {
+  const [state, setState] = useState({ content: null, error: false });
+  useEffect(() => {
+    if (!on) return undefined;
+    let un = () => {};
+    try {
+      un = FB.db.doc("site/content").onSnapshot(
+        (s) => setState({ content: normalize(s.exists ? s.data() : {}), error: false }),
+        () => setState((x) => ({ ...x, error: true })));
+    } catch (e) { setState((x) => ({ ...x, error: true })); }
+    return () => un();
+  }, [on]);
+  return state;
+}
+function useRoster(on) {
+  const [state, setState] = useState({ roster: [], ready: false });
+  useEffect(() => {
+    if (!on) { setState({ roster: [], ready: false }); return undefined; }
+    let un = () => {};
+    try {
+      un = FB.db.collection("students").onSnapshot(
+        (qs) => setState({ roster: qs.docs.map((d) => ({ ...d.data(), code: d.id })), ready: true }),
+        () => setState((x) => ({ ...x, ready: true })));
+    } catch (e) { setState((x) => ({ ...x, ready: true })); }
+    return () => un();
+  }, [on]);
+  return state;
+}
+function useStudentDoc(code) {
+  const [state, setState] = useState({ code: null, doc: undefined });
+  useEffect(() => {
+    if (!code || !FB) { setState({ code, doc: null }); return undefined; }
+    setState({ code, doc: undefined });
+    let un = () => {};
+    try {
+      un = FB.db.doc("students/" + code).onSnapshot(
+        (s) => setState({ code, doc: s.exists ? { ...s.data(), code } : null }),
+        () => setState({ code, doc: null }));
+    } catch (e) { setState({ code, doc: null }); }
+    return () => un();
+  }, [code]);
+  return state.code === code ? state.doc : undefined;
+}
+
+function Notice({ text }) {
+  return (
+    <div className="welcome">
+      <div className="seyes welcome-page">
+        <h1 className="welcome-title">Bright Minds</h1>
+        <p className="welcome-sub">{text}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- app ---------- */
+function App() {
+  const [role, setRole] = useState(() => ls.get("bm:role"));
+  const [me, setMe] = useState(() => ls.get("bm:me"));
+  const [done, setDone] = useState(() => ls.get("bm:done", {}) || {});
+  const [lang, setLang] = useState(() => ls.get("bm:lang") || (/^fr/i.test(navigator.language || "") ? "fr" : "en"));
+  const [user, setUser] = useState(undefined);
+  const [joinView, setJoinView] = useState(() => (window.location.hash || "") === "#join");
+  const [tab, setTab] = useState(null);
+  const [openDeck, setOpenDeck] = useState(null);
+  const [toast, setToast] = useState("");
+  const toastTimer = useRef(null);
+  const canTeach = isTeacherUser(user);
+  const isTeacher = role === "teacher" && canTeach;
+  const db = canTeach ? FB.db : null;
+  const userId = canTeach ? user.uid : null;
+  const thisMonth = monthKey(new Date());
+  const { content, error } = useContent(!!FB);
+  const rosterH = useRoster(isTeacher);
+  const studentRec = useStudentDoc(!isTeacher && me && me.id !== "guest" ? me.code : null);
+  const attToday = useAttendance(isTeacher ? db : null, userId, thisMonth);
+  const moneyNow = useMoney(isTeacher ? db : null, userId, thisMonth);
+  const bizH = useBiz(isTeacher ? db : null, userId);
+
+  const flash = (msg) => { setToast(msg); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(""), 3200); };
+  const saveFail = () => flash("That didn't save. Check your connection and try again.");
+
+  useEffect(() => {
+    if (!FB) { setUser(null); return undefined; }
+    FB.auth.getRedirectResult().catch(() => {});
+    return FB.auth.onAuthStateChanged((u) => { checkTeacher(u).then(() => setUser(u || null), () => setUser(u || null)); });
+  }, []);
+
+  useEffect(() => {
+    const onHash = () => setJoinView((window.location.hash || "") === "#join");
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  useEffect(() => {
+    if (user === undefined) return;
+    if (canTeach && role == null) { setRole("teacher"); ls.set("bm:role", "teacher"); }
+    if (!canTeach && role === "teacher") { setRole(null); ls.del("bm:role"); }
+  }, [user, role]);
+
+  // Keep each student's "classes left" and "paid" up to date from your private records.
+  const showStatus = content ? content.settings.showStatus : true;
+  const wanted = useMemo(() => (
+    isTeacher && rosterH.ready && moneyNow.ready && attToday.ready && !moneyNow.failed
+      ? (showStatus ? computeStatuses(rosterH.roster, moneyNow.fees, moneyNow.pays, attToday.taken, thisMonth) : {}) : null
+  ), [isTeacher, showStatus, rosterH.ready, rosterH.roster, moneyNow.ready, moneyNow.failed, moneyNow.fees, moneyNow.pays, attToday.ready, attToday.taken, thisMonth]);
+  useEffect(() => {
+    if (!wanted) return;
+    const batch = FB.db.batch();
+    let n = 0;
+    rosterH.roster.forEach((r) => {
+      const w = wanted[r.id] || null;
+      const cur = r.st ? { m: r.st.m, left: r.st.left, total: r.st.total, pay: r.st.pay } : null;
+      if (stable(cur) === stable(w)) return;
+      batch.set(FB.db.doc("students/" + r.code), { st: w ? { ...w, at: todayISO() } : null }, { mergeFields: ["st"] });
+      n++;
+    });
+    if (n) batch.commit().catch(() => {});
+  }, [wanted]);
+
+  const saveContent = (key) => (value) => {
+    FB.db.doc("site/content").set({ [key]: value, updated: new Date().toISOString() }, { mergeFields: [key, "updated"] }).catch(saveFail);
+  };
+  const saveRoster = (next) => { saveRosterDocs(rosterH.roster, next).catch(saveFail); };
+  const roster = rosterH.roster;
+  const groups = useMemo(() => {
+    const s = [...new Set(roster.map((r) => r.group).filter((g) => g && g !== EVERYONE))].sort();
+    return [EVERYONE, ...s];
+  }, [roster]);
+
+  const meR = !me ? null : me.id === "guest" ? GUEST : studentRec || null;
+
+  const toggleLang = () => { const next = lang === "fr" ? "en" : "fr"; setLang(next); ls.set("bm:lang", next); };
+  const toggleDone = (lessonId) => {
+    const next = { ...done };
+    if (next[lessonId]) delete next[lessonId]; else next[lessonId] = todayISO();
+    setDone(next); ls.set("bm:done", next);
+  };
+  const chooseStudent = (s) => {
+    const m = s ? { id: s.id, name: s.name, group: s.group, code: s.code } : GUEST;
+    setMe(m); ls.set("bm:me", m); setRole("student"); ls.set("bm:role", "student"); setTab("words");
+  };
+  const toTeacher = () => { setRole("teacher"); ls.set("bm:role", "teacher"); setTab("classes"); window.scrollTo(0, 0); };
+  const toStudentView = () => { setRole("student"); ls.set("bm:role", "student"); setTab(null); };
+  const switchStudent = () => { setMe(null); ls.del("bm:me"); setTab(null); };
+  const signIn = async () => {
+    try {
+      await teacherSignIn();
+      if (await checkTeacher(FB.auth.currentUser)) toTeacher();
+    } catch (e) { flash("Sign-in didn't work. Check your connection and try again."); }
+  };
+  const signOut = () => { FB.auth.signOut().catch(() => {}); setRole(null); ls.del("bm:role"); setTab(null); };
+
+  const uiLang = isTeacher ? "en" : lang;
+  const T = (k) => STR[uiLang][k];
+  const tabs = isTeacher
+    ? [{ id: "classes", label: "Classes", icon: "calendar" }, { id: "lessons", label: "Lessons", icon: "clipboard" }, { id: "words", label: "Words", icon: "book" }, { id: "students", label: "Students", icon: "users" }, { id: "business", label: "Business", icon: "briefcase" }]
+    : [{ id: "words", label: T("tabWords"), icon: "book" }, { id: "homework", label: T("tabHomework"), icon: "clipboard" }, { id: "classes", label: T("tabClasses"), icon: "calendar" }, { id: "pay", label: T("tabPay"), icon: "wallet" }];
+  const current = tabs.some((t) => t.id === tab) ? tab : tabs[0].id;
+
+  if (!FB) return <Notice text={CONFIGURED ? "Bright Minds could not load. Check your internet connection, then open the page again." : "This app isn't connected to its database yet."} />;
+  if (role === "teacher" && user === undefined) return <p className="boot" role="status">Opening Bright Minds...</p>;
+  if (!content) return error ? <Notice text={STR[lang].offline} /> : <p className="boot" role="status">{STR[lang].opening}</p>;
+  if (!isTeacher && me && me.id !== "guest" && studentRec === undefined) return <p className="boot" role="status">{STR[lang].opening}</p>;
+
+  const view = content;
+  if (!isTeacher && !meR) {
+    return (
+      <LangCtx.Provider value={lang}>
+        {joinView
+          ? <JoinPage join={view.join} pay={view.pay} schedule={view.schedule} counts={view.groupCounts} onBack={() => { setJoinView(false); if (window.location.hash === "#join") { try { history.replaceState(null, "", window.location.pathname + window.location.search); } catch (e) { /* ignore */ } } }} onLang={toggleLang} />
+          : <Welcome canTeach={canTeach} signedIn={!!user} notTeacher={user && !canTeach ? user.email || "This account" : ""} onStudent={chooseStudent} onTeacher={toTeacher}
+              onSignIn={signIn} onSignOut={signOut} onLang={toggleLang} onJoin={() => { setJoinView(true); window.scrollTo(0, 0); }} />}
+        {toast && <div className="dock"><div className="toast" role="status">{toast}</div></div>}
+      </LangCtx.Provider>
+    );
+  }
+
+  let screen;
+  if (isTeacher) {
+    if (current === "classes") screen = (
+      <>
+        <NoticesTeacher notices={view.notices} groups={groups} saveNotices={saveContent("notices")} flash={flash} />
+        <Classes schedule={view.schedule} changes={view.changes} saveChanges={saveContent("changes")} notices={view.notices} saveNotices={saveContent("notices")}
+          isTeacher groups={groups} saveSchedule={saveContent("schedule")} flash={flash} roster={roster} att={attToday} />
+      </>
+    );
+    else if (current === "lessons") screen = <LessonsTeacher lessons={view.lessons} groups={groups} saveLessons={saveContent("lessons")} flash={flash} sample={null} db={db} userId={userId} />;
+    else if (current === "words") screen = <WordsTeacher decks={view.decks} groups={groups} saveDecks={saveContent("decks")} openId={openDeck} setOpenId={setOpenDeck} sample={null} />;
+    else if (current === "business") screen = (
+      <BusinessTeacher bizH={bizH} db={db} userId={userId} flash={flash} pay={view.pay} downloads={downloads}
+        roster={roster} schedule={view.schedule} changes={view.changes} join={view.join} saveJoin={saveContent("join")} groups={groups} />
+    );
+    else screen = (
+      <StudentsTeacher roster={roster} saveRoster={saveRoster} pay={view.pay} savePay={saveContent("pay")}
+        settings={view.settings} saveSettings={saveContent("settings")} lessons={view.lessons} decks={view.decks}
+        schedule={view.schedule} changes={view.changes} places={bizH.biz.places} downloads={downloads} teacherName={bizH.biz.teacher.name || view.pay.accountName}
+        db={db} userId={userId} flash={flash} />
+    );
+  } else {
+    const st = view.settings.showStatus ? meR.st : null;
+    if (current === "words") screen = <WordsStudent decks={view.decks} me={meR} />;
+    else if (current === "homework") screen = <HomeworkStudent lessons={view.lessons} me={meR} done={done} onToggle={toggleDone} />;
+    else if (current === "pay") screen = <PayStudent pay={view.pay} me={meR} st={st} />;
+    else screen = <Classes schedule={view.schedule} changes={view.changes} me={meR} st={st} updated={st && st.at ? st.at : null} />;
+  }
+
+  const today = todayISO();
+  const hwCount = isTeacher ? 0 : view.lessons.filter((l) => l.homework && forGroup(l.group, meR.group) && !done[l.id] && (!l.due || l.due >= today)).length;
+  const fresh = isTeacher && rosterH.ready && roster.length === 0 && !view.lessons.length && !view.schedule.length;
+
+  return (
+    <LangCtx.Provider value={uiLang}>
+      <div className="shell">
+        <header className="top">
+          <span className="brand">Bright Minds</span>
+          <div className="who">
+            {isTeacher ? (
+              <>
+                <span>Teacher</span>
+                <button className="link" onClick={toStudentView}>Student view</button>
+                <button className="link" onClick={signOut}>Sign out</button>
+              </>
+            ) : (
+              <>
+                <span>{meR.id === "guest" ? "" : meR.name}</span>
+                <button className="link" onClick={toggleLang} aria-label={STR[lang].otherLangName}>{STR[lang].otherLang}</button>
+                <button className="link" onClick={switchStudent}>{STR[lang].switchUser}</button>
+                {canTeach && <button className="link" onClick={toTeacher}>Teacher view</button>}
+              </>
+            )}
+          </div>
+        </header>
+        <main>
+          {fresh && <p className="note">Welcome to your own Bright Minds. To bring in everything from the Claude version, go to Business, then Settings, and use Move in.</p>}
+          {!isTeacher && <StudentNotices notices={view.notices} me={meR} />}
+          {screen}
+        </main>
+      </div>
+      <div className="dock">
+        {toast && <div className="toast" role="status">{toast}</div>}
+        <nav className="tabbar" aria-label="Sections">
+          <div className="dock-in">
+            {tabs.map((t) => (
+              <button key={t.id} className="tab" aria-current={current === t.id ? "page" : undefined} onClick={() => setTab(t.id)}>
+                <Icon name={t.icon} size={22} />
+                <span className="tab-label">{t.label}</span>
+                {t.id === "homework" && hwCount > 0 && <span className="badge" aria-label={`${hwCount}`}>{hwCount}</span>}
+              </button>
+            ))}
+          </div>
+        </nav>
+      </div>
+    </LangCtx.Provider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+})();

@@ -1,0 +1,26 @@
+rules_version = '2';
+// Reference copy. The live rules are in the Firebase console (Firestore, Rules), with the teacher's real
+// Google address in place of TEACHER_GOOGLE_ADDRESS. Never commit the real address: this repository is public.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isTeacher() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in ['TEACHER_GOOGLE_ADDRESS'];
+    }
+    // Lessons, word lists, class times, announcements, prices: everyone reads, only the teacher writes.
+    match /site/content {
+      allow read: if true;
+      allow write: if isTeacher();
+    }
+    // One record per student, named by their code: open it only if you know the code.
+    match /students/{code} {
+      allow get: if true;
+      allow list, write: if isTeacher();
+    }
+    // Fees, payments, class counts, schools, phone numbers: the teacher only.
+    match /data/users/{uid}/{rest=**} {
+      allow read, write: if isTeacher() && request.auth.uid == uid;
+    }
+  }
+}
