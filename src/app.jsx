@@ -1003,7 +1003,7 @@ function LessonEntry({ lesson: l, teacher = false, isDone = false, onToggle, onE
   );
 }
 
-function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId }) {
+function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks }) {
   const [mode, setMode] = useState("lessons");
   const [form, setForm] = useState(null);
   const lib = useLibrary(db, userId);
@@ -1030,10 +1030,13 @@ function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userI
       {lib.on && (
         <div className="seg">
           <button aria-pressed={mode === "lessons"} onClick={() => setMode("lessons")}>Lessons</button>
-          <button aria-pressed={mode === "library"} onClick={() => setMode("library")}>Library{lib.items.length ? ` (${lib.items.length})` : ""}</button>
+          <button aria-pressed={mode === "library"} onClick={() => setMode("library")}>Library</button>
         </div>
       )}
-      {mode === "library" ? <Library items={lib.items} onUse={usePlan} onRemove={(id) => lib.remove(id).catch(() => flash("That didn't save. Check your connection and try again."))} /> : (
+      {mode === "library" ? (
+        <CourseLibrary saved={lib.items} onUse={usePlan} decks={decks} saveDecks={saveDecks} groups={groups} flash={flash}
+          onRemoveSaved={(id) => lib.remove(id).catch(() => flash("That didn't save. Check your connection and try again."))} />
+      ) : (
         <>
           {form && (
             <div className="form">
@@ -1060,7 +1063,7 @@ function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userI
               </div>
             </div>
           )}
-          {sorted.length === 0 ? (!form && <Empty text="Add your first lesson to give students their notes and homework." />) : (
+          {sorted.length === 0 ? (!form && <Empty text="Add your first lesson to give students their notes and homework, or open Library to use one of your lesson plans." />) : (
             <ol className="entries">
               {sorted.map((l) => (
                 <LessonEntry key={l.id} lesson={l} teacher
@@ -1936,6 +1939,294 @@ function Library({ items, onUse, onRemove }) {
           </div>
         );
       })}
+    </>
+  );
+}
+
+/* ---------- lesson plans (courses.json at the site root, written from the teacher's Claude docs) ---------- */
+let coursesCache = null;
+function useCourses() {
+  const [state, setState] = useState(() => (coursesCache ? { status: "ready", data: coursesCache } : { status: "loading", data: null }));
+  const [tries, setTries] = useState(0);
+  useEffect(() => {
+    if (coursesCache) return undefined;
+    let live = true;
+    setState({ status: "loading", data: null });
+    fetch(window.BM_COURSES || "courses.json")
+      .then((r) => { if (!r.ok) throw new Error("http " + r.status); return r.json(); })
+      .then((d) => {
+        coursesCache = { courses: arr(d && d.courses).filter((c) => c && c.id), wordLists: arr(d && d.wordLists).filter((w) => w && w.id) };
+        if (live) setState({ status: "ready", data: coursesCache });
+      })
+      .catch(() => { if (live) setState({ status: "error", data: null }); });
+    return () => { live = false; };
+  }, [tries]);
+  return { ...state, retry: () => setTries((n) => n + 1) };
+}
+
+/* A small reader for the lesson text: ### headings, **bold**, _italic_, lists, nested lists and | tables |. */
+const MD_INLINE = /\*\*([^*]+)\*\*|(^|[\s(“"'])_([^_\n]+)_(?=[\s.,;:!?)”"']|$)/g;
+function mdInline(text, key) {
+  const src = String(text || "");
+  const out = [];
+  let last = 0;
+  let n = 0;
+  let m;
+  MD_INLINE.lastIndex = 0;
+  while ((m = MD_INLINE.exec(src))) {
+    if (m[1] !== undefined) { out.push(src.slice(last, m.index)); out.push(<strong key={key + "-" + n++}>{m[1]}</strong>); }
+    else { out.push(src.slice(last, m.index) + m[2]); out.push(<em key={key + "-" + n++}>{m[3]}</em>); }
+    last = MD_INLINE.lastIndex;
+  }
+  out.push(src.slice(last));
+  return out;
+}
+function mdBlocks(text) {
+  const lines = String(text || "").split("\n");
+  const blocks = [];
+  const itemRe = /^(\d+\.|-|\[ \])\s+(.*)$/;
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    if (!line) { i++; continue; }
+    const h = /^(#{2,4})\s+(.*)$/.exec(line);
+    if (h) { blocks.push({ t: "h", level: h[1].length, text: h[2] }); i++; continue; }
+    if (line.startsWith("|")) {
+      const rows = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) {
+        const r = lines[i].trim();
+        if (!/^\|[\s:|-]+\|$/.test(r)) rows.push(r.replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim()));
+        i++;
+      }
+      if (rows.length) blocks.push({ t: "table", rows });
+      continue;
+    }
+    const first = itemRe.exec(line);
+    if (first) {
+      const ordered = /^\d+\./.test(first[1]);
+      const items = [];
+      while (i < lines.length) {
+        const raw = lines[i];
+        const tr = raw.trim();
+        if (!tr) break;
+        const indent = raw.length - raw.replace(/^\s+/, "").length;
+        const mm = itemRe.exec(tr);
+        if (indent >= 2 && items.length) {
+          const lastItem = items[items.length - 1];
+          if (mm) lastItem.sub.push(mm[2]); else lastItem.text += " " + tr;
+          i++; continue;
+        }
+        if (!mm || /^\d+\./.test(mm[1]) !== ordered) break;
+        items.push({ text: mm[2], sub: [] });
+        i++;
+      }
+      blocks.push({ t: ordered ? "ol" : "ul", items });
+      continue;
+    }
+    blocks.push({ t: "p", text: line });
+    i++;
+  }
+  return blocks;
+}
+function Md({ text }) {
+  const blocks = useMemo(() => mdBlocks(text), [text]);
+  return (
+    <div className="md">
+      {blocks.map((b, k) => {
+        if (b.t === "h") return b.level <= 3 ? <h4 key={k}>{mdInline(b.text, k)}</h4> : <h5 key={k}>{mdInline(b.text, k)}</h5>;
+        if (b.t === "p") return <p key={k}>{mdInline(b.text, k)}</p>;
+        if (b.t === "table") {
+          return (
+            <div key={k} className="md-table">
+              <table>
+                <thead><tr>{b.rows[0].map((c, j) => <th key={j} scope="col">{mdInline(c, k + "h" + j)}</th>)}</tr></thead>
+                <tbody>{b.rows.slice(1).map((r, ri) => <tr key={ri}>{r.map((c, j) => <td key={j}>{mdInline(c, k + "r" + ri + "c" + j)}</td>)}</tr>)}</tbody>
+              </table>
+            </div>
+          );
+        }
+        const List = b.t === "ol" ? "ol" : "ul";
+        return (
+          <List key={k}>
+            {b.items.map((it, j) => (
+              <li key={j}>
+                {mdInline(it.text, k + "i" + j)}
+                {it.sub.length > 0 && <ul>{it.sub.map((x, si) => <li key={si}>{mdInline(x, k + "i" + j + "s" + si)}</li>)}</ul>}
+              </li>
+            ))}
+          </List>
+        );
+      })}
+    </div>
+  );
+}
+
+function WordListOffers({ lists, decks, saveDecks, groups, flash }) {
+  const [openId, setOpenId] = useState(null);
+  const [group, setGroup] = useState(EVERYONE);
+  const added = (w) => decks.some((d) => d.title === w.title);
+  const add = (w) => {
+    const d = { id: uid(), title: w.title, group, cards: arr(w.cards).map((c) => ({ id: uid(), en: String(c.en || ""), fr: String(c.fr || ""), ex: String(c.ex || "") })).filter((c) => c.en && c.fr) };
+    saveDecks([d, ...decks]);
+    setOpenId(null);
+    flash(`${w.title} is in Words now, for ${group}.`);
+  };
+  return (
+    <div className="day-block">
+      <p className="day-name">Word lists</p>
+      <p className="hint">Ready-made lists with the French. Add one and your students can practice it with flashcards and quizzes.</p>
+      <ul className="rows">
+        {lists.map((w) => (
+          <li key={w.id} className="lib-row">
+            <div className="row-main">
+              <span className="row-title">{w.title}</span>
+              <span className="row-sub">{arr(w.cards).length} words. {w.about}</span>
+            </div>
+            <div className="pay-actions">
+              {added(w) ? <span className="muted small"><Icon name="check" size={15} /> In Words</span>
+                : openId !== w.id && <button className="btn sm" onClick={() => { setGroup(groups[1] || EVERYONE); setOpenId(w.id); }}>Add to Words</button>}
+            </div>
+            {openId === w.id && (
+              <div className="inline-add lib-add">
+                <select className="inp" aria-label={`Who ${w.title} is for`} value={group} onChange={(e) => setGroup(e.target.value)}>{groups.map((g) => <option key={g} value={g}>{g}</option>)}</select>
+                <button className="btn sm" onClick={() => add(w)}>Add</button>
+                <button className="btn ghost sm" onClick={() => setOpenId(null)}>Cancel</button>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function CourseLibrary({ saved, onUse, onRemoveSaved, decks, saveDecks, groups, flash }) {
+  const { status, data, retry } = useCourses();
+  const [courseId, setCourseId] = useState(null);
+  const [itemId, setItemId] = useState(null);
+  const [q, setQ] = useState("");
+  const top = () => window.scrollTo(0, 0);
+  const savedBlock = saved.length > 0 && (
+    <div className="day-block">
+      <p className="day-name">Saved by you</p>
+      <Library items={saved} onUse={onUse} onRemove={onRemoveSaved} />
+    </div>
+  );
+  if (status === "loading") return <p className="muted">Opening your lesson plans...</p>;
+  if (status === "error") {
+    return (
+      <>
+        <Empty text="Your lesson plans didn't load. Check your connection and try again."><button className="btn sm" onClick={retry}>Try again</button></Empty>
+        {savedBlock}
+      </>
+    );
+  }
+  const courses = data.courses;
+  const course = courses.find((c) => c.id === courseId);
+  const items = course ? arr(course.items) : [];
+  const item = items.find((x) => x.id === itemId);
+
+  if (course && item) {
+    const k = items.indexOf(item);
+    const prev = items[k - 1];
+    const next = items[k + 1];
+    return (
+      <article className="lib-item">
+        <button className="back-link" onClick={() => { setItemId(null); top(); }}><Icon name="left" />{course.title}</button>
+        <p className="muted small">{item.section}</p>
+        <h3 className="lib-title">{item.title}</h3>
+        {item.send && (
+          <div className="lib-use">
+            <button className="btn" onClick={() => onUse(item.send)}>Use for a class</button>
+            <p className="hint">Opens a new lesson with the words and home practice filled in, ready to pick the group and save for your students.</p>
+          </div>
+        )}
+        <Md text={item.body} />
+        <div className="lib-nav">
+          {prev ? <button className="btn ghost sm" onClick={() => { setItemId(prev.id); top(); }}><Icon name="left" size={16} />Previous</button> : <span />}
+          {next && <button className="btn ghost sm" onClick={() => { setItemId(next.id); top(); }}>Next<Icon name="right" size={16} /></button>}
+        </div>
+      </article>
+    );
+  }
+
+  if (course) {
+    const sections = [];
+    items.forEach((it) => {
+      let sec = sections.find((x) => x.name === it.section);
+      if (!sec) { sec = { name: it.section || "", intro: "", list: [] }; sections.push(sec); }
+      if (it.sectionIntro) sec.intro = it.sectionIntro;
+      sec.list.push(it);
+    });
+    return (
+      <section>
+        <button className="back-link" onClick={() => { setCourseId(null); top(); }}><Icon name="left" />All lesson plans</button>
+        <h3 className="lib-title">{course.title}</h3>
+        {course.about && <p className="muted lib-about">{course.about}</p>}
+        {sections.map((sec) => (
+          <div key={sec.name} className="day-block">
+            <p className="day-name">{sec.name}</p>
+            {sec.intro && <p className="hint">{sec.intro}</p>}
+            <ul className="rows">
+              {sec.list.map((it) => (
+                <li key={it.id}>
+                  <button className="row-btn" onClick={() => { setItemId(it.id); top(); }}>
+                    <span className="row-main">
+                      <span className="row-title">{it.title}</span>
+                      {it.send && it.send.notes && <span className="row-sub clamp">{it.send.notes.split("\n")[0]}</span>}
+                    </span>
+                    <Icon name="right" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </section>
+    );
+  }
+
+  const ql = q.trim().toLowerCase();
+  const hits = ql.length >= 2
+    ? courses.flatMap((c) => arr(c.items).filter((it) => (it.title + "\n" + it.body).toLowerCase().includes(ql)).map((it) => ({ c, it }))).slice(0, 40)
+    : [];
+  return (
+    <>
+      <input className="inp lib-search" type="search" aria-label="Search your lesson plans" placeholder="Search, e.g. colors or airport" value={q} onChange={(e) => setQ(e.target.value)} />
+      {ql.length >= 2 ? (
+        hits.length ? (
+          <ul className="rows">
+            {hits.map(({ c, it }) => (
+              <li key={c.id + it.id}>
+                <button className="row-btn" onClick={() => { setCourseId(c.id); setItemId(it.id); setQ(""); top(); }}>
+                  <span className="row-main"><span className="row-title">{it.title}</span><span className="row-sub">{c.title}</span></span>
+                  <Icon name="right" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : <Empty text={`Nothing in your lesson plans matches "${q.trim()}".`} />
+      ) : (
+        <>
+          <div className="day-block">
+            <p className="day-name">Lesson plans</p>
+            {courses.length === 0 ? <Empty text="No lesson plans yet." /> : (
+              <ul className="rows">
+                {courses.map((c) => (
+                  <li key={c.id}>
+                    <button className="row-btn" onClick={() => { setCourseId(c.id); top(); }}>
+                      <span className="row-main"><span className="row-title">{c.title}</span><span className="row-sub">{c.about}</span></span>
+                      <Icon name="right" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {data.wordLists.length > 0 && <WordListOffers lists={data.wordLists} decks={decks} saveDecks={saveDecks} groups={groups} flash={flash} />}
+          {savedBlock}
+        </>
+      )}
     </>
   );
 }
@@ -2861,7 +3152,7 @@ function App() {
           isTeacher groups={groups} saveSchedule={saveContent("schedule")} flash={flash} roster={roster} att={attToday} />
       </>
     );
-    else if (current === "lessons") screen = <LessonsTeacher lessons={view.lessons} groups={groups} saveLessons={saveContent("lessons")} flash={flash} sample={null} db={db} userId={userId} />;
+    else if (current === "lessons") screen = <LessonsTeacher lessons={view.lessons} groups={groups} saveLessons={saveContent("lessons")} flash={flash} sample={null} db={db} userId={userId} decks={view.decks} saveDecks={saveContent("decks")} />;
     else if (current === "words") screen = <WordsTeacher decks={view.decks} groups={groups} saveDecks={saveContent("decks")} openId={openDeck} setOpenId={setOpenDeck} sample={null} />;
     else if (current === "business") screen = (
       <BusinessTeacher bizH={bizH} db={db} userId={userId} flash={flash} pay={view.pay} downloads={downloads}

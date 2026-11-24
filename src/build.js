@@ -28,6 +28,14 @@ fs.writeFileSync(out + "/app.js", js);
 fs.writeFileSync(out + "/app.css", css);
 if (!fs.existsSync(out + "/config.js")) { console.error("config.js is missing at the repo root"); process.exit(1); }
 const cfg = fs.readFileSync(out + "/config.js", "utf8");
+// courses.json: the lesson plans shown in Lessons → Library. Checked here so a broken edit fails the build.
+const coursesPath = out + "/courses.json";
+let coursesTag = "";
+if (fs.existsSync(coursesPath)) {
+  const raw = fs.readFileSync(coursesPath, "utf8");
+  try { JSON.parse(raw); } catch (e) { console.error("courses.json is not valid JSON: " + e.message); process.exit(1); }
+  coursesTag = `<script>window.BM_COURSES = "courses.json?v=${hash(raw)}";</script>\n`;
+}
 
 const html = `<!DOCTYPE html>
 <html lang="en">
@@ -54,7 +62,7 @@ const html = `<!DOCTYPE html>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="config.js?v=${hash(cfg)}"></script>
+${coursesTag}<script src="config.js?v=${hash(cfg)}"></script>
 <script src="app.js?v=${hash(js)}"></script>
 </body>
 </html>

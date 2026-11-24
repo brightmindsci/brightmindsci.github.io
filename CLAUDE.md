@@ -17,6 +17,16 @@ The teacher asked that their real name and personal Google address never appear 
 - `config.js`: `window.BM_CONFIG` with the Firebase web config (public by design) and `teacherKeys`. Not generated; edit by hand.
 - `firestore.rules`: reference copy only. GitHub does not deploy it. The live rules are in the Firebase console (Firestore → Rules) with the teacher's real address in place of the placeholder; when rules change, give the teacher the new text with their address filled in to paste and Publish there, and keep the placeholder in this file.
 
+## Lesson plans (`courses.json`)
+
+The teacher's lesson plans, shown to the teacher only in Lessons → Library. The file itself is public like the rest of the site, so it holds no student names, client details or term dates.
+
+- Shape: `{ updated, courses: [{ id, title, level, about, items: [{ id, section, sectionIntro?, title, body, send? }] }], wordLists: [{ id, title, about, cards: [{ en, fr, ex }] }] }`. Keep ids stable; items show in file order, grouped by `section`.
+- `body` is light markdown: `###` headings, `**bold**`, `_italic_`, `- ` and `1. ` lists (indent 2+ spaces for a sub-item), `| tables |` (the first row is the header).
+- `send` is what "Use for a class" fills into a new lesson for students: `{ title, notes, homework }`. Leave it out for pages that aren't a class (routines, checklists, quizzes).
+- A word list's "Add to Words" copies it into the site's word lists for the group the teacher picks.
+- To add plans from one of the teacher's Claude docs: read the doc with the Claude Docs tools, turn it into a course or items here, run `node src/build.js` (it fails on invalid JSON), commit and push.
+
 ## Making a change
 
 1. Edit `src/app.jsx` and/or `src/styles.css`.

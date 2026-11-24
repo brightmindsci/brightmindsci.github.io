@@ -248,3 +248,27 @@ a.btn{text-decoration:none}
 .tbl thead th{font-size:13px;color:var(--ink-soft);font-weight:700}
 @media (prefers-reduced-motion:reduce){.flip-inner{transition:none}}
 @media (max-width:360px){.grid2{grid-template-columns:1fr}}
+
+/* lesson plans */
+.lib-search{margin-bottom:16px}
+.lib-title{font-size:20px;font-weight:700;line-height:1.3;margin:2px 0 8px;text-wrap:balance}
+.lib-about{margin-bottom:8px}
+.lib-use{margin:4px 0 18px}
+.lib-use .hint{margin:8px 0 0}
+.lib-add{flex-basis:100%;margin:0}
+.lib-nav{display:flex;justify-content:space-between;gap:12px;margin:20px 0 8px;padding-top:12px;border-top:1px solid var(--line)}
+.md{line-height:1.55;font-size:16px}
+.md h4{font-size:17px;font-weight:700;margin:20px 0 6px}
+.md h5{font-size:16px;font-weight:700;margin:16px 0 4px}
+.md p{margin:0 0 10px}
+.md ul,.md ol{padding-left:22px;margin:0 0 12px}
+.md ul{list-style:disc}
+.md ol{list-style:decimal}
+.md li{margin-bottom:6px}
+.md li>ul{margin:6px 0 0}
+.md em{font-style:italic}
+.md-table{overflow-x:auto;margin:0 0 14px;border:1px solid var(--line);border-radius:10px}
+.md-table table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.4}
+.md-table th,.md-table td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line)}
+.md-table tr:last-child td{border-bottom:0}
+.md-table th{font-weight:700;background:var(--paper)}

@@ -1098,7 +1098,7 @@
                     React.createElement("button", { className: "btn sm", onClick: () => { onSaveToLibrary(libLevel); setLibLevel(null); } }, "Save"),
                     React.createElement("button", { className: "btn ghost sm", onClick: () => setLibLevel(null) }, "Cancel"))))));
     }
-    function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId }) {
+    function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks }) {
         const [mode, setMode] = useState("lessons");
         const [form, setForm] = useState(null);
         const lib = useLibrary(db, userId);
@@ -1128,10 +1128,8 @@
                     "New lesson")),
             lib.on && (React.createElement("div", { className: "seg" },
                 React.createElement("button", { "aria-pressed": mode === "lessons", onClick: () => setMode("lessons") }, "Lessons"),
-                React.createElement("button", { "aria-pressed": mode === "library", onClick: () => setMode("library") },
-                    "Library",
-                    lib.items.length ? ` (${lib.items.length})` : ""))),
-            mode === "library" ? React.createElement(Library, { items: lib.items, onUse: usePlan, onRemove: (id) => lib.remove(id).catch(() => flash("That didn't save. Check your connection and try again.")) }) : (React.createElement(React.Fragment, null,
+                React.createElement("button", { "aria-pressed": mode === "library", onClick: () => setMode("library") }, "Library"))),
+            mode === "library" ? (React.createElement(CourseLibrary, { saved: lib.items, onUse: usePlan, decks: decks, saveDecks: saveDecks, groups: groups, flash: flash, onRemoveSaved: (id) => lib.remove(id).catch(() => flash("That didn't save. Check your connection and try again.")) })) : (React.createElement(React.Fragment, null,
                 form && (React.createElement("div", { className: "form" },
                     React.createElement(AskClaude, { sample: sample, title: "Draft with Claude", label: "What's the lesson about?", placeholder: "Present continuous for adult beginners", button: "Draft", makePrompt: lessonPrompt, onResult: (d) => {
                             if (!d || !d.title)
@@ -1155,7 +1153,7 @@
                     React.createElement("div", { className: "form-actions" },
                         React.createElement("button", { className: "btn", onClick: submit, disabled: !form.title.trim() }, "Save lesson"),
                         React.createElement("button", { className: "btn ghost", onClick: () => setForm(null) }, "Cancel")))),
-                sorted.length === 0 ? (!form && React.createElement(Empty, { text: "Add your first lesson to give students their notes and homework." })) : (React.createElement("ol", { className: "entries" }, sorted.map((l) => (React.createElement(LessonEntry, { key: l.id, lesson: l, teacher: true, onEdit: () => { setForm(Object.assign({}, l)); window.scrollTo(0, 0); }, onDelete: () => saveLessons(lessons.filter((x) => x.id !== l.id)), onSaveToLibrary: lib.on ? (level) => saveToLib(l, level) : null })))))))));
+                sorted.length === 0 ? (!form && React.createElement(Empty, { text: "Add your first lesson to give students their notes and homework, or open Library to use one of your lesson plans." })) : (React.createElement("ol", { className: "entries" }, sorted.map((l) => (React.createElement(LessonEntry, { key: l.id, lesson: l, teacher: true, onEdit: () => { setForm(Object.assign({}, l)); window.scrollTo(0, 0); }, onDelete: () => saveLessons(lessons.filter((x) => x.id !== l.id)), onSaveToLibrary: lib.on ? (level) => saveToLib(l, level) : null })))))))));
     }
     function HomeworkStudent({ lessons, me, done, onToggle }) {
         const { t } = useT();
@@ -1967,6 +1965,258 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                         React.createElement("button", { className: "btn sm", onClick: () => onUse(p) }, "Use"),
                         React.createElement(ConfirmButton, { iconOnly: true, label: `Delete ${p.title}`, onConfirm: () => onRemove(p.id) }))))))));
         })));
+    }
+    /* ---------- lesson plans (courses.json at the site root, written from the teacher's Claude docs) ---------- */
+    let coursesCache = null;
+    function useCourses() {
+        const [state, setState] = useState(() => (coursesCache ? { status: "ready", data: coursesCache } : { status: "loading", data: null }));
+        const [tries, setTries] = useState(0);
+        useEffect(() => {
+            if (coursesCache)
+                return undefined;
+            let live = true;
+            setState({ status: "loading", data: null });
+            fetch(window.BM_COURSES || "courses.json")
+                .then((r) => { if (!r.ok)
+                throw new Error("http " + r.status); return r.json(); })
+                .then((d) => {
+                coursesCache = { courses: arr(d && d.courses).filter((c) => c && c.id), wordLists: arr(d && d.wordLists).filter((w) => w && w.id) };
+                if (live)
+                    setState({ status: "ready", data: coursesCache });
+            })
+                .catch(() => { if (live)
+                setState({ status: "error", data: null }); });
+            return () => { live = false; };
+        }, [tries]);
+        return Object.assign(Object.assign({}, state), { retry: () => setTries((n) => n + 1) });
+    }
+    /* A small reader for the lesson text: ### headings, **bold**, _italic_, lists, nested lists and | tables |. */
+    const MD_INLINE = /\*\*([^*]+)\*\*|(^|[\s(“"'])_([^_\n]+)_(?=[\s.,;:!?)”"']|$)/g;
+    function mdInline(text, key) {
+        const src = String(text || "");
+        const out = [];
+        let last = 0;
+        let n = 0;
+        let m;
+        MD_INLINE.lastIndex = 0;
+        while ((m = MD_INLINE.exec(src))) {
+            if (m[1] !== undefined) {
+                out.push(src.slice(last, m.index));
+                out.push(React.createElement("strong", { key: key + "-" + n++ }, m[1]));
+            }
+            else {
+                out.push(src.slice(last, m.index) + m[2]);
+                out.push(React.createElement("em", { key: key + "-" + n++ }, m[3]));
+            }
+            last = MD_INLINE.lastIndex;
+        }
+        out.push(src.slice(last));
+        return out;
+    }
+    function mdBlocks(text) {
+        const lines = String(text || "").split("\n");
+        const blocks = [];
+        const itemRe = /^(\d+\.|-|\[ \])\s+(.*)$/;
+        let i = 0;
+        while (i < lines.length) {
+            const line = lines[i].trim();
+            if (!line) {
+                i++;
+                continue;
+            }
+            const h = /^(#{2,4})\s+(.*)$/.exec(line);
+            if (h) {
+                blocks.push({ t: "h", level: h[1].length, text: h[2] });
+                i++;
+                continue;
+            }
+            if (line.startsWith("|")) {
+                const rows = [];
+                while (i < lines.length && lines[i].trim().startsWith("|")) {
+                    const r = lines[i].trim();
+                    if (!/^\|[\s:|-]+\|$/.test(r))
+                        rows.push(r.replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim()));
+                    i++;
+                }
+                if (rows.length)
+                    blocks.push({ t: "table", rows });
+                continue;
+            }
+            const first = itemRe.exec(line);
+            if (first) {
+                const ordered = /^\d+\./.test(first[1]);
+                const items = [];
+                while (i < lines.length) {
+                    const raw = lines[i];
+                    const tr = raw.trim();
+                    if (!tr)
+                        break;
+                    const indent = raw.length - raw.replace(/^\s+/, "").length;
+                    const mm = itemRe.exec(tr);
+                    if (indent >= 2 && items.length) {
+                        const lastItem = items[items.length - 1];
+                        if (mm)
+                            lastItem.sub.push(mm[2]);
+                        else
+                            lastItem.text += " " + tr;
+                        i++;
+                        continue;
+                    }
+                    if (!mm || /^\d+\./.test(mm[1]) !== ordered)
+                        break;
+                    items.push({ text: mm[2], sub: [] });
+                    i++;
+                }
+                blocks.push({ t: ordered ? "ol" : "ul", items });
+                continue;
+            }
+            blocks.push({ t: "p", text: line });
+            i++;
+        }
+        return blocks;
+    }
+    function Md({ text }) {
+        const blocks = useMemo(() => mdBlocks(text), [text]);
+        return (React.createElement("div", { className: "md" }, blocks.map((b, k) => {
+            if (b.t === "h")
+                return b.level <= 3 ? React.createElement("h4", { key: k }, mdInline(b.text, k)) : React.createElement("h5", { key: k }, mdInline(b.text, k));
+            if (b.t === "p")
+                return React.createElement("p", { key: k }, mdInline(b.text, k));
+            if (b.t === "table") {
+                return (React.createElement("div", { key: k, className: "md-table" },
+                    React.createElement("table", null,
+                        React.createElement("thead", null,
+                            React.createElement("tr", null, b.rows[0].map((c, j) => React.createElement("th", { key: j, scope: "col" }, mdInline(c, k + "h" + j))))),
+                        React.createElement("tbody", null, b.rows.slice(1).map((r, ri) => React.createElement("tr", { key: ri }, r.map((c, j) => React.createElement("td", { key: j }, mdInline(c, k + "r" + ri + "c" + j)))))))));
+            }
+            const List = b.t === "ol" ? "ol" : "ul";
+            return (React.createElement(List, { key: k }, b.items.map((it, j) => (React.createElement("li", { key: j },
+                mdInline(it.text, k + "i" + j),
+                it.sub.length > 0 && React.createElement("ul", null, it.sub.map((x, si) => React.createElement("li", { key: si }, mdInline(x, k + "i" + j + "s" + si)))))))));
+        })));
+    }
+    function WordListOffers({ lists, decks, saveDecks, groups, flash }) {
+        const [openId, setOpenId] = useState(null);
+        const [group, setGroup] = useState(EVERYONE);
+        const added = (w) => decks.some((d) => d.title === w.title);
+        const add = (w) => {
+            const d = { id: uid(), title: w.title, group, cards: arr(w.cards).map((c) => ({ id: uid(), en: String(c.en || ""), fr: String(c.fr || ""), ex: String(c.ex || "") })).filter((c) => c.en && c.fr) };
+            saveDecks([d, ...decks]);
+            setOpenId(null);
+            flash(`${w.title} is in Words now, for ${group}.`);
+        };
+        return (React.createElement("div", { className: "day-block" },
+            React.createElement("p", { className: "day-name" }, "Word lists"),
+            React.createElement("p", { className: "hint" }, "Ready-made lists with the French. Add one and your students can practice it with flashcards and quizzes."),
+            React.createElement("ul", { className: "rows" }, lists.map((w) => (React.createElement("li", { key: w.id, className: "lib-row" },
+                React.createElement("div", { className: "row-main" },
+                    React.createElement("span", { className: "row-title" }, w.title),
+                    React.createElement("span", { className: "row-sub" },
+                        arr(w.cards).length,
+                        " words. ",
+                        w.about)),
+                React.createElement("div", { className: "pay-actions" }, added(w) ? React.createElement("span", { className: "muted small" },
+                    React.createElement(Icon, { name: "check", size: 15 }),
+                    " In Words")
+                    : openId !== w.id && React.createElement("button", { className: "btn sm", onClick: () => { setGroup(groups[1] || EVERYONE); setOpenId(w.id); } }, "Add to Words")),
+                openId === w.id && (React.createElement("div", { className: "inline-add lib-add" },
+                    React.createElement("select", { className: "inp", "aria-label": `Who ${w.title} is for`, value: group, onChange: (e) => setGroup(e.target.value) }, groups.map((g) => React.createElement("option", { key: g, value: g }, g))),
+                    React.createElement("button", { className: "btn sm", onClick: () => add(w) }, "Add"),
+                    React.createElement("button", { className: "btn ghost sm", onClick: () => setOpenId(null) }, "Cancel")))))))));
+    }
+    function CourseLibrary({ saved, onUse, onRemoveSaved, decks, saveDecks, groups, flash }) {
+        const { status, data, retry } = useCourses();
+        const [courseId, setCourseId] = useState(null);
+        const [itemId, setItemId] = useState(null);
+        const [q, setQ] = useState("");
+        const top = () => window.scrollTo(0, 0);
+        const savedBlock = saved.length > 0 && (React.createElement("div", { className: "day-block" },
+            React.createElement("p", { className: "day-name" }, "Saved by you"),
+            React.createElement(Library, { items: saved, onUse: onUse, onRemove: onRemoveSaved })));
+        if (status === "loading")
+            return React.createElement("p", { className: "muted" }, "Opening your lesson plans...");
+        if (status === "error") {
+            return (React.createElement(React.Fragment, null,
+                React.createElement(Empty, { text: "Your lesson plans didn't load. Check your connection and try again." },
+                    React.createElement("button", { className: "btn sm", onClick: retry }, "Try again")),
+                savedBlock));
+        }
+        const courses = data.courses;
+        const course = courses.find((c) => c.id === courseId);
+        const items = course ? arr(course.items) : [];
+        const item = items.find((x) => x.id === itemId);
+        if (course && item) {
+            const k = items.indexOf(item);
+            const prev = items[k - 1];
+            const next = items[k + 1];
+            return (React.createElement("article", { className: "lib-item" },
+                React.createElement("button", { className: "back-link", onClick: () => { setItemId(null); top(); } },
+                    React.createElement(Icon, { name: "left" }),
+                    course.title),
+                React.createElement("p", { className: "muted small" }, item.section),
+                React.createElement("h3", { className: "lib-title" }, item.title),
+                item.send && (React.createElement("div", { className: "lib-use" },
+                    React.createElement("button", { className: "btn", onClick: () => onUse(item.send) }, "Use for a class"),
+                    React.createElement("p", { className: "hint" }, "Opens a new lesson with the words and home practice filled in, ready to pick the group and save for your students."))),
+                React.createElement(Md, { text: item.body }),
+                React.createElement("div", { className: "lib-nav" },
+                    prev ? React.createElement("button", { className: "btn ghost sm", onClick: () => { setItemId(prev.id); top(); } },
+                        React.createElement(Icon, { name: "left", size: 16 }),
+                        "Previous") : React.createElement("span", null),
+                    next && React.createElement("button", { className: "btn ghost sm", onClick: () => { setItemId(next.id); top(); } },
+                        "Next",
+                        React.createElement(Icon, { name: "right", size: 16 })))));
+        }
+        if (course) {
+            const sections = [];
+            items.forEach((it) => {
+                let sec = sections.find((x) => x.name === it.section);
+                if (!sec) {
+                    sec = { name: it.section || "", intro: "", list: [] };
+                    sections.push(sec);
+                }
+                if (it.sectionIntro)
+                    sec.intro = it.sectionIntro;
+                sec.list.push(it);
+            });
+            return (React.createElement("section", null,
+                React.createElement("button", { className: "back-link", onClick: () => { setCourseId(null); top(); } },
+                    React.createElement(Icon, { name: "left" }),
+                    "All lesson plans"),
+                React.createElement("h3", { className: "lib-title" }, course.title),
+                course.about && React.createElement("p", { className: "muted lib-about" }, course.about),
+                sections.map((sec) => (React.createElement("div", { key: sec.name, className: "day-block" },
+                    React.createElement("p", { className: "day-name" }, sec.name),
+                    sec.intro && React.createElement("p", { className: "hint" }, sec.intro),
+                    React.createElement("ul", { className: "rows" }, sec.list.map((it) => (React.createElement("li", { key: it.id },
+                        React.createElement("button", { className: "row-btn", onClick: () => { setItemId(it.id); top(); } },
+                            React.createElement("span", { className: "row-main" },
+                                React.createElement("span", { className: "row-title" }, it.title),
+                                it.send && it.send.notes && React.createElement("span", { className: "row-sub clamp" }, it.send.notes.split("\n")[0])),
+                            React.createElement(Icon, { name: "right" })))))))))));
+        }
+        const ql = q.trim().toLowerCase();
+        const hits = ql.length >= 2
+            ? courses.flatMap((c) => arr(c.items).filter((it) => (it.title + "\n" + it.body).toLowerCase().includes(ql)).map((it) => ({ c, it }))).slice(0, 40)
+            : [];
+        return (React.createElement(React.Fragment, null,
+            React.createElement("input", { className: "inp lib-search", type: "search", "aria-label": "Search your lesson plans", placeholder: "Search, e.g. colors or airport", value: q, onChange: (e) => setQ(e.target.value) }),
+            ql.length >= 2 ? (hits.length ? (React.createElement("ul", { className: "rows" }, hits.map(({ c, it }) => (React.createElement("li", { key: c.id + it.id },
+                React.createElement("button", { className: "row-btn", onClick: () => { setCourseId(c.id); setItemId(it.id); setQ(""); top(); } },
+                    React.createElement("span", { className: "row-main" },
+                        React.createElement("span", { className: "row-title" }, it.title),
+                        React.createElement("span", { className: "row-sub" }, c.title)),
+                    React.createElement(Icon, { name: "right" }))))))) : React.createElement(Empty, { text: `Nothing in your lesson plans matches "${q.trim()}".` })) : (React.createElement(React.Fragment, null,
+                React.createElement("div", { className: "day-block" },
+                    React.createElement("p", { className: "day-name" }, "Lesson plans"),
+                    courses.length === 0 ? React.createElement(Empty, { text: "No lesson plans yet." }) : (React.createElement("ul", { className: "rows" }, courses.map((c) => (React.createElement("li", { key: c.id },
+                        React.createElement("button", { className: "row-btn", onClick: () => { setCourseId(c.id); top(); } },
+                            React.createElement("span", { className: "row-main" },
+                                React.createElement("span", { className: "row-title" }, c.title),
+                                React.createElement("span", { className: "row-sub" }, c.about)),
+                            React.createElement(Icon, { name: "right" })))))))),
+                data.wordLists.length > 0 && React.createElement(WordListOffers, { lists: data.wordLists, decks: decks, saveDecks: saveDecks, groups: groups, flash: flash }),
+                savedBlock))));
     }
     /* ---------- cancelling and moving a class ---------- */
     function upcomingClasses(slots, changes, now, days = 14) {
@@ -2991,7 +3241,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                     React.createElement(NoticesTeacher, { notices: view.notices, groups: groups, saveNotices: saveContent("notices"), flash: flash }),
                     React.createElement(Classes, { schedule: view.schedule, changes: view.changes, saveChanges: saveContent("changes"), notices: view.notices, saveNotices: saveContent("notices"), isTeacher: true, groups: groups, saveSchedule: saveContent("schedule"), flash: flash, roster: roster, att: attToday })));
             else if (current === "lessons")
-                screen = React.createElement(LessonsTeacher, { lessons: view.lessons, groups: groups, saveLessons: saveContent("lessons"), flash: flash, sample: null, db: db, userId: userId });
+                screen = React.createElement(LessonsTeacher, { lessons: view.lessons, groups: groups, saveLessons: saveContent("lessons"), flash: flash, sample: null, db: db, userId: userId, decks: view.decks, saveDecks: saveContent("decks") });
             else if (current === "words")
                 screen = React.createElement(WordsTeacher, { decks: view.decks, groups: groups, saveDecks: saveContent("decks"), openId: openDeck, setOpenId: setOpenDeck, sample: null });
             else if (current === "business")
