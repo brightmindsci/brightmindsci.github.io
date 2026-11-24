@@ -1098,10 +1098,13 @@
                     React.createElement("button", { className: "btn sm", onClick: () => { onSaveToLibrary(libLevel); setLibLevel(null); } }, "Save"),
                     React.createElement("button", { className: "btn ghost sm", onClick: () => setLibLevel(null) }, "Cancel"))))));
     }
-    function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks }) {
+    function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks, roster = [] }) {
         const [mode, setMode] = useState("lessons");
         const [form, setForm] = useState(null);
         const lib = useLibrary(db, userId);
+        const plansH = usePlans(db, userId);
+        const pending = useRef(null);
+        const [libKey, setLibKey] = useState(0); // tapping Library again goes back to its first page
         const blank = () => ({ id: null, date: todayISO(), group: groups[1] || EVERYONE, title: "", notes: "", homework: "", due: "" });
         const upd = (k) => (e) => setForm(Object.assign(Object.assign({}, form), { [k]: e.target.value }));
         const submit = () => {
@@ -1112,12 +1115,25 @@
                 saveLessons(lessons.map((l) => (l.id === form.id ? item : l)));
             else
                 saveLessons([Object.assign(Object.assign({}, item), { id: uid() }), ...lessons]);
+            const pend = pending.current;
+            pending.current = null;
+            if (pend && !form.id && plansH.on) {
+                const list = arr(plansH.plans[pend.studentId]);
+                if (list.some((x) => x.id === pend.planId))
+                    plansH.save(pend.studentId, list.map((x) => (x.id === pend.planId ? Object.assign(Object.assign({}, x), { used: form.date || todayISO() }) : x))).catch(() => { });
+            }
             setForm(null);
             flash("Lesson saved. Students can see it now.");
         };
         const saveToLib = (l, level) => lib.save({ id: uid(), title: l.title, level, notes: l.notes || "", homework: l.homework || "" })
             .then(() => flash(`Saved to your library under ${level}.`), () => flash("That didn't save. Check your connection and try again."));
-        const usePlan = (p) => { setMode("lessons"); setForm(Object.assign(Object.assign({}, blank()), { title: p.title || "", notes: p.notes || "", homework: p.homework || "" })); window.scrollTo(0, 0); };
+        const usePlan = (p, opt = {}) => {
+            const b = blank();
+            pending.current = opt.studentId && opt.planId ? { studentId: opt.studentId, planId: opt.planId } : null;
+            setMode("lessons");
+            setForm(Object.assign(Object.assign({}, b), { group: opt.group || b.group, title: p.title || "", notes: p.notes || "", homework: p.homework || "" }));
+            window.scrollTo(0, 0);
+        };
         const opts = form && !groups.includes(form.group) ? [...groups, form.group] : groups;
         const sorted = [...lessons].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
         return (React.createElement("section", null,
@@ -1128,8 +1144,8 @@
                     "New lesson")),
             lib.on && (React.createElement("div", { className: "seg" },
                 React.createElement("button", { "aria-pressed": mode === "lessons", onClick: () => setMode("lessons") }, "Lessons"),
-                React.createElement("button", { "aria-pressed": mode === "library", onClick: () => setMode("library") }, "Library"))),
-            mode === "library" ? (React.createElement(CourseLibrary, { saved: lib.items, onUse: usePlan, decks: decks, saveDecks: saveDecks, groups: groups, flash: flash, onRemoveSaved: (id) => lib.remove(id).catch(() => flash("That didn't save. Check your connection and try again.")) })) : (React.createElement(React.Fragment, null,
+                React.createElement("button", { "aria-pressed": mode === "library", onClick: () => { pending.current = null; setMode("library"); setLibKey((k) => k + 1); } }, "Library"))),
+            mode === "library" ? (React.createElement(CourseLibrary, { key: libKey, saved: lib.items, onUse: usePlan, decks: decks, saveDecks: saveDecks, groups: groups, flash: flash, roster: roster, plansH: plansH, onRemoveSaved: (id) => lib.remove(id).catch(() => flash("That didn't save. Check your connection and try again.")) })) : (React.createElement(React.Fragment, null,
                 form && (React.createElement("div", { className: "form" },
                     React.createElement(AskClaude, { sample: sample, title: "Draft with Claude", label: "What's the lesson about?", placeholder: "Present continuous for adult beginners", button: "Draft", makePrompt: lessonPrompt, onResult: (d) => {
                             if (!d || !d.title)
@@ -1152,7 +1168,7 @@
                         React.createElement("input", { id: "lesson-due", className: "inp", type: "date", value: form.due, onChange: upd("due") })),
                     React.createElement("div", { className: "form-actions" },
                         React.createElement("button", { className: "btn", onClick: submit, disabled: !form.title.trim() }, "Save lesson"),
-                        React.createElement("button", { className: "btn ghost", onClick: () => setForm(null) }, "Cancel")))),
+                        React.createElement("button", { className: "btn ghost", onClick: () => { pending.current = null; setForm(null); } }, "Cancel")))),
                 sorted.length === 0 ? (!form && React.createElement(Empty, { text: "Add your first lesson to give students their notes and homework, or open Library to use one of your lesson plans." })) : (React.createElement("ol", { className: "entries" }, sorted.map((l) => (React.createElement(LessonEntry, { key: l.id, lesson: l, teacher: true, onEdit: () => { setForm(Object.assign({}, l)); window.scrollTo(0, 0); }, onDelete: () => saveLessons(lessons.filter((x) => x.id !== l.id)), onSaveToLibrary: lib.on ? (level) => saveToLib(l, level) : null })))))))));
     }
     function HomeworkStudent({ lessons, me, done, onToggle }) {
@@ -2124,12 +2140,151 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                     React.createElement("button", { className: "btn sm", onClick: () => add(w) }, "Add"),
                     React.createElement("button", { className: "btn ghost sm", onClick: () => setOpenId(null) }, "Cancel")))))))));
     }
-    function CourseLibrary({ saved, onUse, onRemoveSaved, decks, saveDecks, groups, flash }) {
+    /* Each student's own list of lessons: data/users/{uid}/plans/{studentId} = { items: [{ id, course, item } | { id, custom: { title, notes, homework } }, used?] } */
+    function usePlans(db, userId) {
+        const path = db && userId ? "data/users/" + userId + "/plans" : "";
+        const [plans, setPlans] = useState({});
+        const [ready, setReady] = useState(false);
+        useEffect(() => {
+            if (!path)
+                return undefined;
+            let un = () => { };
+            try {
+                un = db.collection(path).onSnapshot((qs) => {
+                    const next = {};
+                    qs.docs.forEach((d) => { next[d.id] = arr((d.data() || {}).items); });
+                    setPlans(next);
+                    setReady(true);
+                }, () => setReady(true));
+            }
+            catch (e) {
+                setReady(true);
+            }
+            return () => un();
+        }, [path]);
+        const save = (studentId, items) => {
+            setPlans((cur) => (Object.assign(Object.assign({}, cur), { [studentId]: items })));
+            return queuedSet(db.collection(path).doc(studentId), { items, updated: new Date().toISOString() });
+        };
+        return { on: !!path, ready, plans, save };
+    }
+    const PLAN_SKIP = ["Start here", "Checklists", "Extras"];
+    const isLessonItem = (it) => !PLAN_SKIP.includes(it.section);
+    const lessonTopic = (title) => String(title || "").replace(/^(Lesson \d+|Bonus [A-Z]|Week \d+)\s*[–:-]\s*/, "");
+    function LessonPage({ backLabel, onBack, kicker, title, actions, body, prev, next, onPrev, onNext }) {
+        return (React.createElement("article", { className: "lib-item" },
+            React.createElement("button", { className: "back-link", onClick: onBack },
+                React.createElement(Icon, { name: "left" }),
+                backLabel),
+            kicker && React.createElement("p", { className: "muted small" }, kicker),
+            React.createElement("h3", { className: "lib-title" }, title),
+            actions && React.createElement("div", { className: "lib-use" }, actions),
+            React.createElement(Md, { text: body }),
+            React.createElement("div", { className: "lib-nav" },
+                prev ? React.createElement("button", { className: "btn ghost sm", onClick: onPrev },
+                    React.createElement(Icon, { name: "left", size: 16 }),
+                    "Previous") : React.createElement("span", null),
+                next && React.createElement("button", { className: "btn ghost sm", onClick: onNext },
+                    "Next",
+                    React.createElement(Icon, { name: "right", size: 16 })))));
+    }
+    function AddToStudent({ roster, onAdd }) {
+        const [open, setOpen] = useState(false);
+        const [sid, setSid] = useState("");
+        if (!roster.length)
+            return null;
+        if (!open)
+            return React.createElement("button", { className: "btn ghost sm", onClick: () => { setSid(roster[0].id); setOpen(true); } },
+                React.createElement(Icon, { name: "plus", size: 15 }),
+                "Add to a student's lessons");
+        return (React.createElement("div", { className: "inline-add lib-add" },
+            React.createElement("select", { className: "inp", "aria-label": "Which student", value: sid, onChange: (e) => setSid(e.target.value) }, roster.map((r) => React.createElement("option", { key: r.id, value: r.id }, r.name))),
+            React.createElement("button", { className: "btn sm", onClick: () => { onAdd(sid); setOpen(false); } }, "Add"),
+            React.createElement("button", { className: "btn ghost sm", onClick: () => setOpen(false) }, "Cancel")));
+    }
+    function AddLessons({ student, courses, have, onAddItems, onAddCustom, onBack }) {
+        const [openCourse, setOpenCourse] = useState(null);
+        const [picked, setPicked] = useState(() => new Set());
+        const [custom, setCustom] = useState({ title: "", notes: "", homework: "" });
+        const toggle = (key) => setPicked((cur) => { const n = new Set(cur); if (n.has(key))
+            n.delete(key);
+        else
+            n.add(key); return n; });
+        const addPicked = () => {
+            const list = [];
+            courses.forEach((c) => arr(c.items).forEach((it) => { if (picked.has(c.id + "/" + it.id))
+                list.push({ course: c.id, item: it.id }); }));
+            onAddItems(list);
+        };
+        const addBtn = picked.size > 0 && React.createElement("button", { className: "btn", onClick: addPicked },
+            "Add ",
+            picked.size,
+            " ",
+            picked.size === 1 ? "lesson" : "lessons");
+        return (React.createElement("section", null,
+            React.createElement("button", { className: "back-link", onClick: onBack },
+                React.createElement(Icon, { name: "left" }),
+                student.name,
+                "'s lessons"),
+            React.createElement("h3", { className: "lib-title" },
+                "Add lessons for ",
+                student.name),
+            React.createElement("p", { className: "hint" },
+                "Add a whole course, or tap Pick lessons and tick the ones you want. They go on ",
+                student.name,
+                "'s list in course order."),
+            addBtn && React.createElement("div", { className: "lib-use" }, addBtn),
+            React.createElement("ul", { className: "rows" }, courses.map((c) => {
+                const lessons = arr(c.items).filter(isLessonItem);
+                const fresh = lessons.filter((it) => !have.has(c.id + "/" + it.id));
+                const isOpen = openCourse === c.id;
+                return (React.createElement("li", { key: c.id },
+                    React.createElement("div", { className: "lib-row" },
+                        React.createElement("div", { className: "row-main" },
+                            React.createElement("span", { className: "row-title" }, c.title),
+                            React.createElement("span", { className: "row-sub" },
+                                lessons.length,
+                                " ",
+                                lessons.length === 1 ? "lesson" : "lessons",
+                                fresh.length < lessons.length ? `, ${lessons.length - fresh.length} already on the list` : "")),
+                        React.createElement("div", { className: "pay-actions" },
+                            fresh.length > 0 && React.createElement("button", { className: "btn sm", onClick: () => onAddItems(fresh.map((it) => ({ course: c.id, item: it.id }))) }, fresh.length === 1 ? "Add it" : `Add all ${fresh.length}`),
+                            React.createElement("button", { className: "btn ghost sm", "aria-expanded": isOpen, onClick: () => setOpenCourse(isOpen ? null : c.id) }, isOpen ? "Close" : "Pick lessons"))),
+                    isOpen && (React.createElement("div", { className: "pick-list" },
+                        lessons.map((it) => {
+                            const key = c.id + "/" + it.id;
+                            const already = have.has(key);
+                            return (React.createElement("label", { key: it.id, className: "check" },
+                                React.createElement("input", { type: "checkbox", checked: already || picked.has(key), disabled: already, onChange: () => toggle(key) }),
+                                React.createElement("span", null,
+                                    it.title,
+                                    already && React.createElement("span", { className: "muted small" }, " (on the list)"))));
+                        }),
+                        addBtn && React.createElement("div", { className: "lib-use" }, addBtn)))));
+            })),
+            React.createElement("div", { className: "day-block" },
+                React.createElement("p", { className: "day-name" },
+                    "Or write a lesson just for ",
+                    student.name),
+                React.createElement("div", { className: "form" },
+                    React.createElement(Field, { label: "Title" },
+                        React.createElement("input", { id: "own-title", className: "inp", value: custom.title, placeholder: "Talking about my weekend", onChange: (e) => setCustom(Object.assign(Object.assign({}, custom), { title: e.target.value })) })),
+                    React.createElement(Field, { label: "The plan" },
+                        React.createElement("textarea", { id: "own-notes", className: "inp", value: custom.notes, placeholder: "New words, phrases, what you'll do in class...", onChange: (e) => setCustom(Object.assign(Object.assign({}, custom), { notes: e.target.value })) })),
+                    React.createElement(Field, { label: "Home practice (optional)" },
+                        React.createElement("textarea", { id: "own-hw", className: "inp", value: custom.homework, placeholder: "Send me a voice note about your weekend.", onChange: (e) => setCustom(Object.assign(Object.assign({}, custom), { homework: e.target.value })) })),
+                    React.createElement("div", { className: "form-actions" },
+                        React.createElement("button", { className: "btn", disabled: !custom.title.trim(), onClick: () => onAddCustom({ title: custom.title.trim(), notes: custom.notes.trim(), homework: custom.homework.trim() }) },
+                            "Add to ",
+                            student.name,
+                            "'s lessons"))))));
+    }
+    function CourseLibrary({ saved, onUse, onRemoveSaved, decks, saveDecks, groups, flash, roster = [], plansH }) {
         const { status, data, retry } = useCourses();
-        const [courseId, setCourseId] = useState(null);
-        const [itemId, setItemId] = useState(null);
+        const [nav, setNav] = useState({ view: "home" });
         const [q, setQ] = useState("");
-        const top = () => window.scrollTo(0, 0);
+        const go = (n) => { setNav(n); window.scrollTo(0, 0); };
+        const fail = () => flash("That didn't save. Check your connection and try again.");
         const savedBlock = saved.length > 0 && (React.createElement("div", { className: "day-block" },
             React.createElement("p", { className: "day-name" }, "Saved by you"),
             React.createElement(Library, { items: saved, onUse: onUse, onRemove: onRemoveSaved })));
@@ -2142,32 +2297,118 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                 savedBlock));
         }
         const courses = data.courses;
-        const course = courses.find((c) => c.id === courseId);
-        const items = course ? arr(course.items) : [];
-        const item = items.find((x) => x.id === itemId);
-        if (course && item) {
-            const k = items.indexOf(item);
-            const prev = items[k - 1];
-            const next = items[k + 1];
-            return (React.createElement("article", { className: "lib-item" },
-                React.createElement("button", { className: "back-link", onClick: () => { setItemId(null); top(); } },
+        const students = [...roster].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+        const plansOn = !!(plansH && plansH.on);
+        const planOf = (sid) => (plansOn ? arr(plansH.plans[sid]) : []);
+        const findItem = (cid, iid) => {
+            const c = courses.find((x) => x.id === cid);
+            const it = c && arr(c.items).find((x) => x.id === iid);
+            return c && it ? { c, it } : null;
+        };
+        const entriesOf = (sid) => planOf(sid).map((p) => {
+            if (p.custom) {
+                const cu = p.custom;
+                return { p, title: cu.title, from: "Your own lesson", body: [cu.notes, cu.homework ? "**Home practice:** " + cu.homework : ""].filter(Boolean).join("\n\n") || "_No plan written yet._", send: { title: cu.title, notes: cu.notes || "", homework: cu.homework || "" } };
+            }
+            const f = findItem(p.course, p.item);
+            if (!f)
+                return { p, missing: true, title: "A lesson that's no longer in the library", from: "" };
+            return { p, title: f.it.title, from: f.c.title, body: f.it.body, send: f.it.send || { title: lessonTopic(f.it.title), notes: "", homework: "" } };
+        });
+        const savePlan = (sid, items, msg) => plansH.save(sid, items).then(() => { if (msg)
+            flash(msg); }, fail);
+        const appendTo = (sid, list) => {
+            const cur = planOf(sid);
+            const have = new Set(cur.filter((x) => !x.custom).map((x) => x.course + "/" + x.item));
+            const add = list.filter((x) => x.custom || !have.has(x.course + "/" + x.item)).map((x) => (Object.assign({ id: uid() }, x)));
+            const who = (roster.find((r) => r.id === sid) || {}).name || "the student";
+            if (!add.length) {
+                flash(`That's already on ${who}'s list.`);
+                return;
+            }
+            savePlan(sid, [...cur, ...add], add.length === 1 ? `Added to ${who}'s lessons.` : `Added ${add.length} lessons to ${who}'s list.`);
+        };
+        const studentLine = (r) => {
+            const es = entriesOf(r.id);
+            const done = es.filter((e) => e.p.used).length;
+            const nextE = es.find((e) => !e.p.used && !e.missing);
+            const grp = r.group && r.group !== r.name ? r.group + ". " : "";
+            if (!es.length)
+                return grp + "No lessons yet";
+            return grp + `${done} of ${es.length} taught` + (nextE ? `. Next: ${nextE.title}` : ". All taught");
+        };
+        /* one student's list */
+        if ((nav.view === "student" || nav.view === "add" || nav.view === "plan") && plansOn) {
+            const r = roster.find((x) => x.id === nav.studentId);
+            if (!r) {
+                setTimeout(() => go({ view: "home" }), 0);
+                return null;
+            }
+            const entries = entriesOf(r.id);
+            if (nav.view === "add") {
+                const have = new Set(planOf(r.id).filter((x) => !x.custom).map((x) => x.course + "/" + x.item));
+                return (React.createElement(AddLessons, { student: r, courses: courses, have: have, onBack: () => go({ view: "student", studentId: r.id }), onAddItems: (list) => { appendTo(r.id, list); go({ view: "student", studentId: r.id }); }, onAddCustom: (cu) => { appendTo(r.id, [{ custom: cu }]); go({ view: "student", studentId: r.id }); } }));
+            }
+            if (nav.view === "plan") {
+                const live = entries.filter((e) => !e.missing);
+                const k = live.findIndex((e) => e.p.id === nav.planId);
+                const e = live[k];
+                if (!e) {
+                    setTimeout(() => go({ view: "student", studentId: r.id }), 0);
+                    return null;
+                }
+                const setUsed = (val) => savePlan(r.id, planOf(r.id).map((x) => (x.id === e.p.id ? Object.assign(Object.assign({}, x), { used: val || null }) : x)), val ? "Marked as taught." : "Marked as not taught yet.");
+                return (React.createElement(LessonPage, { backLabel: `${r.name}'s lessons`, onBack: () => go({ view: "student", studentId: r.id }), kicker: e.from + (e.p.used ? `. Taught ${fmtDate(e.p.used)}` : ""), title: e.title, body: e.body, actions: (React.createElement(React.Fragment, null,
+                        React.createElement("button", { className: "btn", onClick: () => onUse(e.send, { group: r.group, studentId: r.id, planId: e.p.id }) }, e.p.used ? `Use again for ${r.name}` : `Use for ${r.name}'s class`),
+                        React.createElement("p", { className: "hint" },
+                            "Opens a new lesson for ",
+                            r.group || r.name,
+                            " with the words and home practice filled in. Saving it marks this lesson as taught."),
+                        React.createElement("div", { className: "pay-actions" },
+                            e.p.used ? React.createElement("button", { className: "btn ghost sm", onClick: () => setUsed(null) }, "Mark as not taught")
+                                : React.createElement("button", { className: "btn ghost sm", onClick: () => setUsed(todayISO()) },
+                                    React.createElement(Icon, { name: "check", size: 15 }),
+                                    "Mark as taught"),
+                            React.createElement(ConfirmButton, { label: `Remove from ${r.name}'s lessons`, onConfirm: () => { savePlan(r.id, planOf(r.id).filter((x) => x.id !== e.p.id), "Removed from the list."); go({ view: "student", studentId: r.id }); } })))), prev: live[k - 1], next: live[k + 1], onPrev: () => go({ view: "plan", studentId: r.id, planId: live[k - 1].p.id }), onNext: () => go({ view: "plan", studentId: r.id, planId: live[k + 1].p.id }) }));
+            }
+            const done = entries.filter((e) => e.p.used).length;
+            const nextIdx = entries.findIndex((e) => !e.p.used && !e.missing);
+            return (React.createElement("section", null,
+                React.createElement("button", { className: "back-link", onClick: () => go({ view: "home" }) },
                     React.createElement(Icon, { name: "left" }),
-                    course.title),
-                React.createElement("p", { className: "muted small" }, item.section),
-                React.createElement("h3", { className: "lib-title" }, item.title),
-                item.send && (React.createElement("div", { className: "lib-use" },
-                    React.createElement("button", { className: "btn", onClick: () => onUse(item.send) }, "Use for a class"),
-                    React.createElement("p", { className: "hint" }, "Opens a new lesson with the words and home practice filled in, ready to pick the group and save for your students."))),
-                React.createElement(Md, { text: item.body }),
-                React.createElement("div", { className: "lib-nav" },
-                    prev ? React.createElement("button", { className: "btn ghost sm", onClick: () => { setItemId(prev.id); top(); } },
-                        React.createElement(Icon, { name: "left", size: 16 }),
-                        "Previous") : React.createElement("span", null),
-                    next && React.createElement("button", { className: "btn ghost sm", onClick: () => { setItemId(next.id); top(); } },
-                        "Next",
-                        React.createElement(Icon, { name: "right", size: 16 })))));
+                    "Library"),
+                React.createElement("h3", { className: "lib-title" }, r.name),
+                React.createElement("p", { className: "muted lib-about" },
+                    r.group && r.group !== r.name ? `Group: ${r.group}. ` : "",
+                    entries.length ? `${done} of ${entries.length} lessons taught.` : "No lessons on the list yet."),
+                React.createElement("div", { className: "lib-use" },
+                    React.createElement("button", { className: "btn", onClick: () => go({ view: "add", studentId: r.id }) },
+                        React.createElement(Icon, { name: "plus", size: 16 }),
+                        "Add lessons")),
+                entries.length === 0 ? React.createElement(Empty, { text: `Add a whole course for ${r.name}, pick single lessons, or write your own.` }) : (React.createElement("ul", { className: "rows" }, entries.map((e, k) => (React.createElement("li", { key: e.p.id }, e.missing ? (React.createElement("div", { className: "lib-row" },
+                    React.createElement("div", { className: "row-main" },
+                        React.createElement("span", { className: "row-sub" }, e.title)),
+                    React.createElement(ConfirmButton, { iconOnly: true, label: "Remove it", onConfirm: () => savePlan(r.id, planOf(r.id).filter((x) => x.id !== e.p.id)) }))) : (React.createElement("button", { className: "row-btn", onClick: () => go({ view: "plan", studentId: r.id, planId: e.p.id }) },
+                    React.createElement("span", { className: "plan-num" + (e.p.used ? " is-done" : k === nextIdx ? " is-next" : ""), "aria-hidden": "true" }, e.p.used ? React.createElement(Icon, { name: "check", size: 14 }) : k + 1),
+                    React.createElement("span", { className: "row-main" },
+                        React.createElement("span", { className: "row-title" }, e.title),
+                        React.createElement("span", { className: "row-sub" }, e.p.used ? `Taught ${fmtDate(e.p.used)}` : k === nextIdx ? `Next. ${e.from}` : e.from)),
+                    React.createElement(Icon, { name: "right" }))))))))));
         }
-        if (course) {
+        /* a course and its lessons */
+        const course = courses.find((c) => c.id === nav.courseId);
+        const items = course ? arr(course.items) : [];
+        if (nav.view === "item" && course) {
+            const k = items.findIndex((x) => x.id === nav.itemId);
+            const item = items[k];
+            if (item) {
+                return (React.createElement(LessonPage, { backLabel: course.title, onBack: () => go({ view: "course", courseId: course.id }), kicker: item.section, title: item.title, body: item.body, actions: (React.createElement(React.Fragment, null,
+                        item.send && React.createElement("button", { className: "btn", onClick: () => onUse(item.send) }, "Use for a class"),
+                        item.send && React.createElement("p", { className: "hint" }, "Opens a new lesson with the words and home practice filled in, ready to pick the group and save for your students."),
+                        plansOn && isLessonItem(item) && React.createElement(AddToStudent, { roster: students, onAdd: (sid) => appendTo(sid, [{ course: course.id, item: item.id }]) }))), prev: items[k - 1], next: items[k + 1], onPrev: () => go({ view: "item", courseId: course.id, itemId: items[k - 1].id }), onNext: () => go({ view: "item", courseId: course.id, itemId: items[k + 1].id }) }));
+            }
+        }
+        if ((nav.view === "course" || nav.view === "item") && course) {
             const sections = [];
             items.forEach((it) => {
                 let sec = sections.find((x) => x.name === it.section);
@@ -2180,21 +2421,22 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                 sec.list.push(it);
             });
             return (React.createElement("section", null,
-                React.createElement("button", { className: "back-link", onClick: () => { setCourseId(null); top(); } },
+                React.createElement("button", { className: "back-link", onClick: () => go({ view: "home" }) },
                     React.createElement(Icon, { name: "left" }),
-                    "All lesson plans"),
+                    "Library"),
                 React.createElement("h3", { className: "lib-title" }, course.title),
                 course.about && React.createElement("p", { className: "muted lib-about" }, course.about),
                 sections.map((sec) => (React.createElement("div", { key: sec.name, className: "day-block" },
                     React.createElement("p", { className: "day-name" }, sec.name),
                     sec.intro && React.createElement("p", { className: "hint" }, sec.intro),
                     React.createElement("ul", { className: "rows" }, sec.list.map((it) => (React.createElement("li", { key: it.id },
-                        React.createElement("button", { className: "row-btn", onClick: () => { setItemId(it.id); top(); } },
+                        React.createElement("button", { className: "row-btn", onClick: () => go({ view: "item", courseId: course.id, itemId: it.id }) },
                             React.createElement("span", { className: "row-main" },
                                 React.createElement("span", { className: "row-title" }, it.title),
                                 it.send && it.send.notes && React.createElement("span", { className: "row-sub clamp" }, it.send.notes.split("\n")[0])),
                             React.createElement(Icon, { name: "right" })))))))))));
         }
+        /* the Library's first page */
         const ql = q.trim().toLowerCase();
         const hits = ql.length >= 2
             ? courses.flatMap((c) => arr(c.items).filter((it) => (it.title + "\n" + it.body).toLowerCase().includes(ql)).map((it) => ({ c, it }))).slice(0, 40)
@@ -2202,15 +2444,23 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         return (React.createElement(React.Fragment, null,
             React.createElement("input", { className: "inp lib-search", type: "search", "aria-label": "Search your lesson plans", placeholder: "Search, e.g. colors or airport", value: q, onChange: (e) => setQ(e.target.value) }),
             ql.length >= 2 ? (hits.length ? (React.createElement("ul", { className: "rows" }, hits.map(({ c, it }) => (React.createElement("li", { key: c.id + it.id },
-                React.createElement("button", { className: "row-btn", onClick: () => { setCourseId(c.id); setItemId(it.id); setQ(""); top(); } },
+                React.createElement("button", { className: "row-btn", onClick: () => { setQ(""); go({ view: "item", courseId: c.id, itemId: it.id }); } },
                     React.createElement("span", { className: "row-main" },
                         React.createElement("span", { className: "row-title" }, it.title),
                         React.createElement("span", { className: "row-sub" }, c.title)),
                     React.createElement(Icon, { name: "right" }))))))) : React.createElement(Empty, { text: `Nothing in your lesson plans matches "${q.trim()}".` })) : (React.createElement(React.Fragment, null,
+                plansOn && (React.createElement("div", { className: "day-block" },
+                    React.createElement("p", { className: "day-name" }, "Your students"),
+                    students.length === 0 ? React.createElement("p", { className: "hint" }, "Add your students in the Students tab, and each one gets a list of lessons here.") : (React.createElement("ul", { className: "rows" }, students.map((r) => (React.createElement("li", { key: r.id },
+                        React.createElement("button", { className: "row-btn", onClick: () => go({ view: "student", studentId: r.id }) },
+                            React.createElement("span", { className: "row-main" },
+                                React.createElement("span", { className: "row-title" }, r.name),
+                                React.createElement("span", { className: "row-sub" }, studentLine(r))),
+                            React.createElement(Icon, { name: "right" }))))))))),
                 React.createElement("div", { className: "day-block" },
-                    React.createElement("p", { className: "day-name" }, "Lesson plans"),
+                    React.createElement("p", { className: "day-name" }, "All lesson plans"),
                     courses.length === 0 ? React.createElement(Empty, { text: "No lesson plans yet." }) : (React.createElement("ul", { className: "rows" }, courses.map((c) => (React.createElement("li", { key: c.id },
-                        React.createElement("button", { className: "row-btn", onClick: () => { setCourseId(c.id); top(); } },
+                        React.createElement("button", { className: "row-btn", onClick: () => go({ view: "course", courseId: c.id }) },
                             React.createElement("span", { className: "row-main" },
                                 React.createElement("span", { className: "row-title" }, c.title),
                                 React.createElement("span", { className: "row-sub" }, c.about)),
@@ -3241,7 +3491,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                     React.createElement(NoticesTeacher, { notices: view.notices, groups: groups, saveNotices: saveContent("notices"), flash: flash }),
                     React.createElement(Classes, { schedule: view.schedule, changes: view.changes, saveChanges: saveContent("changes"), notices: view.notices, saveNotices: saveContent("notices"), isTeacher: true, groups: groups, saveSchedule: saveContent("schedule"), flash: flash, roster: roster, att: attToday })));
             else if (current === "lessons")
-                screen = React.createElement(LessonsTeacher, { lessons: view.lessons, groups: groups, saveLessons: saveContent("lessons"), flash: flash, sample: null, db: db, userId: userId, decks: view.decks, saveDecks: saveContent("decks") });
+                screen = React.createElement(LessonsTeacher, { lessons: view.lessons, groups: groups, saveLessons: saveContent("lessons"), flash: flash, sample: null, db: db, userId: userId, decks: view.decks, saveDecks: saveContent("decks"), roster: roster });
             else if (current === "words")
                 screen = React.createElement(WordsTeacher, { decks: view.decks, groups: groups, saveDecks: saveContent("decks"), openId: openDeck, setOpenId: setOpenDeck, sample: null });
             else if (current === "business")

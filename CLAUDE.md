@@ -38,5 +38,6 @@ The teacher's lesson plans, shown to the teacher only in Lessons → Library. Th
 - `site/content`: lessons, word lists, class times, announcements, prices, group counts. Everyone reads; the teacher writes.
 - `students/{code}`: one doc per student, keyed by their code, with their name, group and status (`st`: classes left, paid). Anyone can `get` a single code; only the teacher can list or write.
 - `data/users/{uid}/...`: the teacher's private records (fees, payments, attendance, schools, lesson library). Teacher only.
+- `data/users/{uid}/plans/{studentId}`: each student's own lesson list in Lessons → Library, `{ items: [{ id, course, item } | { id, custom: { title, notes, homework } }, used?: "YYYY-MM-DD"], updated }`. `course`/`item` are ids from `courses.json`, so keep those ids stable. "Use for <name>'s class" sets `used` when the new lesson is saved.
 
 If a change adds a new collection or path, update the rules too, or the app will get permission errors.

@@ -279,3 +279,10 @@ a.btn{text-decoration:none}
 .md-table th,.md-table td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line)}
 .md-table tr:last-child td{border-bottom:0}
 .md-table th{font-weight:700;background:var(--paper)}
+.lib-use .pay-actions{margin-top:10px}
+.plan-num{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);font-size:13px;font-weight:700;color:var(--ink-soft)}
+.plan-num.is-next{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
+.plan-num.is-done{background:var(--ok-bg);border-color:var(--ok-bg);color:var(--ok)}
+.pick-list{padding:4px 0 12px 4px}
+.pick-list .check{font-weight:400;align-items:flex-start}
+.pick-list .check input{flex:none;margin-top:1px}
