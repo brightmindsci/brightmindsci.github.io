@@ -1172,26 +1172,35 @@ function Classes({ schedule, changes = [], saveChanges, notices = [], saveNotice
   const upd = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const placeOf = (s) => s.place || (s.link ? t("online") : t("placeNotSet"));
   const fail = () => flash("That didn't save. Check your connection and try again.");
-  const toggleDay = (k) => setForm({ ...form, days: form.days.includes(k) ? form.days.filter((d) => d !== k) : [...form.days, k] });
+  /* Each picked day keeps its own start time; a newly ticked day starts with the last time used. */
+  const timeOf = (k) => (form.times && form.times[k]) || form.start;
+  const toggleDay = (k) => {
+    if (form.days.includes(k)) { setForm({ ...form, days: form.days.filter((d) => d !== k) }); return; }
+    const last = form.days.length ? timeOf(form.days[form.days.length - 1]) : form.start;
+    setForm({ ...form, days: [...form.days, k], times: { ...(form.times || {}), [k]: (form.times && form.times[k]) || last } });
+  };
+  const setTime = (k) => (e) => setForm({ ...form, start: e.target.value, times: { ...(form.times || {}), [k]: e.target.value } });
   /* Each picked day is saved as its own class, so one day can still be cancelled, moved or edited alone. */
   const submit = () => {
-    if (!form.start) return;
     const days = [...new Set(arr(form.days).map(Number))].sort((a, b) => a - b);
     if (!days.length) { setFormErr("Pick at least one day."); return; }
+    const noTime = days.find((d) => !timeOf(d));
+    if (noTime !== undefined) { setFormErr(`Add a start time for ${DAYS.en[noTime]}.`); return; }
     const link = form.link.trim();
     if (link && !isLink(link)) { setFormErr("An online link must start with https:// and have no spaces."); return; }
-    const base = { group: form.group, start: form.start, minutes: Number(form.minutes) || 60, place: form.place.trim() };
+    const base = { group: form.group, minutes: Number(form.minutes) || 60, place: form.place.trim() };
     if (link) base.link = link;
+    const slotFor = (d, id) => ({ id, ...base, day: d, start: timeOf(d) });
     let next = schedule;
     let rest = days;
     if (form.id) {
       const orig = schedule.find((x) => x.id === form.id);
       const keep = orig && days.includes(Number(orig.day)) ? Number(orig.day) : days[0];
-      next = schedule.map((x) => (x.id === form.id ? { id: form.id, ...base, day: keep } : x));
+      next = schedule.map((x) => (x.id === form.id ? slotFor(keep, form.id) : x));
       rest = days.filter((d) => d !== keep);
     }
-    const already = (d) => next.some((x) => x.group === base.group && Number(x.day) === d && x.start === base.start);
-    const added = rest.filter((d) => !already(d)).map((d) => ({ id: uid(), ...base, day: d }));
+    const already = (d) => next.some((x) => x.group === base.group && Number(x.day) === d && x.start === timeOf(d));
+    const added = rest.filter((d) => !already(d)).map((d) => slotFor(d, uid()));
     if (!form.id && !added.length) { setFormErr("That class is already on the schedule."); return; }
     saveSchedule([...next, ...added]);
     const n = (form.id ? 1 : 0) + added.length;
@@ -1230,7 +1239,7 @@ function Classes({ schedule, changes = [], saveChanges, notices = [], saveNotice
       <div className="h-row">
         <h2 className="h">{isTeacher ? "Classes" : t("myClasses")}</h2>
         {isTeacher && !form && !changeFor && (
-          <button className="btn sm" onClick={() => { setFormErr(""); setForm({ id: null, group: groups[1] || EVERYONE, days: [ti], start: "16:00", minutes: 60, place: "", link: "" }); }}>
+          <button className="btn sm" onClick={() => { setFormErr(""); setForm({ id: null, group: groups[1] || EVERYONE, days: [ti], times: { [ti]: "16:00" }, start: "16:00", minutes: 60, place: "", link: "" }); }}>
             <Icon name="plus" size={16} />Add class
           </button>
         )}
@@ -1245,10 +1254,20 @@ function Classes({ schedule, changes = [], saveChanges, notices = [], saveNotice
                 <button key={d} type="button" aria-label={d} aria-pressed={form.days.includes(k)} onClick={() => toggleDay(k)}>{d.slice(0, 3)}</button>
               ))}
             </div>
-            <span className="hint">{form.id ? "Tap another day to add the same class on that day too." : "Tap every day this group meets, like Monday and Thursday. Each day becomes its own class, so you can still cancel or move one day alone."}</span>
+            <span className="hint">{form.id ? "Tap another day to add this class on that day too, with its own start time." : "Tap every day this group meets. Each day can have its own start time, and each becomes its own class, so you can still cancel or move one day alone."}</span>
           </div>
+          {form.days.length > 1 && (
+            <div className="field">
+              <span id="class-times-label">Start time for each day</span>
+              <div className="day-times" role="group" aria-labelledby="class-times-label">
+                {[...form.days].sort((a, b) => a - b).map((k) => (
+                  <label key={k} className="day-time"><span>{DAYS.en[k]}</span><input id={"class-start-" + k} className="inp" type="time" value={timeOf(k)} onChange={setTime(k)} /></label>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="grid2">
-            <Field label="Starts at"><input id="class-start" className="inp" type="time" value={form.start} onChange={upd("start")} /></Field>
+            {form.days.length <= 1 && <Field label="Starts at"><input id="class-start" className="inp" type="time" value={form.days.length ? timeOf(form.days[0]) : form.start} onChange={form.days.length ? setTime(form.days[0]) : upd("start")} /></Field>}
             <Field label="Minutes"><input id="class-min" className="inp" type="number" inputMode="numeric" min="15" step="15" value={form.minutes} onChange={upd("minutes")} /></Field>
           </div>
           <Field label="Where"><input id="class-place" className="inp" placeholder="School, home or online" value={form.place} onChange={upd("place")} /></Field>
@@ -1347,7 +1366,7 @@ function Classes({ schedule, changes = [], saveChanges, notices = [], saveNotice
                     {s.link && <a className="btn ghost sm" href={s.link} target="_blank" rel="noopener noreferrer"><Icon name="video" size={16} />{t("join")}</a>}
                     {d === ti && !cancelledToday && taughtButton(s.id, s.group, placeName(s))}
                     {isTeacher && <button className="btn ghost sm" onClick={() => { setForm(null); setChangeFor({ slot: s.id, change: null }); window.scrollTo(0, 0); }}>Cancel or move</button>}
-                    {isTeacher && <button className="icon-btn sm-icon" aria-label="Edit class" onClick={() => { setChangeFor(null); setFormErr(""); setForm({ id: s.id, group: s.group, days: [Number(s.day)], start: s.start, minutes: s.minutes, place: s.place || "", link: s.link || "" }); window.scrollTo(0, 0); }}><Icon name="pencil" size={15} /></button>}
+                    {isTeacher && <button className="icon-btn sm-icon" aria-label="Edit class" onClick={() => { setChangeFor(null); setFormErr(""); setForm({ id: s.id, group: s.group, days: [Number(s.day)], times: { [Number(s.day)]: s.start }, start: s.start, minutes: s.minutes, place: s.place || "", link: s.link || "" }); window.scrollTo(0, 0); }}><Icon name="pencil" size={15} /></button>}
                     {isTeacher && <ConfirmButton iconOnly label="Delete class" onConfirm={() => saveSchedule(schedule.filter((x) => x.id !== s.id))} />}
                   </span>
                 </div>
