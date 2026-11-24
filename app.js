@@ -1233,21 +1233,43 @@
         const upd = (k) => (e) => setForm(Object.assign(Object.assign({}, form), { [k]: e.target.value }));
         const placeOf = (s) => s.place || (s.link ? t("online") : t("placeNotSet"));
         const fail = () => flash("That didn't save. Check your connection and try again.");
+        const toggleDay = (k) => setForm(Object.assign(Object.assign({}, form), { days: form.days.includes(k) ? form.days.filter((d) => d !== k) : [...form.days, k] }));
+        /* Each picked day is saved as its own class, so one day can still be cancelled, moved or edited alone. */
         const submit = () => {
             if (!form.start)
                 return;
+            const days = [...new Set(arr(form.days).map(Number))].sort((a, b) => a - b);
+            if (!days.length) {
+                setFormErr("Pick at least one day.");
+                return;
+            }
             const link = form.link.trim();
             if (link && !isLink(link)) {
                 setFormErr("An online link must start with https:// and have no spaces.");
                 return;
             }
-            const slot = { id: form.id || uid(), group: form.group, day: Number(form.day), start: form.start, minutes: Number(form.minutes) || 60, place: form.place.trim() };
+            const base = { group: form.group, start: form.start, minutes: Number(form.minutes) || 60, place: form.place.trim() };
             if (link)
-                slot.link = link;
-            saveSchedule(form.id ? schedule.map((x) => (x.id === form.id ? slot : x)) : [...schedule, slot]);
+                base.link = link;
+            let next = schedule;
+            let rest = days;
+            if (form.id) {
+                const orig = schedule.find((x) => x.id === form.id);
+                const keep = orig && days.includes(Number(orig.day)) ? Number(orig.day) : days[0];
+                next = schedule.map((x) => (x.id === form.id ? Object.assign(Object.assign({ id: form.id }, base), { day: keep }) : x));
+                rest = days.filter((d) => d !== keep);
+            }
+            const already = (d) => next.some((x) => x.group === base.group && Number(x.day) === d && x.start === base.start);
+            const added = rest.filter((d) => !already(d)).map((d) => (Object.assign(Object.assign({ id: uid() }, base), { day: d })));
+            if (!form.id && !added.length) {
+                setFormErr("That class is already on the schedule.");
+                return;
+            }
+            saveSchedule([...next, ...added]);
+            const n = (form.id ? 1 : 0) + added.length;
             setForm(null);
             setFormErr("");
-            flash("Class saved.");
+            flash(n > 1 ? `${n} classes saved.` : "Class saved.");
         };
         const isTaught = (key) => markable && att.taken.some((x) => x.slot === key && x.date === today);
         const toggleTaught = (key, group, place) => {
@@ -1281,15 +1303,17 @@
         return (React.createElement("section", null,
             React.createElement("div", { className: "h-row" },
                 React.createElement("h2", { className: "h" }, isTeacher ? "Classes" : t("myClasses")),
-                isTeacher && !form && !changeFor && (React.createElement("button", { className: "btn sm", onClick: () => { setFormErr(""); setForm({ id: null, group: groups[1] || EVERYONE, day: ti, start: "16:00", minutes: 60, place: "", link: "" }); } },
+                isTeacher && !form && !changeFor && (React.createElement("button", { className: "btn sm", onClick: () => { setFormErr(""); setForm({ id: null, group: groups[1] || EVERYONE, days: [ti], start: "16:00", minutes: 60, place: "", link: "" }); } },
                     React.createElement(Icon, { name: "plus", size: 16 }),
                     "Add class"))),
             form && (React.createElement("div", { className: "form" },
+                React.createElement(Field, { label: "Group" },
+                    React.createElement("select", { id: "class-group", className: "inp", value: form.group, onChange: upd("group") }, (groups.includes(form.group) ? groups : [...groups, form.group]).map((g) => React.createElement("option", { key: g, value: g }, g)))),
+                React.createElement("div", { className: "field" },
+                    React.createElement("span", { id: "class-days-label" }, "Days"),
+                    React.createElement("div", { className: "day-pick", role: "group", "aria-labelledby": "class-days-label" }, DAYS.en.map((d, k) => (React.createElement("button", { key: d, type: "button", "aria-label": d, "aria-pressed": form.days.includes(k), onClick: () => toggleDay(k) }, d.slice(0, 3))))),
+                    React.createElement("span", { className: "hint" }, form.id ? "Tap another day to add the same class on that day too." : "Tap every day this group meets, like Monday and Thursday. Each day becomes its own class, so you can still cancel or move one day alone.")),
                 React.createElement("div", { className: "grid2" },
-                    React.createElement(Field, { label: "Group" },
-                        React.createElement("select", { id: "class-group", className: "inp", value: form.group, onChange: upd("group") }, (groups.includes(form.group) ? groups : [...groups, form.group]).map((g) => React.createElement("option", { key: g, value: g }, g)))),
-                    React.createElement(Field, { label: "Day" },
-                        React.createElement("select", { id: "class-day", className: "inp", value: form.day, onChange: upd("day") }, DAYS.en.map((d, k) => React.createElement("option", { key: d, value: k }, d)))),
                     React.createElement(Field, { label: "Starts at" },
                         React.createElement("input", { id: "class-start", className: "inp", type: "time", value: form.start, onChange: upd("start") })),
                     React.createElement(Field, { label: "Minutes" },
@@ -1301,7 +1325,7 @@
                 React.createElement("p", { className: "hint" }, "Paste a Google Meet or Zoom link and students get a Join button."),
                 formErr && React.createElement("p", { className: "err", role: "alert" }, formErr),
                 React.createElement("div", { className: "form-actions" },
-                    React.createElement("button", { className: "btn", onClick: submit }, "Save class"),
+                    React.createElement("button", { className: "btn", onClick: submit }, form.days.length > 1 ? `Save ${form.days.length} classes` : "Save class"),
                     React.createElement("button", { className: "btn ghost", onClick: () => { setForm(null); setFormErr(""); } }, "Cancel")))),
             changeSlot && (React.createElement(ChangeForm, { key: changeFor.slot + (changeFor.change ? changeFor.change.id : ""), slot: changeSlot, change: changeFor.change, onSave: (v) => saveChange(changeSlot, changeFor.change, v), onCancel: () => setChangeFor(null) })),
             showSt && (React.createElement("div", { className: "status-card" },
@@ -1371,7 +1395,7 @@
                                     t("join")),
                                 d === ti && !cancelledToday && taughtButton(s.id, s.group, placeName(s)),
                                 isTeacher && React.createElement("button", { className: "btn ghost sm", onClick: () => { setForm(null); setChangeFor({ slot: s.id, change: null }); window.scrollTo(0, 0); } }, "Cancel or move"),
-                                isTeacher && React.createElement("button", { className: "icon-btn sm-icon", "aria-label": "Edit class", onClick: () => { setChangeFor(null); setFormErr(""); setForm({ id: s.id, group: s.group, day: s.day, start: s.start, minutes: s.minutes, place: s.place || "", link: s.link || "" }); window.scrollTo(0, 0); } },
+                                isTeacher && React.createElement("button", { className: "icon-btn sm-icon", "aria-label": "Edit class", onClick: () => { setChangeFor(null); setFormErr(""); setForm({ id: s.id, group: s.group, days: [Number(s.day)], start: s.start, minutes: s.minutes, place: s.place || "", link: s.link || "" }); window.scrollTo(0, 0); } },
                                     React.createElement(Icon, { name: "pencil", size: 15 })),
                                 isTeacher && React.createElement(ConfirmButton, { iconOnly: true, label: "Delete class", onConfirm: () => saveSchedule(schedule.filter((x) => x.id !== s.id)) }))));
                     })));

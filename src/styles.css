@@ -53,6 +53,10 @@ ul,ol{list-style:none;padding:0}
 .inp::placeholder{color:var(--ink-soft);opacity:.75}
 textarea.inp{min-height:88px;resize:vertical}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.day-pick{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.day-pick button{min-height:44px;padding:0;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink-soft);font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.day-pick button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
+.field>.hint{font-size:13px;font-weight:400;margin:2px 0 0}
 .form{padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface);margin-bottom:20px}
 .form-title{font-weight:700;margin-bottom:10px}
 .form-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
