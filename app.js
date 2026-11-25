@@ -93,14 +93,40 @@
     const ls = makeStore("localStorage");
     const ss = makeStore("sessionStorage");
     const canSpeak = "speechSynthesis" in window;
+    let enVoice = null;
+    function pickVoice() {
+        try {
+            const vs = (window.speechSynthesis.getVoices() || []).filter((v) => /^en[-_]/i.test(v.lang));
+            enVoice = vs.find((v) => /^en[-_]US/i.test(v.lang) && /samantha|google us|aaron|nicky|ava/i.test(v.name))
+                || vs.find((v) => /^en[-_]US/i.test(v.lang)) || vs.find((v) => /^en[-_]GB/i.test(v.lang)) || vs[0] || null;
+        }
+        catch (e) {
+            enVoice = null;
+        }
+    }
+    if (canSpeak) {
+        pickVoice();
+        try {
+            window.speechSynthesis.addEventListener("voiceschanged", pickVoice);
+        }
+        catch (e) { /* older browser */ }
+    }
+    let lastSaid = { text: "", at: 0 };
+    /* Saying the same thing again within a few seconds says it slowly. */
     function speak(text) {
         if (!canSpeak || !text)
             return;
         try {
+            const clean = String(text).replace(/_{2,}/g, "…").replace(/→/g, ",");
+            const now = Date.now();
+            const again = lastSaid.text === clean && now - lastSaid.at < 5000;
+            lastSaid = { text: clean, at: now };
             window.speechSynthesis.cancel();
-            const u = new SpeechSynthesisUtterance(text);
-            u.lang = "en-US";
-            u.rate = 0.85;
+            const u = new SpeechSynthesisUtterance(clean);
+            u.lang = enVoice ? enVoice.lang : "en-US";
+            if (enVoice)
+                u.voice = enVoice;
+            u.rate = again ? 0.6 : 0.85;
             window.speechSynthesis.speak(u);
         }
         catch (e) { /* no voice */ }
@@ -157,6 +183,26 @@
             trialHint: "This opens WhatsApp with a message ready to send.",
             yourLevel: (l) => `Your level: ${l}`, changesTitle: "Changes to classes", makeupLabel: "Make-up class",
             cancelledOn: (d, t) => `${d} at ${t}: cancelled`, makeupOn: (d, t) => `Make-up class on ${d} at ${t}`,
+            tabProgress: "Progress", cardsShort: "Cards", listenGame: "Listen", memoryGame: "Memory",
+            sayIt: "Say it", sayItAria: (w) => `Say "${w}"`, hearIt: (w) => `Hear "${w}"`, listening: "Listening... tap to stop", speakNow: "Say it now.",
+            saidRight: (h) => `Great! I heard "${h}".`, saidWrong: (h) => (h ? `I heard "${h}". Listen and try again.` : "Listen and try again."),
+            micBlocked: "The microphone is blocked. Allow it for this site in your phone's settings, then try again.", micNo: "The microphone doesn't work here on this phone.",
+            micNothing: "I didn't hear anything. Try again a little louder.", recordMe: "Record myself", recordAgain: "Record again", playMine: "Play mine",
+            hearModel: "Hear it", compareHint: "Listen to both and compare.",
+            practiceTitle: (n) => `Practice saying these (${n})`, practiceHint: "Tap the speaker to listen, then the microphone to say it. Tap the speaker twice to hear it slowly.",
+            practiceHintNoMic: "Tap the speaker to listen, then say it out loud. Tap twice to hear it slowly.",
+            listenTitle: "Listen and tap", listenHow: "Listen to the word, then tap the right picture.", listenHowRead: "Read the word, then tap the right picture.",
+            startGame: "Start", hearAgain: "Hear it again", tapPicture: "Tap the right picture", yesStar: "Yes! You get a star.", gotIt: "Yes, that's it!",
+            starsN: (n) => `${n} ${n === 1 ? "star" : "stars"}`, starsOf: (s, n) => `${s} ${s === 1 ? "star" : "stars"} out of ${n}!`, playAgain: "Play again",
+            pictureN: (k) => `Picture ${k}`, cardN: (k) => `Card ${k}`, pairsFound: (a, b) => `${a} of ${b} pairs`, movesN: (n) => `${n} ${n === 1 ? "try" : "tries"}`,
+            allPairs: (n) => `You found all the pairs in ${n} tries!`, memoryHow: "Find each picture and its word. Tap two cards.",
+            recordAnswer: "Record my answer", recordAnother: "Record another answer", recordHint: "Say your homework out loud. You can listen before you send it. Up to 2 minutes.",
+            startRec: "Start recording", stopRec: "Stop", sendTeacher: "Send to my teacher", sending: "Sending...", cancel: "Cancel",
+            voiceSent: (d) => `Sent to your teacher, ${d}`, voiceFail: "It didn't send. Check your internet and try again.",
+            voiceTooLong: "That recording is too long. Try one under 2 minutes.", teacherReplied: "Your teacher listened to your recording",
+            progressTitle: "What I can do", skillsCount: (n) => (n === 1 ? "thing I can do in English" : "things I can do in English"),
+            starsFromTeacher: (n) => `${n} ${n === 1 ? "star" : "stars"} from my teacher`, loadingProgress: "Opening your progress...",
+            noSkillsYet: "After your classes, your teacher ticks off what you can do. It will show up here.", comingNext: "Coming next", canDoSince: (d) => `Since ${d}`,
         },
         fr: {
             tagline: "Vocabulaire, devoirs et horaires de cours d'anglais, au même endroit.",
@@ -208,6 +254,26 @@
             trialHint: "WhatsApp s'ouvre avec un message prêt à envoyer.",
             yourLevel: (l) => `Votre niveau : ${l}`, changesTitle: "Changements", makeupLabel: "Rattrapage",
             cancelledOn: (d, t) => `${cap(d)} à ${t} : annulé`, makeupOn: (d, t) => `Cours de rattrapage le ${d} à ${t}`,
+            tabProgress: "Progrès", cardsShort: "Cartes", listenGame: "Écouter", memoryGame: "Mémoire",
+            sayIt: "Dites-le", sayItAria: (w) => `Dire « ${w} »`, hearIt: (w) => `Écouter « ${w} »`, listening: "J'écoute... touchez pour arrêter", speakNow: "Dites-le maintenant.",
+            saidRight: (h) => `Bravo ! J'ai entendu « ${h} ».`, saidWrong: (h) => (h ? `J'ai entendu « ${h} ». Écoutez et réessayez.` : "Écoutez et réessayez."),
+            micBlocked: "Le micro est bloqué. Autorisez-le pour ce site dans les réglages du téléphone, puis réessayez.", micNo: "Le micro ne marche pas ici sur ce téléphone.",
+            micNothing: "Je n'ai rien entendu. Réessayez un peu plus fort.", recordMe: "M'enregistrer", recordAgain: "Recommencer", playMine: "Écouter le mien",
+            hearModel: "Écouter le modèle", compareHint: "Écoutez les deux et comparez.",
+            practiceTitle: (n) => `S'entraîner à les dire (${n})`, practiceHint: "Touchez le haut-parleur pour écouter, puis le micro pour le dire. Touchez deux fois pour écouter lentement.",
+            practiceHintNoMic: "Touchez le haut-parleur pour écouter, puis dites-le à voix haute. Touchez deux fois pour écouter lentement.",
+            listenTitle: "Écoute et touche", listenHow: "Écoute le mot, puis touche la bonne image.", listenHowRead: "Lis le mot, puis touche la bonne image.",
+            startGame: "Commencer", hearAgain: "Réécouter", tapPicture: "Touche la bonne image", yesStar: "Oui ! Tu gagnes une étoile.", gotIt: "Oui, c'est ça !",
+            starsN: (n) => `${n} étoile${n > 1 ? "s" : ""}`, starsOf: (s, n) => `${s} étoile${s > 1 ? "s" : ""} sur ${n} !`, playAgain: "Rejouer",
+            pictureN: (k) => `Image ${k}`, cardN: (k) => `Carte ${k}`, pairsFound: (a, b) => `${a} paire${a > 1 ? "s" : ""} sur ${b}`, movesN: (n) => `${n} essai${n > 1 ? "s" : ""}`,
+            allPairs: (n) => `Tu as trouvé toutes les paires en ${n} essais !`, memoryHow: "Trouve chaque image et son mot. Touche deux cartes.",
+            recordAnswer: "Enregistrer ma réponse", recordAnother: "Enregistrer une autre réponse", recordHint: "Dites vos devoirs à voix haute. Vous pourrez écouter avant d'envoyer. 2 minutes au maximum.",
+            startRec: "Commencer l'enregistrement", stopRec: "Arrêter", sendTeacher: "Envoyer au professeur", sending: "Envoi...", cancel: "Annuler",
+            voiceSent: (d) => `Envoyé au professeur, ${d}`, voiceFail: "L'envoi n'a pas marché. Vérifiez votre connexion et réessayez.",
+            voiceTooLong: "Cet enregistrement est trop long. Essayez en moins de 2 minutes.", teacherReplied: "Votre professeur a écouté votre enregistrement",
+            progressTitle: "Ce que je sais faire", skillsCount: (n) => (n > 1 ? "choses que je sais faire en anglais" : "chose que je sais faire en anglais"),
+            starsFromTeacher: (n) => `${n} étoile${n > 1 ? "s" : ""} de mon professeur`, loadingProgress: "Ouverture de vos progrès...",
+            noSkillsYet: "Après les cours, votre professeur coche ce que vous savez faire. Ça s'affichera ici.", comingNext: "Bientôt", canDoSince: (d) => `Depuis le ${d}`,
         },
     };
     const LangCtx = createContext("en");
@@ -452,7 +518,7 @@
             const dir = Math.random() < 0.5 ? "en" : "fr";
             const answer = dir === "en" ? c.fr : c.en;
             const pool = [...new Set(cards.filter((x) => x.id !== c.id).map((x) => (dir === "en" ? x.fr : x.en)).filter((t) => t !== answer))];
-            return { id: c.id, dir, en: c.en, prompt: dir === "en" ? c.en : c.fr, answer, options: shuffle([answer, ...shuffle(pool).slice(0, 3)]) };
+            return { id: c.id, dir, en: c.en, pic: c.pic || "", prompt: dir === "en" ? c.en : c.fr, answer, options: shuffle([answer, ...shuffle(pool).slice(0, 3)]) };
         });
     }
     function parseBulk(text) {
@@ -462,10 +528,11 @@
                 return null;
             const en = l.slice(0, i).trim();
             const rest = l.slice(i + 1);
-            const j = rest.indexOf("|");
-            const fr = (j < 0 ? rest : rest.slice(0, j)).trim();
-            const ex = j < 0 ? "" : rest.slice(j + 1).trim();
-            return en && fr ? { id: uid(), en, fr, ex } : null;
+            const [frPart, exPart = "", picPart = ""] = rest.split("|");
+            const fr = frPart.trim();
+            const ex = exPart.trim();
+            const pic = picPart.trim().slice(0, 16);
+            return en && fr ? (pic ? { id: uid(), en, fr, ex, pic } : { id: uid(), en, fr, ex }) : null;
         }).filter(Boolean);
     }
     function whenLabel(at, t, lang) {
@@ -739,6 +806,16 @@
         briefcase: React.createElement(React.Fragment, null,
             React.createElement("rect", { width: "20", height: "14", x: "2", y: "7", rx: "2" }),
             React.createElement("path", { d: "M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" })),
+        mic: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }),
+            React.createElement("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }),
+            React.createElement("path", { d: "M12 19v3" })),
+        star: React.createElement("path", { d: "M12 2.5l2.94 5.96 6.58.96-4.76 4.64 1.12 6.55L12 17.52l-5.88 3.09 1.12-6.55L2.48 9.42l6.58-.96z" }),
+        stop: React.createElement("rect", { width: "12", height: "12", x: "6", y: "6", rx: "2" }),
+        play: React.createElement("path", { d: "M7 4.5v15l12-7.5z" }),
+        award: React.createElement(React.Fragment, null,
+            React.createElement("circle", { cx: "12", cy: "8", r: "6" }),
+            React.createElement("path", { d: "M15.5 12.9 17 22l-5-3-5 3 1.5-9.1" })),
         report: React.createElement(React.Fragment, null,
             React.createElement("path", { d: "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" }),
             React.createElement("path", { d: "M14 2v4a2 2 0 0 0 2 2h4" }),
@@ -930,6 +1007,401 @@
                 : !signedIn && React.createElement("button", { className: "link small", onClick: onSignIn }, t("teacherSignIn")))));
     }
     /* ---------- words: study ---------- */
+    /* ---------- saying it: the phone listens and checks ---------- */
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    const canRecord = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+    const NUM_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];
+    function normSay(s) {
+        return String(s || "").toLowerCase().replace(/[’‘`]/g, "'")
+            .replace(/\b(\w+)'m\b/g, "$1 am").replace(/\b(\w+)'re\b/g, "$1 are").replace(/\b(\w+)n't\b/g, "$1 not").replace(/\b(\w+)'ll\b/g, "$1 will")
+            .replace(/\b(it|that|what|where|who|how|there|here|he|she)'s\b/g, "$1 is").replace(/\bcan not\b/g, "cannot")
+            .replace(/\d+/g, (n) => (Number(n) <= 20 ? NUM_WORDS[Number(n)] : n))
+            .replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+    }
+    function editDistance(a, b) {
+        const m = a.length, n = b.length;
+        let prev = Array.from({ length: n + 1 }, (_, j) => j);
+        for (let i = 1; i <= m; i++) {
+            const cur = [i];
+            for (let j = 1; j <= n; j++)
+                cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+            prev = cur;
+        }
+        return prev[n];
+    }
+    function sameSaid(heard, target) {
+        const h = normSay(heard), w = normSay(target);
+        if (!h || !w)
+            return false;
+        if (h === w || (" " + h + " ").includes(" " + w + " "))
+            return true;
+        if (w.includes(" ") && w.includes(h) && h.length >= w.length * 0.7)
+            return true;
+        return editDistance(h, w) <= Math.max(1, Math.floor(w.length * 0.25));
+    }
+    const canSay = (text) => !!text && !/_{2,}/.test(text) && /[a-z]/i.test(text);
+    function pickMime() {
+        if (!window.MediaRecorder || !MediaRecorder.isTypeSupported)
+            return "";
+        return ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"].find((m) => { try {
+            return MediaRecorder.isTypeSupported(m);
+        }
+        catch (e) {
+            return false;
+        } }) || "";
+    }
+    const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+    /* Records from the microphone, up to maxSecs. */
+    function useRecorder(maxSecs) {
+        const { t } = useT();
+        const [state, setState] = useState("idle");
+        const [secs, setSecs] = useState(0);
+        const [blob, setBlob] = useState(null);
+        const [url, setUrl] = useState("");
+        const [error, setError] = useState("");
+        const r = useRef({ mr: null, stream: null, timer: null, t0: 0, audio: null, url: "" });
+        const setUrlSafe = (u) => { if (r.current.url)
+            URL.revokeObjectURL(r.current.url); r.current.url = u; setUrl(u); };
+        const release = () => { const x = r.current; clearInterval(x.timer); if (x.stream)
+            x.stream.getTracks().forEach((tr) => tr.stop()); x.stream = null; };
+        useEffect(() => () => {
+            const x = r.current;
+            if (x.mr && x.mr.state !== "inactive") {
+                x.mr.onstop = null;
+                try {
+                    x.mr.stop();
+                }
+                catch (e) { /* already stopped */ }
+            }
+            release();
+            if (x.url)
+                URL.revokeObjectURL(x.url);
+        }, []);
+        const start = async () => {
+            setError("");
+            try {
+                if (canSpeak)
+                    window.speechSynthesis.cancel();
+            }
+            catch (e) { /* nothing playing */ }
+            let stream;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            }
+            catch (e) {
+                setError(e && (e.name === "NotAllowedError" || e.name === "SecurityError") ? t("micBlocked") : t("micNo"));
+                return;
+            }
+            const mime = pickMime();
+            let mr;
+            try {
+                mr = new MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 32000 } : { audioBitsPerSecond: 32000 });
+            }
+            catch (e) {
+                try {
+                    mr = new MediaRecorder(stream);
+                }
+                catch (e2) {
+                    stream.getTracks().forEach((x) => x.stop());
+                    setError(t("micNo"));
+                    return;
+                }
+            }
+            const chunks = [];
+            mr.ondataavailable = (e) => { if (e.data && e.data.size)
+                chunks.push(e.data); };
+            mr.onstop = () => {
+                const took = Math.max(1, Math.round((Date.now() - r.current.t0) / 1000));
+                release();
+                const b = new Blob(chunks, { type: (mr.mimeType || mime || "audio/webm").split(";")[0] });
+                if (!b.size) {
+                    setState("idle");
+                    setError(t("micNothing"));
+                    return;
+                }
+                setBlob(b);
+                setSecs(Math.min(took, maxSecs));
+                setUrlSafe(URL.createObjectURL(b));
+                setState("done");
+            };
+            r.current.mr = mr;
+            r.current.stream = stream;
+            r.current.t0 = Date.now();
+            mr.start(1000);
+            setBlob(null);
+            setSecs(0);
+            setState("recording");
+            r.current.timer = setInterval(() => {
+                const s = Math.floor((Date.now() - r.current.t0) / 1000);
+                setSecs(s);
+                if (s >= maxSecs && mr.state !== "inactive") {
+                    try {
+                        mr.stop();
+                    }
+                    catch (e) { /* stopped */ }
+                }
+            }, 250);
+        };
+        const stop = () => { const mr = r.current.mr; if (mr && mr.state !== "inactive") {
+            try {
+                mr.stop();
+            }
+            catch (e) { /* stopped */ }
+        } };
+        const play = () => {
+            if (!r.current.url)
+                return;
+            try {
+                if (!r.current.audio)
+                    r.current.audio = new Audio();
+                r.current.audio.src = r.current.url;
+                r.current.audio.play().catch(() => { });
+            }
+            catch (e) { /* can't play */ }
+        };
+        const reset = () => { setBlob(null); setUrlSafe(""); setState("idle"); setSecs(0); setError(""); };
+        return { state, secs, blob, url, error, start, stop, play, reset };
+    }
+    /* Where the phone can't recognise speech: record yourself and compare. */
+    function RecordCompare({ text }) {
+        const { t } = useT();
+        const rec = useRecorder(8);
+        if (!canRecord)
+            return null;
+        return (React.createElement("div", { className: "say-it" },
+            React.createElement("div", { className: "say-row" },
+                rec.state === "recording"
+                    ? React.createElement("button", { className: "btn sm rec", onClick: rec.stop },
+                        React.createElement(Icon, { name: "stop", size: 15 }),
+                        t("stopRec"),
+                        " ",
+                        mmss(rec.secs))
+                    : React.createElement("button", { className: "btn ghost sm", onClick: rec.start },
+                        React.createElement(Icon, { name: "mic", size: 16 }),
+                        rec.url ? t("recordAgain") : t("recordMe")),
+                rec.url && rec.state !== "recording" && React.createElement("button", { className: "btn ghost sm", onClick: rec.play },
+                    React.createElement(Icon, { name: "play", size: 15 }),
+                    t("playMine")),
+                rec.url && rec.state !== "recording" && canSpeak && React.createElement("button", { className: "btn ghost sm", onClick: () => speak(text) },
+                    React.createElement(Icon, { name: "volume", size: 15 }),
+                    t("hearModel"))),
+            rec.error ? React.createElement("p", { className: "say-result error", role: "alert" }, rec.error) : rec.url && React.createElement("p", { className: "hint" }, t("compareHint"))));
+    }
+    /* "Say it": listens once, then says whether it understood. */
+    function SayIt({ text, compact = false }) {
+        const { t } = useT();
+        const [state, setState] = useState("idle");
+        const [heard, setHeard] = useState("");
+        const [err, setErr] = useState("");
+        const recRef = useRef(null);
+        useEffect(() => () => { try {
+            if (recRef.current)
+                recRef.current.abort();
+        }
+        catch (e) { /* stopped */ } }, []);
+        useEffect(() => { setState("idle"); setHeard(""); setErr(""); }, [text]);
+        if (!canSay(text))
+            return null;
+        if (!SpeechRec)
+            return compact ? null : React.createElement(RecordCompare, { text: text });
+        const start = () => {
+            try {
+                if (canSpeak)
+                    window.speechSynthesis.cancel();
+            }
+            catch (e) { /* nothing playing */ }
+            let r;
+            try {
+                r = new SpeechRec();
+            }
+            catch (e) {
+                setState("error");
+                setErr(t("micNo"));
+                return;
+            }
+            recRef.current = r;
+            r.lang = "en-US";
+            r.interimResults = false;
+            r.maxAlternatives = 5;
+            r.continuous = false;
+            let got = false;
+            r.onresult = (e) => {
+                got = true;
+                const alts = [];
+                for (let i = 0; i < e.results.length; i++)
+                    for (let j = 0; j < e.results[i].length; j++)
+                        alts.push(e.results[i][j].transcript);
+                const hit = alts.find((a) => sameSaid(a, text));
+                setHeard(String(hit || alts[0] || "").trim());
+                setState(hit ? "good" : "again");
+            };
+            r.onerror = (e) => {
+                got = true;
+                setState("error");
+                setErr(e.error === "not-allowed" || e.error === "service-not-allowed" ? t("micBlocked") : e.error === "no-speech" ? t("micNothing") : t("micNo"));
+            };
+            r.onend = () => { if (!got) {
+                setState("error");
+                setErr(t("micNothing"));
+            } };
+            setState("listening");
+            setHeard("");
+            setErr("");
+            try {
+                r.start();
+            }
+            catch (e) {
+                setState("error");
+                setErr(t("micNo"));
+            }
+        };
+        const stop = () => { try {
+            if (recRef.current)
+                recRef.current.stop();
+        }
+        catch (e) { /* stopped */ } };
+        const listening = state === "listening";
+        const msg = listening ? t("speakNow") : state === "good" ? t("saidRight", heard) : state === "again" ? t("saidWrong", heard) : state === "error" ? err : "";
+        if (compact) {
+            return (React.createElement("span", { className: "say-compact" },
+                React.createElement("button", { className: "icon-btn" + (listening ? " listening" : ""), "aria-label": listening ? t("listening") : t("sayItAria", text), onClick: listening ? stop : start },
+                    React.createElement(Icon, { name: "mic", size: 17 })),
+                React.createElement("span", { className: "say-mark " + state, role: "status", "aria-label": msg }, state === "good" ? React.createElement(Icon, { name: "check", size: 16 }) : state === "again" || state === "error" ? React.createElement(Icon, { name: "again", size: 15 }) : null)));
+        }
+        return (React.createElement("div", { className: "say-it" },
+            React.createElement("button", { className: "btn sm" + (listening ? " rec" : " ghost"), onClick: listening ? stop : start },
+                React.createElement(Icon, { name: "mic", size: 16 }),
+                listening ? t("listening") : t("sayIt")),
+            msg && React.createElement("p", { className: "say-result " + state, role: "status" }, msg)));
+    }
+    /* ---------- picture games for kids ---------- */
+    function ListenTap({ deck }) {
+        const { t } = useT();
+        const pool = deck.cards.filter((c) => c.pic);
+        const rounds = Math.min(8, pool.length * 2);
+        const makeRound = (prevId) => {
+            const target = shuffle(pool.filter((c) => c.id !== prevId))[0] || pool[0];
+            const seen = new Set([target.pic]);
+            const others = shuffle(pool.filter((c) => c.id !== target.id)).filter((c) => (seen.has(c.pic) ? false : (seen.add(c.pic), true))).slice(0, 3);
+            return { target, options: shuffle([target, ...others]) };
+        };
+        const [started, setStarted] = useState(false);
+        const [n, setN] = useState(0);
+        const [round, setRound] = useState(null);
+        const [stars, setStars] = useState(0);
+        const [wrong, setWrong] = useState([]);
+        const [right, setRight] = useState(false);
+        const begin = () => { const r = makeRound(); setRound(r); setN(0); setStars(0); setWrong([]); setRight(false); setStarted(true); speak(r.target.en); };
+        const next = () => {
+            if (n + 1 >= rounds) {
+                setN(rounds);
+                return;
+            }
+            const r = makeRound(round.target.id);
+            setRound(r);
+            setN(n + 1);
+            setWrong([]);
+            setRight(false);
+            speak(r.target.en);
+        };
+        const tap = (c) => {
+            if (right)
+                return;
+            speak(c.en);
+            if (c.id === round.target.id) {
+                setRight(true);
+                if (!wrong.length)
+                    setStars((s) => s + 1);
+            }
+            else
+                setWrong((w) => [...w, c.id]);
+        };
+        if (!started) {
+            return (React.createElement("div", { className: "seyes game-start" },
+                React.createElement("p", { className: "game-title" }, t("listenTitle")),
+                React.createElement("p", { className: "muted" }, canSpeak ? t("listenHow") : t("listenHowRead")),
+                React.createElement("button", { className: "btn", onClick: begin },
+                    React.createElement(Icon, { name: "play", size: 16 }),
+                    t("startGame"))));
+        }
+        if (n >= rounds) {
+            return (React.createElement("div", null,
+                React.createElement("div", { className: "seyes result" },
+                    React.createElement("p", { className: "game-stars big", "aria-hidden": "true" }, Array.from({ length: Math.max(1, Math.round((stars / rounds) * 3)) }, (_, k) => React.createElement(Icon, { key: k, name: "star", size: 34 }))),
+                    React.createElement("p", { className: "result-big" }, t("starsOf", stars, rounds))),
+                React.createElement("button", { className: "btn", onClick: begin },
+                    React.createElement(Icon, { name: "again", size: 16 }),
+                    t("playAgain"))));
+        }
+        return (React.createElement("div", null,
+            React.createElement("div", { className: "game-bar" },
+                React.createElement("span", { className: "muted small" }, t("xOfY", n + 1, rounds)),
+                React.createElement("span", { className: "game-stars", "aria-label": t("starsN", stars) }, Array.from({ length: stars }, (_, k) => React.createElement(Icon, { key: k, name: "star", size: 16 })))),
+            React.createElement("div", { className: "seyes game-ask" },
+                canSpeak
+                    ? React.createElement("button", { className: "btn ghost", onClick: () => speak(round.target.en) },
+                        React.createElement(Icon, { name: "volume", size: 18 }),
+                        t("hearAgain"))
+                    : React.createElement("span", { className: "face-word" }, round.target.en),
+                React.createElement("span", { className: "face-hint" }, t("tapPicture"))),
+            React.createElement("div", { className: "pic-grid" }, round.options.map((c, k) => {
+                const isR = right && c.id === round.target.id;
+                const isW = wrong.includes(c.id);
+                return (React.createElement("button", { key: c.id, className: "pic-opt" + (isR ? " right" : "") + (isW ? " wrong" : ""), onClick: () => tap(c), disabled: isW || right, "aria-label": isR || isW ? c.en : t("pictureN", k + 1) },
+                    React.createElement("span", { className: "pic-big", "aria-hidden": "true" }, c.pic),
+                    (isR || isW) && React.createElement("span", { className: "pic-word" }, c.en)));
+            })),
+            right && (React.createElement("div", { className: "feedback" },
+                React.createElement("p", { className: "verdict", role: "status" }, wrong.length ? t("gotIt") : t("yesStar")),
+                React.createElement("button", { className: "btn", onClick: next }, n + 1 < rounds ? t("nextQ") : t("seeScore"))))));
+    }
+    function Memory({ deck }) {
+        const { t } = useT();
+        const pool = deck.cards.filter((c) => c.pic);
+        const pairs = Math.min(6, pool.length);
+        const deal = () => shuffle(shuffle(pool).slice(0, pairs).flatMap((c) => [{ key: c.id + "p", id: c.id, kind: "pic", c }, { key: c.id + "w", id: c.id, kind: "word", c }]));
+        const [tiles, setTiles] = useState(deal);
+        const [open, setOpen] = useState([]);
+        const [found, setFound] = useState([]);
+        const [moves, setMoves] = useState(0);
+        const busy = useRef(false);
+        const flip = (tile) => {
+            if (busy.current || open.includes(tile.key) || found.includes(tile.id))
+                return;
+            speak(tile.c.en);
+            if (!open.length) {
+                setOpen([tile.key]);
+                return;
+            }
+            const first = tiles.find((x) => x.key === open[0]);
+            setMoves((m) => m + 1);
+            if (first && first.id === tile.id) {
+                setFound((f) => [...f, tile.id]);
+                setOpen([]);
+                return;
+            }
+            setOpen([open[0], tile.key]);
+            busy.current = true;
+            setTimeout(() => { setOpen([]); busy.current = false; }, 1100);
+        };
+        const restart = () => { setTiles(deal()); setOpen([]); setFound([]); setMoves(0); };
+        const won = found.length === pairs;
+        const starsWon = moves <= pairs + 2 ? 3 : moves <= pairs * 2 ? 2 : 1;
+        return (React.createElement("div", null,
+            React.createElement("div", { className: "game-bar" },
+                React.createElement("span", { className: "muted small" }, t("pairsFound", found.length, pairs)),
+                React.createElement("span", { className: "muted small" }, t("movesN", moves))),
+            won && (React.createElement("div", { className: "seyes result" },
+                React.createElement("p", { className: "game-stars big", "aria-hidden": "true" }, Array.from({ length: starsWon }, (_, k) => React.createElement(Icon, { key: k, name: "star", size: 34 }))),
+                React.createElement("p", { className: "result-big", role: "status" }, t("allPairs", moves)))),
+            React.createElement("div", { className: "mem-grid" }, tiles.map((x, k) => {
+                const shown = open.includes(x.key) || found.includes(x.id);
+                return (React.createElement("button", { key: x.key, className: "mem-tile" + (shown ? " shown" : "") + (found.includes(x.id) ? " found" : ""), onClick: () => flip(x), "aria-label": shown ? x.c.en : t("cardN", k + 1), "aria-pressed": shown }, shown ? (x.kind === "pic" ? React.createElement("span", { className: "pic-mid", "aria-hidden": "true" }, x.c.pic) : React.createElement("span", { className: "mem-word" }, x.c.en)) : React.createElement("span", { className: "mem-back", "aria-hidden": "true" }, "?")));
+            })),
+            won ? React.createElement("button", { className: "btn", onClick: restart },
+                React.createElement(Icon, { name: "again", size: 16 }),
+                t("playAgain")) : React.createElement("p", { className: "hint" }, t("memoryHow"))));
+    }
     function Flashcards({ cards }) {
         const { t } = useT();
         const [order, setOrder] = useState(() => cards.map((_, k) => k));
@@ -946,9 +1418,11 @@
             React.createElement("div", { key: order[i], className: "flip" + (flipped ? " is-flipped" : "") },
                 React.createElement("button", { type: "button", className: "flip-inner", onClick: () => setFlipped((f) => !f), "aria-label": flipped ? t("ariaBack", card.fr) : t("ariaFront", card.en) },
                     React.createElement("span", { className: "face seyes face-front" },
+                        card.pic && React.createElement("span", { className: "face-pic", "aria-hidden": "true" }, card.pic),
                         React.createElement("span", { className: "face-word" }, card.en),
                         React.createElement("span", { className: "face-hint" }, t("tapMeaning"))),
                     React.createElement("span", { className: "face seyes face-back" },
+                        card.pic && React.createElement("span", { className: "face-pic small", "aria-hidden": "true" }, card.pic),
                         React.createElement("span", { className: "face-word" }, card.fr),
                         card.ex && React.createElement("span", { className: "face-ex" }, card.ex)))),
             React.createElement("div", { className: "card-tools" },
@@ -956,6 +1430,7 @@
                 canSpeak && (React.createElement("button", { className: "btn ghost sm", onClick: () => speak(sayExample ? card.ex : card.en) },
                     React.createElement(Icon, { name: "volume", size: 16 }),
                     sayExample ? t("hearSentence") : t("hearWord")))),
+            React.createElement(SayIt, { text: card.en }),
             React.createElement("div", { className: "card-nav" },
                 React.createElement("button", { className: "btn ghost", onClick: () => go(-1) },
                     React.createElement(Icon, { name: "left" }),
@@ -1011,6 +1486,7 @@
             React.createElement("p", { className: "muted small", style: { marginBottom: 8 } }, t("questionN", idx + 1, qs.length)),
             React.createElement("div", { className: "seyes q-prompt" },
                 React.createElement("span", { className: "face-hint" }, q.dir === "en" ? t("whatMeans") : t("howSay")),
+                q.pic && React.createElement("span", { className: "face-pic small", "aria-hidden": "true" }, q.pic),
                 React.createElement("span", { className: "face-word" }, q.prompt)),
             React.createElement("div", { className: "options" }, q.options.map((o) => {
                 const isRight = picked !== null && o === q.answer;
@@ -1033,15 +1509,21 @@
     function Study({ deck, onBack, backLabel }) {
         const { t } = useT();
         const [mode, setMode] = useState("cards");
+        const games = deck.cards.filter((c) => c.pic).length >= 4;
         return (React.createElement("section", null,
             React.createElement("button", { className: "back-link", onClick: onBack },
                 React.createElement(Icon, { name: "left" }),
                 backLabel || t("allLists")),
             React.createElement("h2", { className: "h" }, deck.title),
             React.createElement("div", { className: "seg" },
-                React.createElement("button", { "aria-pressed": mode === "cards", onClick: () => setMode("cards") }, t("flashcards")),
-                React.createElement("button", { "aria-pressed": mode === "quiz", onClick: () => setMode("quiz") }, t("quiz"))),
-            deck.cards.length === 0 ? React.createElement(Empty, { text: t("emptyList") }) : mode === "cards" ? React.createElement(Flashcards, { cards: deck.cards }) : React.createElement(Quiz, { deck: deck })));
+                React.createElement("button", { "aria-pressed": mode === "cards", onClick: () => setMode("cards") }, games ? t("cardsShort") : t("flashcards")),
+                React.createElement("button", { "aria-pressed": mode === "quiz", onClick: () => setMode("quiz") }, t("quiz")),
+                games && React.createElement("button", { "aria-pressed": mode === "listen", onClick: () => setMode("listen") }, t("listenGame")),
+                games && React.createElement("button", { "aria-pressed": mode === "memory", onClick: () => setMode("memory") }, t("memoryGame"))),
+            deck.cards.length === 0 ? React.createElement(Empty, { text: t("emptyList") })
+                : mode === "listen" && games ? React.createElement(ListenTap, { key: deck.id, deck: deck })
+                    : mode === "memory" && games ? React.createElement(Memory, { key: deck.id, deck: deck })
+                        : mode === "quiz" ? React.createElement(Quiz, { deck: deck }) : React.createElement(Flashcards, { cards: deck.cards })));
     }
     function WordsStudent({ decks, me }) {
         const { t, lang } = useT();
@@ -1066,6 +1548,7 @@
         const [en, setEn] = useState("");
         const [fr, setFr] = useState("");
         const [ex, setEx] = useState("");
+        const [pic, setPic] = useState("");
         const [bulk, setBulk] = useState("");
         const [showBulk, setShowBulk] = useState(false);
         const enRef = useRef(null);
@@ -1079,10 +1562,14 @@
         const addCard = () => {
             if (!en.trim() || !fr.trim())
                 return;
-            onChange(Object.assign(Object.assign({}, deck), { cards: [...deck.cards, { id: uid(), en: en.trim(), fr: fr.trim(), ex: ex.trim() }] }));
+            const card = { id: uid(), en: en.trim(), fr: fr.trim(), ex: ex.trim() };
+            if (pic.trim())
+                card.pic = pic.trim().slice(0, 16);
+            onChange(Object.assign(Object.assign({}, deck), { cards: [...deck.cards, card] }));
             setEn("");
             setFr("");
             setEx("");
+            setPic("");
             if (enRef.current)
                 enRef.current.focus();
         };
@@ -1110,14 +1597,17 @@
                         React.createElement("input", { id: "word-fr", className: "inp", value: fr, placeholder: "la fen\u00EAtre", onChange: (e) => setFr(e.target.value), onKeyDown: enter }))),
                 React.createElement(Field, { label: "Example sentence (optional)" },
                     React.createElement("input", { id: "word-ex", className: "inp", value: ex, placeholder: "Open the window, please.", onChange: (e) => setEx(e.target.value), onKeyDown: enter })),
+                React.createElement(Field, { label: "Picture (optional): one emoji, like \uD83C\uDF4E" },
+                    React.createElement("input", { id: "word-pic", className: "inp pic-inp", value: pic, placeholder: "\uD83E\uDE9F", maxLength: 16, onChange: (e) => setPic(e.target.value), onKeyDown: enter }),
+                    React.createElement("span", { className: "hint" }, "Use your phone's emoji keyboard. Lists with 4 or more pictures get the kids' games.")),
                 React.createElement("div", { className: "form-actions" },
                     React.createElement("button", { className: "btn", onClick: addCard, disabled: !en.trim() || !fr.trim() },
                         React.createElement(Icon, { name: "plus", size: 16 }),
                         "Add word"),
                     React.createElement("button", { className: "btn ghost", onClick: () => setShowBulk((s) => !s) }, showBulk ? "Hide paste box" : "Paste many words")),
                 showBulk && (React.createElement("div", { style: { marginTop: 16 } },
-                    React.createElement(Field, { label: "One word per line: English = French | example" },
-                        React.createElement("textarea", { id: "word-bulk", className: "inp", rows: 5, value: bulk, onChange: (e) => setBulk(e.target.value), placeholder: "pencil = le crayon | I write with a pencil.\nruler = la règle" })),
+                    React.createElement(Field, { label: "One word per line: English = French | example | picture" },
+                        React.createElement("textarea", { id: "word-bulk", className: "inp", rows: 5, value: bulk, onChange: (e) => setBulk(e.target.value), placeholder: "pencil = le crayon | I write with a pencil. | ✏️\nruler = la règle" })),
                     React.createElement("button", { className: "btn", onClick: addBulk, disabled: !parsed.length },
                         "Add ",
                         parsed.length,
@@ -1128,6 +1618,7 @@
                 " ",
                 deck.cards.length === 1 ? "word" : "words"),
             deck.cards.length === 0 ? React.createElement(Empty, { text: "Add your first word above." }) : (React.createElement("ul", null, deck.cards.map((c) => (React.createElement("li", { key: c.id, className: "word-row" },
+                c.pic && React.createElement("span", { className: "row-pic", "aria-hidden": "true" }, c.pic),
                 React.createElement("div", { className: "row-main" },
                     React.createElement("span", { className: "row-title" }, c.en),
                     React.createElement("span", { className: "row-sub" }, c.fr),
@@ -1182,7 +1673,7 @@
                     React.createElement(Icon, { name: "right" })))))))));
     }
     /* ---------- lessons & homework ---------- */
-    function LessonEntry({ lesson: l, teacher = false, isDone = false, onToggle, onEdit, onDelete, onSaveToLibrary }) {
+    function LessonEntry({ lesson: l, teacher = false, isDone = false, onToggle, onEdit, onDelete, onSaveToLibrary, voice }) {
         const { t, lang } = useT();
         const [libLevel, setLibLevel] = useState(null);
         const d = l.date ? parseISO(l.date) : null;
@@ -1197,6 +1688,7 @@
                     "For ",
                     l.group || EVERYONE),
                 l.notes && React.createElement("p", { className: "notes" }, l.notes),
+                !teacher && React.createElement(PracticeSay, { items: practiceItems(l.notes) }),
                 l.homework && (React.createElement("div", { className: "hw" },
                     React.createElement("p", { className: "hw-head" },
                         t("homework"),
@@ -1205,7 +1697,8 @@
                     !teacher && onToggle && (React.createElement("button", { className: "btn sm" + (isDone ? " done" : ""), onClick: onToggle, "aria-pressed": isDone }, isDone ? React.createElement(React.Fragment, null,
                         React.createElement(Icon, { name: "check", size: 16 }),
                         t("done")) : t("markDone"))),
-                    !teacher && !isDone && pastDue && React.createElement("p", { className: "late" }, t("pastDue")))),
+                    !teacher && !isDone && pastDue && React.createElement("p", { className: "late" }, t("pastDue")),
+                    !teacher && voice && React.createElement(VoiceHomework, { lesson: l, me: voice.me, sent: voice.sent, reply: voice.reply, onSent: voice.onSent }))),
                 teacher && (React.createElement("div", { className: "entry-actions" },
                     React.createElement("button", { className: "btn ghost sm", onClick: onEdit },
                         React.createElement(Icon, { name: "pencil", size: 15 }),
@@ -1217,11 +1710,12 @@
                     React.createElement("button", { className: "btn sm", onClick: () => { onSaveToLibrary(libLevel); setLibLevel(null); } }, "Save"),
                     React.createElement("button", { className: "btn ghost sm", onClick: () => setLibLevel(null) }, "Cancel"))))));
     }
-    function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks, roster = [] }) {
+    function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks, roster = [], voiceNotes = {}, progressMap = {} }) {
         const [mode, setMode] = useState("lessons");
         const [form, setForm] = useState(null);
         const lib = useLibrary(db, userId);
         const plansH = usePlans(db, userId);
+        const newVoice = Object.values(voiceNotes).filter((v) => !v.heard).length;
         const pending = useRef(null);
         const [libKey, setLibKey] = useState(0); // tapping Library again goes back to its first page
         const blank = () => ({ id: null, date: todayISO(), group: groups[1] || EVERYONE, title: "", notes: "", homework: "", due: "" });
@@ -1263,8 +1757,11 @@
                     "New lesson")),
             lib.on && (React.createElement("div", { className: "seg" },
                 React.createElement("button", { "aria-pressed": mode === "lessons", onClick: () => setMode("lessons") }, "Lessons"),
-                React.createElement("button", { "aria-pressed": mode === "library", onClick: () => { pending.current = null; setMode("library"); setLibKey((k) => k + 1); } }, "Library"))),
-            mode === "library" ? (React.createElement(CourseLibrary, { key: libKey, saved: lib.items, onUse: usePlan, decks: decks, saveDecks: saveDecks, groups: groups, flash: flash, roster: roster, plansH: plansH, onRemoveSaved: (id) => lib.remove(id).catch(() => flash("That didn't save. Check your connection and try again.")) })) : (React.createElement(React.Fragment, null,
+                React.createElement("button", { "aria-pressed": mode === "library", onClick: () => { pending.current = null; setMode("library"); setLibKey((k) => k + 1); } }, "Library"),
+                React.createElement("button", { "aria-pressed": mode === "voice", onClick: () => { pending.current = null; setMode("voice"); } },
+                    "Voice notes",
+                    newVoice ? ` (${newVoice})` : ""))),
+            mode === "voice" ? React.createElement(VoiceInbox, { notes: voiceNotes, progressMap: progressMap, flash: flash }) : mode === "library" ? (React.createElement(CourseLibrary, { key: libKey, progressMap: progressMap, saved: lib.items, onUse: usePlan, decks: decks, saveDecks: saveDecks, groups: groups, flash: flash, roster: roster, plansH: plansH, onRemoveSaved: (id) => lib.remove(id).catch(() => flash("That didn't save. Check your connection and try again.")) })) : (React.createElement(React.Fragment, null,
                 form && (React.createElement("div", { className: "form" },
                     React.createElement(AskClaude, { sample: sample, title: "Draft with Claude", label: "What's the lesson about?", placeholder: "Present continuous for adult beginners", button: "Draft", makePrompt: lessonPrompt, onResult: (d) => {
                             if (!d || !d.title)
@@ -1290,12 +1787,184 @@
                         React.createElement("button", { className: "btn ghost", onClick: () => { pending.current = null; setForm(null); } }, "Cancel")))),
                 sorted.length === 0 ? (!form && React.createElement(Empty, { text: "Add your first lesson to give students their notes and homework, or open Library to use one of your lesson plans." })) : (React.createElement("ol", { className: "entries" }, sorted.map((l) => (React.createElement(LessonEntry, { key: l.id, lesson: l, teacher: true, onEdit: () => { setForm(Object.assign({}, l)); window.scrollTo(0, 0); }, onDelete: () => saveLessons(lessons.filter((x) => x.id !== l.id)), onSaveToLibrary: lib.on ? (level) => saveToLib(l, level) : null })))))))));
     }
-    function HomeworkStudent({ lessons, me, done, onToggle }) {
+    /* ---------- voice notes: a student's recorded homework, kept in Firestore in parts ---------- */
+    const VOICE_PART = 700000;
+    const blobToBase64 = (b) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1] || ""); fr.onerror = () => rej(fr.error); fr.readAsDataURL(b); });
+    async function sendVoice(blob, secs, lesson, me) {
+        const data = await blobToBase64(blob);
+        const n = Math.ceil(data.length / VOICE_PART);
+        if (!n || n > 6)
+            throw new Error("too-long");
+        const db = FB.db;
+        const ref = db.collection("voice").doc(uid() + uid());
+        const batch = db.batch();
+        batch.set(ref, {
+            sid: me.id, code: me.code, name: String(me.name || "").slice(0, 120), group: String(me.group || "").slice(0, 120),
+            title: String(lesson.title || "").slice(0, 200), lessonId: String(lesson.id || "").slice(0, 60),
+            mime: (blob.type || "audio/webm").slice(0, 40), secs: Math.round(secs), parts: n, at: new Date().toISOString(),
+        });
+        for (let k = 0; k < n; k++)
+            batch.set(ref.collection("parts").doc(String(k)), { d: data.slice(k * VOICE_PART, (k + 1) * VOICE_PART) });
+        await Promise.race([batch.commit(), new Promise((_, rej) => setTimeout(() => rej(new Error("slow")), 60000))]);
+        return ref.id;
+    }
+    async function loadVoice(v) {
+        const parts = await Promise.all(Array.from({ length: v.parts || 0 }, (_, k) => FB.db.doc(`voice/${v.id}/parts/${k}`).get()));
+        const b64 = parts.map((s) => (s.exists ? (s.data() || {}).d || "" : "")).join("");
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++)
+            bytes[i] = bin.charCodeAt(i);
+        return URL.createObjectURL(new Blob([bytes], { type: v.mime || "audio/mp4" }));
+    }
+    function deleteVoice(v) {
+        const db = FB.db;
+        const ref = db.doc("voice/" + v.id);
+        const batch = db.batch();
+        for (let k = 0; k < (v.parts || 0); k++)
+            batch.delete(ref.collection("parts").doc(String(k)));
+        batch.delete(ref);
+        return batch.commit();
+    }
+    /* progress/{studentId}: skills the teacher ticked, and replies to voice notes. Students read their own. */
+    function useProgressDoc(sid) {
+        const [doc, setDoc] = useState(null);
+        useEffect(() => {
+            setDoc(null);
+            if (!sid || !FB)
+                return undefined;
+            let un = () => { };
+            try {
+                un = FB.db.doc("progress/" + sid).onSnapshot((s) => setDoc(s.exists ? s.data() || {} : {}), () => setDoc({}));
+            }
+            catch (e) {
+                setDoc({});
+            }
+            return () => un();
+        }, [sid]);
+        return doc;
+    }
+    function useCollectionMap(path, on) {
+        const [map, setMap] = useState({});
+        const [ready, setReady] = useState(false);
+        useEffect(() => {
+            if (!on || !FB) {
+                setMap({});
+                setReady(false);
+                return undefined;
+            }
+            let un = () => { };
+            try {
+                un = FB.db.collection(path).onSnapshot((qs) => {
+                    const next = {};
+                    qs.docs.forEach((d) => { next[d.id] = Object.assign(Object.assign({}, (d.data() || {})), { id: d.id }); });
+                    setMap(next);
+                    setReady(true);
+                }, () => setReady(true));
+            }
+            catch (e) {
+                setReady(true);
+            }
+            return () => un();
+        }, [path, on]);
+        return { map, ready };
+    }
+    const saveReply = (sid, vid, reply) => FB.db.doc("progress/" + sid).set({ replies: { [vid]: reply }, updated: new Date().toISOString() }, { merge: true });
+    function VoiceHomework({ lesson, me, sent = [], reply, onSent }) {
+        const { t, lang } = useT();
+        const rec = useRecorder(120);
+        const [open, setOpen] = useState(false);
+        const [busy, setBusy] = useState(false);
+        const [err, setErr] = useState("");
+        if (!canRecord || !me || me.id === "guest" || !me.code)
+            return null;
+        const last = sent[sent.length - 1];
+        const send = async () => {
+            setBusy(true);
+            setErr("");
+            try {
+                const id = await sendVoice(rec.blob, rec.secs, lesson, me);
+                onSent({ id, at: new Date().toISOString(), secs: rec.secs });
+                rec.reset();
+                setOpen(false);
+            }
+            catch (e) {
+                setErr(e && e.message === "too-long" ? t("voiceTooLong") : t("voiceFail"));
+            }
+            setBusy(false);
+        };
+        return (React.createElement("div", { className: "voice-hw" },
+            reply && (React.createElement("div", { className: "voice-reply" },
+                React.createElement("p", { className: "voice-stars", "aria-label": t("starsN", reply.stars || 0) }, Array.from({ length: reply.stars || 0 }, (_, k) => React.createElement(Icon, { key: k, name: "star", size: 20 }))),
+                reply.note && React.createElement("p", { className: "voice-note" },
+                    "\u201C",
+                    reply.note,
+                    "\u201D"),
+                React.createElement("p", { className: "muted small" }, t("teacherReplied")))),
+            last && !open && React.createElement("p", { className: "muted small voice-sent" },
+                React.createElement(Icon, { name: "check", size: 14 }),
+                t("voiceSent", fmtDate(last.at.slice(0, 10), lang))),
+            !open ? (React.createElement("button", { className: "btn ghost sm", onClick: () => setOpen(true) },
+                React.createElement(Icon, { name: "mic", size: 16 }),
+                sent.length ? t("recordAnother") : t("recordAnswer"))) : (React.createElement("div", { className: "recorder" },
+                React.createElement("p", { className: "hint" }, t("recordHint")),
+                rec.state === "recording" ? (React.createElement("button", { className: "btn rec", onClick: rec.stop },
+                    React.createElement(Icon, { name: "stop", size: 16 }),
+                    t("stopRec"),
+                    " \u00B7 ",
+                    mmss(rec.secs))) : rec.state === "done" ? (React.createElement(React.Fragment, null,
+                    React.createElement("audio", { controls: true, src: rec.url, className: "voice-audio" }),
+                    React.createElement("div", { className: "pay-actions" },
+                        React.createElement("button", { className: "btn", onClick: send, disabled: busy }, busy ? t("sending") : t("sendTeacher")),
+                        React.createElement("button", { className: "btn ghost sm", onClick: rec.reset, disabled: busy }, t("recordAgain"))))) : (React.createElement("div", { className: "pay-actions" },
+                    React.createElement("button", { className: "btn", onClick: rec.start },
+                        React.createElement(Icon, { name: "mic", size: 16 }),
+                        t("startRec")),
+                    React.createElement("button", { className: "btn ghost sm", onClick: () => { rec.reset(); setOpen(false); } }, t("cancel")))),
+                (rec.error || err) && React.createElement("p", { className: "say-result error", role: "alert" }, rec.error || err)))));
+    }
+    /* Phrases worth saying out loud, taken from a lesson's notes: quoted phrases and the "New words" line. */
+    function practiceItems(text) {
+        const out = [];
+        const add = (s) => {
+            const x = String(s || "").trim().replace(/^[“"']+|[”"']+$/g, "").trim();
+            if (x && /[a-z]/i.test(x) && x.length <= 80 && !out.some((y) => y.toLowerCase() === x.toLowerCase()))
+                out.push(x);
+        };
+        String(text || "").split("\n").forEach((line) => {
+            const m = line.match(/^\s*(new words|words|vocabulary)\s*:\s*(.+)$/i);
+            if (m)
+                m[2].split(/[,;]/).forEach((w) => { const x = w.replace(/\(.*?\)/g, "").replace(/[.!]+$/, "").trim(); if (x && x.split(/\s+/).length <= 4)
+                    add(x); });
+            (line.match(/[“"]([^“”"]{2,80})[”"]/g) || []).forEach((q) => add(q.slice(1, -1)));
+        });
+        return out.slice(0, 16);
+    }
+    function PracticeSay({ items }) {
         const { t } = useT();
+        const [open, setOpen] = useState(false);
+        if (!items.length || !canSpeak)
+            return null;
+        return (React.createElement("div", { className: "practice" },
+            React.createElement("button", { className: "btn ghost sm", "aria-expanded": open, onClick: () => setOpen((o) => !o) },
+                React.createElement(Icon, { name: "volume", size: 16 }),
+                t("practiceTitle", items.length)),
+            open && (React.createElement(React.Fragment, null,
+                React.createElement("p", { className: "hint" }, SpeechRec ? t("practiceHint") : t("practiceHintNoMic")),
+                React.createElement("ul", { className: "practice-list" }, items.map((x) => (React.createElement("li", { key: x },
+                    React.createElement("span", { className: "practice-text" }, x),
+                    React.createElement("button", { className: "icon-btn", "aria-label": t("hearIt", x), onClick: () => speak(x) },
+                        React.createElement(Icon, { name: "volume", size: 17 })),
+                    SpeechRec && (canSay(x) ? React.createElement(SayIt, { text: x, compact: true }) : React.createElement("span", { className: "say-compact say-gap", "aria-hidden": "true" }))))))))));
+    }
+    function HomeworkStudent({ lessons, me, done, onToggle, prog, voiceSent = {}, onVoiceSent }) {
+        const { t } = useT();
+        const replies = Object.values((prog && prog.replies) || {});
+        const replyFor = (id) => replies.filter((r) => r.lessonId === id).sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")))[0];
         const list = lessons.filter((l) => forGroup(l.group, me.group)).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
         return (React.createElement("section", null,
             React.createElement("h2", { className: "h" }, t("homework")),
-            list.length === 0 ? React.createElement(Empty, { text: t("noLessons") }) : (React.createElement("ol", { className: "entries" }, list.map((l) => (React.createElement(LessonEntry, { key: l.id, lesson: l, isDone: !!done[l.id], onToggle: () => onToggle(l.id) })))))));
+            list.length === 0 ? React.createElement(Empty, { text: t("noLessons") }) : (React.createElement("ol", { className: "entries" }, list.map((l) => (React.createElement(LessonEntry, { key: l.id, lesson: l, isDone: !!done[l.id], onToggle: () => onToggle(l.id), voice: me && me.id !== "guest" ? { me, sent: arr(voiceSent[l.id]), reply: replyFor(l.id), onSent: (x) => onVoiceSent(l.id, x) } : null })))))));
     }
     /* ---------- announcements ---------- */
     const activeNotice = (n, today) => !n.until || n.until >= today;
@@ -2235,29 +2904,37 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         const [group, setGroup] = useState(EVERYONE);
         const added = (w) => decks.some((d) => d.title === w.title);
         const add = (w) => {
-            const d = { id: uid(), title: w.title, group, cards: arr(w.cards).map((c) => ({ id: uid(), en: String(c.en || ""), fr: String(c.fr || ""), ex: String(c.ex || "") })).filter((c) => c.en && c.fr) };
-            saveDecks([d, ...decks]);
+            const cards = arr(w.cards).map((c) => { const x = { id: uid(), en: String(c.en || ""), fr: String(c.fr || ""), ex: String(c.ex || "") }; if (c.pic)
+                x.pic = String(c.pic); return x; }).filter((c) => c.en && c.fr);
+            saveDecks([{ id: uid(), title: w.title, group, cards }, ...decks]);
             setOpenId(null);
             flash(`${w.title} is in Words now, for ${group}.`);
         };
+        const parts = [["Picture lists for kids", lists.filter((w) => w.kids)], ["More word lists", lists.filter((w) => !w.kids)]].filter(([, l]) => l.length);
         return (React.createElement("div", { className: "day-block" },
             React.createElement("p", { className: "day-name" }, "Word lists"),
-            React.createElement("p", { className: "hint" }, "Ready-made lists with the French. Add one and your students can practice it with flashcards and quizzes."),
-            React.createElement("ul", { className: "rows" }, lists.map((w) => (React.createElement("li", { key: w.id, className: "lib-row" },
-                React.createElement("div", { className: "row-main" },
-                    React.createElement("span", { className: "row-title" }, w.title),
-                    React.createElement("span", { className: "row-sub" },
-                        arr(w.cards).length,
-                        " words. ",
-                        w.about)),
-                React.createElement("div", { className: "pay-actions" }, added(w) ? React.createElement("span", { className: "muted small" },
-                    React.createElement(Icon, { name: "check", size: 15 }),
-                    " In Words")
-                    : openId !== w.id && React.createElement("button", { className: "btn sm", onClick: () => { setGroup(groups[1] || EVERYONE); setOpenId(w.id); } }, "Add to Words")),
-                openId === w.id && (React.createElement("div", { className: "inline-add lib-add" },
-                    React.createElement("select", { className: "inp", "aria-label": `Who ${w.title} is for`, value: group, onChange: (e) => setGroup(e.target.value) }, groups.map((g) => React.createElement("option", { key: g, value: g }, g))),
-                    React.createElement("button", { className: "btn sm", onClick: () => add(w) }, "Add"),
-                    React.createElement("button", { className: "btn ghost sm", onClick: () => setOpenId(null) }, "Cancel")))))))));
+            React.createElement("p", { className: "hint" }, "Ready-made lists with the French. Add one and your students can practice it with flashcards and quizzes. Lists with pictures also get two games for kids: Listen and Memory."),
+            parts.map(([label, part]) => (React.createElement("div", { key: label },
+                React.createElement("p", { className: "sub-h" }, label),
+                React.createElement("ul", { className: "rows" }, part.map((w) => (React.createElement("li", { key: w.id, className: "lib-row" },
+                    React.createElement("div", { className: "row-main" },
+                        React.createElement("span", { className: "row-title" },
+                            w.kids && arr(w.cards)[0] && React.createElement("span", { "aria-hidden": "true" },
+                                arr(w.cards)[0].pic,
+                                " "),
+                            w.title),
+                        React.createElement("span", { className: "row-sub" },
+                            arr(w.cards).length,
+                            " words. ",
+                            w.about)),
+                    React.createElement("div", { className: "pay-actions" }, added(w) ? React.createElement("span", { className: "muted small" },
+                        React.createElement(Icon, { name: "check", size: 15 }),
+                        " In Words")
+                        : openId !== w.id && React.createElement("button", { className: "btn sm", onClick: () => { setGroup(groups[1] || EVERYONE); setOpenId(w.id); } }, "Add to Words")),
+                    openId === w.id && (React.createElement("div", { className: "inline-add lib-add" },
+                        React.createElement("select", { className: "inp", "aria-label": `Who ${w.title} is for`, value: group, onChange: (e) => setGroup(e.target.value) }, groups.map((g) => React.createElement("option", { key: g, value: g }, g))),
+                        React.createElement("button", { className: "btn sm", onClick: () => add(w) }, "Add"),
+                        React.createElement("button", { className: "btn ghost sm", onClick: () => setOpenId(null) }, "Cancel"))))))))))));
     }
     /* Each student's own list of lessons: data/users/{uid}/plans/{studentId} = { items: [{ id, course, item } | { id, custom: { title, notes, homework } }, used?] } */
     function usePlans(db, userId) {
@@ -2398,7 +3075,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                             student.name,
                             "'s lessons"))))));
     }
-    function CourseLibrary({ saved, onUse, onRemoveSaved, decks, saveDecks, groups, flash, roster = [], plansH }) {
+    function CourseLibrary({ saved, onUse, onRemoveSaved, decks, saveDecks, groups, flash, roster = [], plansH, progressMap = {} }) {
         const { status, data, retry } = useCourses();
         const [nav, setNav] = useState({ view: "home" });
         const [q, setQ] = useState("");
@@ -2457,13 +3134,17 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
             return grp + `${done} of ${es.length} taught` + (nextE ? `. Next: ${nextE.title}` : ". All taught");
         };
         /* one student's list */
-        if ((nav.view === "student" || nav.view === "add" || nav.view === "plan") && plansOn) {
+        if ((nav.view === "student" || nav.view === "add" || nav.view === "plan" || nav.view === "skills") && plansOn) {
             const r = roster.find((x) => x.id === nav.studentId);
             if (!r) {
                 setTimeout(() => go({ view: "home" }), 0);
                 return null;
             }
             const entries = entriesOf(r.id);
+            if (nav.view === "skills") {
+                const planCourseIds = [...new Set(planOf(r.id).filter((x) => !x.custom).map((x) => x.course))];
+                return React.createElement(SkillsEditor, { student: r, courses: courses, planCourseIds: planCourseIds, prog: progressMap[r.id], flash: flash, onBack: () => go({ view: "student", studentId: r.id }) });
+            }
             if (nav.view === "add") {
                 const have = new Set(planOf(r.id).filter((x) => !x.custom).map((x) => x.course + "/" + x.item));
                 return (React.createElement(AddLessons, { student: r, courses: courses, have: have, onBack: () => go({ view: "student", studentId: r.id }), onAddItems: (list) => { appendTo(r.id, list); go({ view: "student", studentId: r.id }); }, onAddCustom: (cu) => { appendTo(r.id, [{ custom: cu }]); go({ view: "student", studentId: r.id }); } }));
@@ -2500,10 +3181,16 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                 React.createElement("p", { className: "muted lib-about" },
                     r.group && r.group !== r.name ? `Group: ${r.group}. ` : "",
                     entries.length ? `${done} of ${entries.length} lessons taught.` : "No lessons on the list yet."),
-                React.createElement("div", { className: "lib-use" },
+                React.createElement("div", { className: "lib-use pay-actions" },
                     React.createElement("button", { className: "btn", onClick: () => go({ view: "add", studentId: r.id }) },
                         React.createElement(Icon, { name: "plus", size: 16 }),
-                        "Add lessons")),
+                        "Add lessons"),
+                    React.createElement("button", { className: "btn ghost", onClick: () => go({ view: "skills", studentId: r.id }) },
+                        React.createElement(Icon, { name: "award", size: 16 }),
+                        "What ",
+                        r.name,
+                        " can do",
+                        (() => { const n = Object.keys(((progressMap[r.id] || {}).skills) || {}).length; return n ? ` (${n})` : ""; })())),
                 entries.length === 0 ? React.createElement(Empty, { text: `Add a whole course for ${r.name}, pick single lessons, or write your own.` }) : (React.createElement("ul", { className: "rows" }, entries.map((e, k) => (React.createElement("li", { key: e.p.id }, e.missing ? (React.createElement("div", { className: "lib-row" },
                     React.createElement("div", { className: "row-main" },
                         React.createElement("span", { className: "row-sub" }, e.title)),
@@ -2586,6 +3273,179 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                             React.createElement(Icon, { name: "right" })))))))),
                 data.wordLists.length > 0 && React.createElement(WordListOffers, { lists: data.wordLists, decks: decks, saveDecks: saveDecks, groups: groups, flash: flash }),
                 savedBlock))));
+    }
+    /* ---------- "What I can do": skills from the lesson plans, ticked by the teacher ---------- */
+    function skillRows(courses, skills, extraIds = []) {
+        const ticked = Object.keys(skills || {});
+        const ids = new Set(extraIds);
+        ticked.forEach((k) => ids.add(k.split("/")[0]));
+        return courses.filter((c) => ids.has(c.id) && arr(c.skills).length);
+    }
+    function ProgressStudent({ me, prog }) {
+        const { t, lang } = useT();
+        const { status, data } = useCourses();
+        const skills = (prog && prog.skills) || {};
+        const replies = Object.values((prog && prog.replies) || {});
+        const stars = replies.reduce((s, r) => s + (Number(r.stars) || 0), 0);
+        const done = Object.keys(skills).length;
+        const courses = status === "ready" ? skillRows(data.courses, skills, arr(prog && prog.courses)) : [];
+        return (React.createElement("section", null,
+            React.createElement("h2", { className: "h" }, t("progressTitle")),
+            React.createElement("div", { className: "seyes progress-sum" },
+                React.createElement("p", { className: "progress-big" }, done),
+                React.createElement("p", null, t("skillsCount", done)),
+                stars > 0 && React.createElement("p", { className: "progress-stars" },
+                    React.createElement(Icon, { name: "star", size: 18 }),
+                    t("starsFromTeacher", stars))),
+            prog === null || status === "loading" ? React.createElement("p", { className: "muted" }, t("loadingProgress"))
+                : courses.length === 0 ? React.createElement(Empty, { text: t("noSkillsYet") }) : courses.map((c) => {
+                    const units = [];
+                    arr(c.skills).forEach((s) => { let u = units.find((x) => x.name === s.unit); if (!u) {
+                        u = { name: s.unit, fr: s.unitFr || s.unit, list: [] };
+                        units.push(u);
+                    } u.list.push(s); });
+                    return units.map((u) => (React.createElement("div", { key: c.id + u.name, className: "day-block" },
+                        React.createElement("p", { className: "day-name" }, lang === "fr" ? u.fr : u.name),
+                        React.createElement("ul", { className: "skill-list" }, u.list.map((s) => {
+                            const when = skills[c.id + "/" + s.id];
+                            return (React.createElement("li", { key: s.id, className: when ? "got" : "" },
+                                React.createElement("span", { className: "skill-mark", "aria-hidden": "true" }, when ? React.createElement(Icon, { name: "check", size: 15 }) : null),
+                                React.createElement("span", { className: "skill-text" },
+                                    lang === "fr" ? s.fr : s.en,
+                                    React.createElement("span", { className: "muted small skill-when" }, when ? t("canDoSince", fmtDate(when, lang)) : t("comingNext")))));
+                        })))));
+                })));
+    }
+    function SkillsEditor({ student, courses, planCourseIds, prog, onBack, flash }) {
+        const skills = (prog && prog.skills) || {};
+        const [extra, setExtra] = useState([]);
+        const shownIds = [...new Set([...planCourseIds, ...arr(prog && prog.courses), ...extra])];
+        const shown = skillRows(courses, skills, shownIds);
+        const others = courses.filter((c) => arr(c.skills).length && !shown.some((x) => x.id === c.id));
+        const save = (nextSkills, ids) => FB.db.doc("progress/" + student.id).set({ skills: nextSkills, courses: ids, updated: new Date().toISOString() }, { mergeFields: ["skills", "courses", "updated"] })
+            .catch(() => flash("That didn't save. Check your connection and try again."));
+        const toggle = (key) => {
+            const next = Object.assign({}, skills);
+            if (next[key])
+                delete next[key];
+            else
+                next[key] = todayISO();
+            save(next, shown.map((c) => c.id));
+        };
+        const total = shown.reduce((n, c) => n + arr(c.skills).length, 0);
+        const got = shown.reduce((n, c) => n + arr(c.skills).filter((s) => skills[c.id + "/" + s.id]).length, 0);
+        return (React.createElement("section", null,
+            React.createElement("button", { className: "back-link", onClick: onBack },
+                React.createElement(Icon, { name: "left" }),
+                student.name,
+                "'s lessons"),
+            React.createElement("h3", { className: "lib-title" },
+                "What ",
+                student.name,
+                " can do"),
+            React.createElement("p", { className: "hint" },
+                "Tick a skill when ",
+                student.name,
+                " can do it without help. ",
+                student.name,
+                " and their family see the list, in English or French, in the Progress tab with their code."),
+            shown.length > 0 && React.createElement("p", { className: "muted lib-about" },
+                got,
+                " of ",
+                total,
+                " ticked."),
+            shown.length === 0 && React.createElement(Empty, { text: `Add a course to ${student.name}'s lessons, or pick one below, to see its skills.` }),
+            shown.map((c) => {
+                const units = [];
+                arr(c.skills).forEach((s) => { let u = units.find((x) => x.name === s.unit); if (!u) {
+                    u = { name: s.unit, list: [] };
+                    units.push(u);
+                } u.list.push(s); });
+                return (React.createElement("div", { key: c.id, className: "day-block" },
+                    React.createElement("p", { className: "day-name" }, c.title),
+                    units.map((u) => (React.createElement("div", { key: u.name, className: "skill-unit" },
+                        React.createElement("p", { className: "sub-h" }, u.name),
+                        u.list.map((s) => {
+                            const key = c.id + "/" + s.id;
+                            return (React.createElement("label", { key: s.id, className: "check skill-check" },
+                                React.createElement("input", { type: "checkbox", checked: !!skills[key], onChange: () => toggle(key) }),
+                                React.createElement("span", null,
+                                    s.en,
+                                    skills[key] && React.createElement("span", { className: "muted small" },
+                                        " \u00B7 ",
+                                        fmtDate(skills[key])))));
+                        }))))));
+            }),
+            others.length > 0 && (React.createElement("div", { className: "inline-add" },
+                React.createElement("select", { className: "inp", "aria-label": "Show skills from another course", value: "", onChange: (e) => { if (e.target.value)
+                        setExtra((x) => [...x, e.target.value]); } },
+                    React.createElement("option", { value: "" }, "Show skills from another course..."),
+                    others.map((c) => React.createElement("option", { key: c.id, value: c.id }, c.title)))))));
+    }
+    /* ---------- the teacher's voice-note inbox ---------- */
+    function VoiceNote({ v, reply, flash }) {
+        const [url, setUrl] = useState("");
+        const [failed, setFailed] = useState(false);
+        const [stars, setStars] = useState(reply ? reply.stars || 0 : 0);
+        const [note, setNote] = useState(reply ? reply.note || "" : "");
+        const [busy, setBusy] = useState(false);
+        useEffect(() => {
+            let live = true;
+            let made = "";
+            loadVoice(v).then((u) => { made = u; if (live)
+                setUrl(u);
+            else
+                URL.revokeObjectURL(u); }, () => { if (live)
+                setFailed(true); });
+            if (!v.heard)
+                FB.db.doc("voice/" + v.id).set({ heard: true }, { merge: true }).catch(() => { });
+            return () => { live = false; if (made)
+                URL.revokeObjectURL(made); };
+        }, [v.id]);
+        const send = () => {
+            setBusy(true);
+            const r = { stars, note: note.trim(), title: v.title || "", lessonId: v.lessonId || "", at: todayISO() };
+            Promise.all([saveReply(v.sid, v.id, r), FB.db.doc("voice/" + v.id).set({ heard: true, replied: true }, { merge: true })])
+                .then(() => flash(`Reply sent. ${v.name} sees it under that homework.`), () => flash("That didn't save. Check your connection and try again."))
+                .then(() => setBusy(false));
+        };
+        return (React.createElement("div", { className: "voice-open" },
+            failed ? React.createElement("p", { className: "say-result error" }, "This recording didn't load. Check your connection and try again.")
+                : url ? React.createElement("audio", { controls: true, src: url, className: "voice-audio" }) : React.createElement("p", { className: "muted small" }, "Loading the recording..."),
+            React.createElement("p", { className: "sub-h" }, "Your reply"),
+            React.createElement("div", { className: "star-pick", role: "group", "aria-label": "Stars" }, [1, 2, 3].map((n) => (React.createElement("button", { key: n, className: "star-btn" + (stars >= n ? " on" : ""), "aria-label": `${n} ${n === 1 ? "star" : "stars"}`, "aria-pressed": stars === n, onClick: () => setStars(stars === n ? 0 : n) },
+                React.createElement(Icon, { name: "star", size: 26 }))))),
+            React.createElement(Field, { label: "A short note (optional)" },
+                React.createElement("textarea", { className: "inp", rows: 2, value: note, placeholder: "Great pronunciation! Next time, say 'three' with your tongue between your teeth.", onChange: (e) => setNote(e.target.value) })),
+            React.createElement("div", { className: "pay-actions" },
+                React.createElement("button", { className: "btn", onClick: send, disabled: busy || (!stars && !note.trim()) }, reply ? "Update reply" : "Send reply"),
+                React.createElement(ConfirmButton, { label: "Delete recording", onConfirm: () => deleteVoice(v).then(() => flash("Recording deleted."), () => flash("That didn't delete. Try again.")) }))));
+    }
+    function VoiceInbox({ notes, progressMap, flash }) {
+        const [openId, setOpenId] = useState(null);
+        const list = Object.values(notes).sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
+        if (!list.length)
+            return React.createElement(Empty, { text: "When students record their homework, their voice notes show up here." });
+        return (React.createElement("ul", { className: "rows voice-list" }, list.map((v) => {
+            const reply = ((progressMap[v.sid] || {}).replies || {})[v.id];
+            const isOpen = openId === v.id;
+            const d = v.at ? new Date(v.at) : null;
+            const when = d ? d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) + ", " + d.toTimeString().slice(0, 5) : "";
+            return (React.createElement("li", { key: v.id },
+                React.createElement("button", { className: "row-btn", "aria-expanded": isOpen, onClick: () => setOpenId(isOpen ? null : v.id) },
+                    React.createElement("span", { className: "row-main" },
+                        React.createElement("span", { className: "row-title" },
+                            v.name,
+                            !v.heard && React.createElement("span", { className: "new-chip" }, "New")),
+                        React.createElement("span", { className: "row-sub" },
+                            v.title ? v.title + ". " : "",
+                            when,
+                            ". ",
+                            mmss(v.secs || 0),
+                            reply ? `. Replied${reply.stars ? " " + "★".repeat(reply.stars) : ""}` : "")),
+                    React.createElement(Icon, { name: isOpen ? "x" : "play", size: 16 })),
+                isOpen && React.createElement(VoiceNote, { v: v, reply: reply, flash: flash })));
+        })));
     }
     /* ---------- cancelling and moving a class ---------- */
     function upcomingClasses(slots, changes, now, days = 14) {
@@ -3488,6 +4348,9 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         const attToday = useAttendance(isTeacher ? db : null, userId, thisMonth);
         const moneyNow = useMoney(isTeacher ? db : null, userId, thisMonth);
         const bizH = useBiz(isTeacher ? db : null, userId);
+        const progressAll = useCollectionMap("progress", isTeacher);
+        const voiceAll = useCollectionMap("voice", isTeacher);
+        const [voiceSent, setVoiceSent] = useState(() => ls.get("bm:voice", {}) || {});
         const flash = (msg) => { setToast(msg); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(""), 3200); };
         const saveFail = () => flash("That didn't save. Check your connection and try again.");
         useEffect(() => {
@@ -3545,6 +4408,12 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
             return [EVERYONE, ...s];
         }, [roster]);
         const meR = !me ? null : me.id === "guest" ? GUEST : studentRec || null;
+        const progDoc = useProgressDoc(!isTeacher && meR && meR.id !== "guest" ? meR.id : null);
+        const addVoiceSent = (lessonId, x) => {
+            const next = Object.assign(Object.assign({}, voiceSent), { [lessonId]: [...arr(voiceSent[lessonId]), x].slice(-5) });
+            setVoiceSent(next);
+            ls.set("bm:voice", next);
+        };
         const toggleLang = () => { const next = lang === "fr" ? "en" : "fr"; setLang(next); ls.set("bm:lang", next); };
         const toggleDone = (lessonId) => {
             const next = Object.assign({}, done);
@@ -3581,7 +4450,9 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         const T = (k) => STR[uiLang][k];
         const tabs = isTeacher
             ? [{ id: "classes", label: "Classes", icon: "calendar" }, { id: "lessons", label: "Lessons", icon: "clipboard" }, { id: "words", label: "Words", icon: "book" }, { id: "students", label: "Students", icon: "users" }, { id: "business", label: "Business", icon: "briefcase" }]
-            : [{ id: "words", label: T("tabWords"), icon: "book" }, { id: "homework", label: T("tabHomework"), icon: "clipboard" }, { id: "classes", label: T("tabClasses"), icon: "calendar" }, { id: "pay", label: T("tabPay"), icon: "wallet" }];
+            : [{ id: "words", label: T("tabWords"), icon: "book" }, { id: "homework", label: T("tabHomework"), icon: "clipboard" },
+                ...(me && me.id !== "guest" ? [{ id: "progress", label: T("tabProgress"), icon: "award" }] : []),
+                { id: "classes", label: T("tabClasses"), icon: "calendar" }, { id: "pay", label: T("tabPay"), icon: "wallet" }];
         const current = tabs.some((t) => t.id === tab) ? tab : tabs[0].id;
         if (!FB)
             return React.createElement(Notice, { text: CONFIGURED ? "Bright Minds could not load. Check your internet connection, then open the page again." : "This app isn't connected to its database yet." });
@@ -3626,7 +4497,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                     React.createElement(NoticesTeacher, { notices: view.notices, groups: groups, saveNotices: saveContent("notices"), flash: flash }),
                     React.createElement(Classes, { schedule: view.schedule, changes: view.changes, saveChanges: saveContent("changes"), notices: view.notices, saveNotices: saveContent("notices"), isTeacher: true, groups: groups, saveSchedule: saveContent("schedule"), flash: flash, roster: roster, att: attToday })));
             else if (current === "lessons")
-                screen = React.createElement(LessonsTeacher, { lessons: view.lessons, groups: groups, saveLessons: saveContent("lessons"), flash: flash, sample: null, db: db, userId: userId, decks: view.decks, saveDecks: saveContent("decks"), roster: roster });
+                screen = React.createElement(LessonsTeacher, { lessons: view.lessons, groups: groups, saveLessons: saveContent("lessons"), flash: flash, sample: null, db: db, userId: userId, decks: view.decks, saveDecks: saveContent("decks"), roster: roster, voiceNotes: voiceAll.map, progressMap: progressAll.map });
             else if (current === "words")
                 screen = React.createElement(WordsTeacher, { decks: view.decks, groups: groups, saveDecks: saveContent("decks"), openId: openDeck, setOpenId: setOpenDeck, sample: null });
             else if (current === "business")
@@ -3639,13 +4510,16 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
             if (current === "words")
                 screen = React.createElement(WordsStudent, { decks: view.decks, me: meR });
             else if (current === "homework")
-                screen = React.createElement(HomeworkStudent, { lessons: view.lessons, me: meR, done: done, onToggle: toggleDone });
+                screen = React.createElement(HomeworkStudent, { lessons: view.lessons, me: meR, done: done, onToggle: toggleDone, prog: progDoc, voiceSent: voiceSent, onVoiceSent: addVoiceSent });
+            else if (current === "progress")
+                screen = React.createElement(ProgressStudent, { me: meR, prog: progDoc });
             else if (current === "pay")
                 screen = React.createElement(PayStudent, { pay: view.pay, me: meR, st: st });
             else
                 screen = React.createElement(Classes, { schedule: view.schedule, changes: view.changes, me: meR, st: st, updated: st && st.at ? st.at : null });
         }
         const today = todayISO();
+        const voiceNew = isTeacher ? Object.values(voiceAll.map).filter((v) => !v.heard).length : 0;
         const hwCount = isTeacher ? 0 : view.lessons.filter((l) => l.homework && forGroup(l.group, meR.group) && !done[l.id] && (!l.due || l.due >= today)).length;
         const fresh = isTeacher && rosterH.ready && roster.length === 0 && !view.lessons.length && !view.schedule.length;
         return (React.createElement(LangCtx.Provider, { value: uiLang },
@@ -3671,7 +4545,8 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                     React.createElement("div", { className: "dock-in" }, tabs.map((t) => (React.createElement("button", { key: t.id, className: "tab", "aria-current": current === t.id ? "page" : undefined, onClick: () => setTab(t.id) },
                         React.createElement(Icon, { name: t.icon, size: 22 }),
                         React.createElement("span", { className: "tab-label" }, t.label),
-                        t.id === "homework" && hwCount > 0 && React.createElement("span", { className: "badge", "aria-label": `${hwCount}` }, hwCount)))))))));
+                        t.id === "homework" && hwCount > 0 && React.createElement("span", { className: "badge", "aria-label": `${hwCount}` }, hwCount),
+                        t.id === "lessons" && voiceNew > 0 && React.createElement("span", { className: "badge", "aria-label": `${voiceNew} new voice notes` }, voiceNew)))))))));
     }
     ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App, null));
 })();

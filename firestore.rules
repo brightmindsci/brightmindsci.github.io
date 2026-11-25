@@ -8,17 +8,43 @@ service cloud.firestore {
         && request.auth.token.email_verified == true
         && request.auth.token.email.lower() in ['TEACHER_GOOGLE_ADDRESS'];
     }
-    // Lessons, word lists, class times, announcements, prices: everyone reads, only the teacher writes.
+    // A student's voice note: only for a real student code, and only these fields.
+    function validVoice(d) {
+      return d.keys().hasOnly(['sid', 'code', 'name', 'group', 'title', 'lessonId', 'mime', 'secs', 'parts', 'at'])
+        && d.code is string && d.code.size() <= 10
+        && exists(/databases/$(database)/documents/students/$(d.code))
+        && get(/databases/$(database)/documents/students/$(d.code)).data.id == d.sid
+        && d.parts is int && d.parts >= 1 && d.parts <= 6
+        && d.secs is number && d.secs <= 180
+        && d.title is string && d.title.size() <= 200
+        && d.name is string && d.name.size() <= 120
+        && d.mime is string && d.mime.size() <= 40
+        && d.at is string && d.at.size() <= 40;
+    }
     match /site/content {
       allow read: if true;
       allow write: if isTeacher();
     }
-    // One record per student, named by their code: open it only if you know the code.
     match /students/{code} {
       allow get: if true;
       allow list, write: if isTeacher();
     }
-    // Fees, payments, class counts, schools, phone numbers: the teacher only.
+    match /progress/{sid} {
+      allow get: if true;
+      allow list, write: if isTeacher();
+    }
+    match /voice/{vid} {
+      allow create: if isTeacher() || validVoice(request.resource.data);
+      allow read, update, delete: if isTeacher();
+      match /parts/{n} {
+        allow create: if n in ['0', '1', '2', '3', '4', '5']
+          && existsAfter(/databases/$(database)/documents/voice/$(vid))
+          && request.resource.data.keys().hasOnly(['d'])
+          && request.resource.data.d is string
+          && request.resource.data.d.size() <= 700000;
+        allow read, delete: if isTeacher();
+      }
+    }
     match /data/users/{uid}/{rest=**} {
       allow read, write: if isTeacher() && request.auth.uid == uid;
     }

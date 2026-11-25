@@ -294,3 +294,84 @@ a.btn{text-decoration:none}
 .install-steps li{display:flex;gap:12px;align-items:flex-start;margin-bottom:16px;font-size:16px;line-height:1.5}
 .step-n{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--ink);color:var(--on-ink);font-size:14px;font-weight:700}
 .install-link{font-size:14px;word-break:break-all;color:var(--ink-soft);margin:0 0 10px}
+
+/* say it and listen */
+.face-pic{display:block;font-size:64px;line-height:1.1;margin-bottom:6px}
+.face-pic.small{font-size:40px;margin-bottom:4px}
+.say-it{margin:4px 0 16px}
+.say-row{display:flex;flex-wrap:wrap;gap:8px}
+.say-result{font-size:15px;margin-top:8px}
+.say-result.good{color:var(--ok);font-weight:700}
+.say-result.again,.say-result.error{color:var(--bad)}
+.btn.rec{background:var(--bad);border-color:var(--bad);color:var(--on-ink)}
+.icon-btn.listening{background:var(--bad);border-color:var(--bad);color:var(--on-ink)}
+.say-compact{display:inline-flex;align-items:center;gap:4px;flex:none}
+.say-mark{display:inline-flex;width:18px;justify-content:center}
+.say-gap{width:62px}
+.say-mark.good{color:var(--ok)}
+.say-mark.again,.say-mark.error{color:var(--bad)}
+.practice{margin:10px 0 4px}
+.practice .hint{margin:10px 0 6px}
+.practice-list li{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+.practice-list li:last-child{border-bottom:0}
+.practice-text{flex:1;min-width:0;overflow-wrap:anywhere}
+.practice-list .icon-btn{width:40px;height:40px}
+
+/* picture games */
+.game-start{padding:22px 18px 22px 60px;margin-bottom:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.game-title{font-weight:700;font-size:20px}
+.game-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px;min-height:22px}
+.game-stars{display:inline-flex;gap:2px;color:var(--c3)}
+.game-stars svg{fill:currentColor}
+.game-stars.big{justify-content:center;margin-bottom:6px}
+.game-ask{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:16px 16px 16px 60px;margin-bottom:12px}
+.pic-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.pic-opt{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:128px;border:2px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);cursor:pointer;padding:8px}
+.pic-opt.right{border-color:var(--ok);background:var(--ok-bg)}
+.pic-opt.wrong{border-color:var(--bad);background:var(--bad-bg);opacity:.75}
+.pic-big{font-size:64px;line-height:1}
+.pic-word{font-weight:700;font-size:16px}
+.pic-opt.right .pic-word{color:var(--ok)}
+.pic-opt.wrong .pic-word{color:var(--bad)}
+.mem-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:14px}
+.mem-tile{aspect-ratio:1/1;max-width:100%;display:flex;align-items:center;justify-content:center;border-radius:14px;border:2px solid var(--line);background:var(--ink);color:var(--on-ink);cursor:pointer;padding:6px;min-width:0}
+.mem-tile.shown{background:var(--surface);color:var(--ink)}
+.mem-tile.found{border-color:var(--ok);background:var(--ok-bg)}
+.mem-back{font-size:30px;font-weight:700;opacity:.85}
+.pic-mid{font-size:44px;line-height:1}
+.mem-word{font-weight:700;font-size:16px;overflow-wrap:anywhere;text-align:center}
+.row-pic{flex:none;font-size:26px;line-height:1;width:34px;text-align:center}
+.pic-inp{max-width:120px;font-size:22px}
+
+/* voice notes */
+.voice-hw{margin-top:12px;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.voice-sent{display:inline-flex;align-items:center;gap:6px}
+.voice-reply{width:100%;padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--line)}
+.voice-stars{display:flex;gap:2px;color:var(--c3)}
+.voice-stars svg,.star-btn.on svg{fill:currentColor}
+.voice-note{font-size:15px;margin:4px 0}
+.recorder{width:100%;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.recorder .hint{margin:0}
+.voice-audio{width:100%;max-width:100%}
+.voice-open{padding:4px 2px 16px}
+.voice-open .sub-h{margin-top:14px}
+.star-pick{display:flex;gap:6px;margin-bottom:10px}
+.star-btn{width:48px;height:48px;display:inline-flex;align-items:center;justify-content:center;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);cursor:pointer}
+.star-btn.on{color:var(--c3);border-color:var(--c3)}
+.new-chip{display:inline-block;margin-left:8px;font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--margin);color:var(--on-ink);vertical-align:2px}
+
+/* what I can do */
+.progress-sum{padding:18px 16px 18px 60px;margin-bottom:18px}
+.progress-big{font-size:46px;font-weight:700;line-height:1.1}
+.progress-stars{display:flex;align-items:center;gap:6px;margin-top:6px;color:var(--ink)}
+.progress-stars svg{fill:var(--c3);color:var(--c3)}
+.skill-list li{display:flex;gap:12px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line)}
+.skill-list li:last-child{border-bottom:0}
+.skill-mark{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid var(--line);display:inline-flex;align-items:center;justify-content:center;margin-top:1px}
+.skill-list li.got .skill-mark{background:var(--ok);border-color:var(--ok);color:var(--on-ink)}
+.skill-list li:not(.got) .skill-text{color:var(--ink-soft)}
+.skill-text{min-width:0}
+.skill-when{display:block}
+.skill-unit{margin-bottom:10px}
+.skill-check{align-items:flex-start;font-weight:400;padding:6px 0}
+.skill-check input{flex:none;margin-top:3px}

@@ -78,10 +78,33 @@ const ls = makeStore("localStorage");
 const ss = makeStore("sessionStorage");
 
 const canSpeak = "speechSynthesis" in window;
+let enVoice = null;
+function pickVoice() {
+  try {
+    const vs = (window.speechSynthesis.getVoices() || []).filter((v) => /^en[-_]/i.test(v.lang));
+    enVoice = vs.find((v) => /^en[-_]US/i.test(v.lang) && /samantha|google us|aaron|nicky|ava/i.test(v.name))
+      || vs.find((v) => /^en[-_]US/i.test(v.lang)) || vs.find((v) => /^en[-_]GB/i.test(v.lang)) || vs[0] || null;
+  } catch (e) { enVoice = null; }
+}
+if (canSpeak) { pickVoice(); try { window.speechSynthesis.addEventListener("voiceschanged", pickVoice); } catch (e) { /* older browser */ } }
+let lastSaid = { text: "", at: 0 };
+/* Saying the same thing again within a few seconds says it slowly. */
 function speak(text) {
   if (!canSpeak || !text) return;
-  try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = "en-US"; u.rate = 0.85; window.speechSynthesis.speak(u); } catch (e) { /* no voice */ }
+  try {
+    const clean = String(text).replace(/_{2,}/g, "…").replace(/→/g, ",");
+    const now = Date.now();
+    const again = lastSaid.text === clean && now - lastSaid.at < 5000;
+    lastSaid = { text: clean, at: now };
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(clean);
+    u.lang = enVoice ? enVoice.lang : "en-US";
+    if (enVoice) u.voice = enVoice;
+    u.rate = again ? 0.6 : 0.85;
+    window.speechSynthesis.speak(u);
+  } catch (e) { /* no voice */ }
 }
+
 
 /* ---------- words on the student side, in English and French ---------- */
 const STR = {
@@ -135,6 +158,26 @@ const STR = {
     trialHint: "This opens WhatsApp with a message ready to send.",
     yourLevel: (l) => `Your level: ${l}`, changesTitle: "Changes to classes", makeupLabel: "Make-up class",
     cancelledOn: (d, t) => `${d} at ${t}: cancelled`, makeupOn: (d, t) => `Make-up class on ${d} at ${t}`,
+    tabProgress: "Progress", cardsShort: "Cards", listenGame: "Listen", memoryGame: "Memory",
+    sayIt: "Say it", sayItAria: (w) => `Say "${w}"`, hearIt: (w) => `Hear "${w}"`, listening: "Listening... tap to stop", speakNow: "Say it now.",
+    saidRight: (h) => `Great! I heard "${h}".`, saidWrong: (h) => (h ? `I heard "${h}". Listen and try again.` : "Listen and try again."),
+    micBlocked: "The microphone is blocked. Allow it for this site in your phone's settings, then try again.", micNo: "The microphone doesn't work here on this phone.",
+    micNothing: "I didn't hear anything. Try again a little louder.", recordMe: "Record myself", recordAgain: "Record again", playMine: "Play mine",
+    hearModel: "Hear it", compareHint: "Listen to both and compare.",
+    practiceTitle: (n) => `Practice saying these (${n})`, practiceHint: "Tap the speaker to listen, then the microphone to say it. Tap the speaker twice to hear it slowly.",
+    practiceHintNoMic: "Tap the speaker to listen, then say it out loud. Tap twice to hear it slowly.",
+    listenTitle: "Listen and tap", listenHow: "Listen to the word, then tap the right picture.", listenHowRead: "Read the word, then tap the right picture.",
+    startGame: "Start", hearAgain: "Hear it again", tapPicture: "Tap the right picture", yesStar: "Yes! You get a star.", gotIt: "Yes, that's it!",
+    starsN: (n) => `${n} ${n === 1 ? "star" : "stars"}`, starsOf: (s, n) => `${s} ${s === 1 ? "star" : "stars"} out of ${n}!`, playAgain: "Play again",
+    pictureN: (k) => `Picture ${k}`, cardN: (k) => `Card ${k}`, pairsFound: (a, b) => `${a} of ${b} pairs`, movesN: (n) => `${n} ${n === 1 ? "try" : "tries"}`,
+    allPairs: (n) => `You found all the pairs in ${n} tries!`, memoryHow: "Find each picture and its word. Tap two cards.",
+    recordAnswer: "Record my answer", recordAnother: "Record another answer", recordHint: "Say your homework out loud. You can listen before you send it. Up to 2 minutes.",
+    startRec: "Start recording", stopRec: "Stop", sendTeacher: "Send to my teacher", sending: "Sending...", cancel: "Cancel",
+    voiceSent: (d) => `Sent to your teacher, ${d}`, voiceFail: "It didn't send. Check your internet and try again.",
+    voiceTooLong: "That recording is too long. Try one under 2 minutes.", teacherReplied: "Your teacher listened to your recording",
+    progressTitle: "What I can do", skillsCount: (n) => (n === 1 ? "thing I can do in English" : "things I can do in English"),
+    starsFromTeacher: (n) => `${n} ${n === 1 ? "star" : "stars"} from my teacher`, loadingProgress: "Opening your progress...",
+    noSkillsYet: "After your classes, your teacher ticks off what you can do. It will show up here.", comingNext: "Coming next", canDoSince: (d) => `Since ${d}`,
   },
   fr: {
     tagline: "Vocabulaire, devoirs et horaires de cours d'anglais, au même endroit.",
@@ -186,6 +229,26 @@ const STR = {
     trialHint: "WhatsApp s'ouvre avec un message prêt à envoyer.",
     yourLevel: (l) => `Votre niveau : ${l}`, changesTitle: "Changements", makeupLabel: "Rattrapage",
     cancelledOn: (d, t) => `${cap(d)} à ${t} : annulé`, makeupOn: (d, t) => `Cours de rattrapage le ${d} à ${t}`,
+    tabProgress: "Progrès", cardsShort: "Cartes", listenGame: "Écouter", memoryGame: "Mémoire",
+    sayIt: "Dites-le", sayItAria: (w) => `Dire « ${w} »`, hearIt: (w) => `Écouter « ${w} »`, listening: "J'écoute... touchez pour arrêter", speakNow: "Dites-le maintenant.",
+    saidRight: (h) => `Bravo ! J'ai entendu « ${h} ».`, saidWrong: (h) => (h ? `J'ai entendu « ${h} ». Écoutez et réessayez.` : "Écoutez et réessayez."),
+    micBlocked: "Le micro est bloqué. Autorisez-le pour ce site dans les réglages du téléphone, puis réessayez.", micNo: "Le micro ne marche pas ici sur ce téléphone.",
+    micNothing: "Je n'ai rien entendu. Réessayez un peu plus fort.", recordMe: "M'enregistrer", recordAgain: "Recommencer", playMine: "Écouter le mien",
+    hearModel: "Écouter le modèle", compareHint: "Écoutez les deux et comparez.",
+    practiceTitle: (n) => `S'entraîner à les dire (${n})`, practiceHint: "Touchez le haut-parleur pour écouter, puis le micro pour le dire. Touchez deux fois pour écouter lentement.",
+    practiceHintNoMic: "Touchez le haut-parleur pour écouter, puis dites-le à voix haute. Touchez deux fois pour écouter lentement.",
+    listenTitle: "Écoute et touche", listenHow: "Écoute le mot, puis touche la bonne image.", listenHowRead: "Lis le mot, puis touche la bonne image.",
+    startGame: "Commencer", hearAgain: "Réécouter", tapPicture: "Touche la bonne image", yesStar: "Oui ! Tu gagnes une étoile.", gotIt: "Oui, c'est ça !",
+    starsN: (n) => `${n} étoile${n > 1 ? "s" : ""}`, starsOf: (s, n) => `${s} étoile${s > 1 ? "s" : ""} sur ${n} !`, playAgain: "Rejouer",
+    pictureN: (k) => `Image ${k}`, cardN: (k) => `Carte ${k}`, pairsFound: (a, b) => `${a} paire${a > 1 ? "s" : ""} sur ${b}`, movesN: (n) => `${n} essai${n > 1 ? "s" : ""}`,
+    allPairs: (n) => `Tu as trouvé toutes les paires en ${n} essais !`, memoryHow: "Trouve chaque image et son mot. Touche deux cartes.",
+    recordAnswer: "Enregistrer ma réponse", recordAnother: "Enregistrer une autre réponse", recordHint: "Dites vos devoirs à voix haute. Vous pourrez écouter avant d'envoyer. 2 minutes au maximum.",
+    startRec: "Commencer l'enregistrement", stopRec: "Arrêter", sendTeacher: "Envoyer au professeur", sending: "Envoi...", cancel: "Annuler",
+    voiceSent: (d) => `Envoyé au professeur, ${d}`, voiceFail: "L'envoi n'a pas marché. Vérifiez votre connexion et réessayez.",
+    voiceTooLong: "Cet enregistrement est trop long. Essayez en moins de 2 minutes.", teacherReplied: "Votre professeur a écouté votre enregistrement",
+    progressTitle: "Ce que je sais faire", skillsCount: (n) => (n > 1 ? "choses que je sais faire en anglais" : "chose que je sais faire en anglais"),
+    starsFromTeacher: (n) => `${n} étoile${n > 1 ? "s" : ""} de mon professeur`, loadingProgress: "Ouverture de vos progrès...",
+    noSkillsYet: "Après les cours, votre professeur coche ce que vous savez faire. Ça s'affichera ici.", comingNext: "Bientôt", canDoSince: (d) => `Depuis le ${d}`,
   },
 };
 const LangCtx = createContext("en");
@@ -383,7 +446,7 @@ function makeQuiz(cards) {
     const dir = Math.random() < 0.5 ? "en" : "fr";
     const answer = dir === "en" ? c.fr : c.en;
     const pool = [...new Set(cards.filter((x) => x.id !== c.id).map((x) => (dir === "en" ? x.fr : x.en)).filter((t) => t !== answer))];
-    return { id: c.id, dir, en: c.en, prompt: dir === "en" ? c.en : c.fr, answer, options: shuffle([answer, ...shuffle(pool).slice(0, 3)]) };
+    return { id: c.id, dir, en: c.en, pic: c.pic || "", prompt: dir === "en" ? c.en : c.fr, answer, options: shuffle([answer, ...shuffle(pool).slice(0, 3)]) };
   });
 }
 
@@ -393,10 +456,11 @@ function parseBulk(text) {
     if (i < 0) return null;
     const en = l.slice(0, i).trim();
     const rest = l.slice(i + 1);
-    const j = rest.indexOf("|");
-    const fr = (j < 0 ? rest : rest.slice(0, j)).trim();
-    const ex = j < 0 ? "" : rest.slice(j + 1).trim();
-    return en && fr ? { id: uid(), en, fr, ex } : null;
+    const [frPart, exPart = "", picPart = ""] = rest.split("|");
+    const fr = frPart.trim();
+    const ex = exPart.trim();
+    const pic = picPart.trim().slice(0, 16);
+    return en && fr ? (pic ? { id: uid(), en, fr, ex, pic } : { id: uid(), en, fr, ex }) : null;
   }).filter(Boolean);
 }
 
@@ -595,6 +659,11 @@ const ICONS = {
   chat: <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />,
   spark: <path d="M9.9 15.5A2 2 0 0 0 8.5 14.1l-6.1-1.6a.5.5 0 0 1 0-1l6.1-1.6a2 2 0 0 0 1.4-1.4l1.6-6.1a.5.5 0 0 1 1 0l1.6 6.1a2 2 0 0 0 1.4 1.4l6.1 1.6a.5.5 0 0 1 0 1l-6.1 1.6a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0z" />,
   briefcase: <><rect width="20" height="14" x="2" y="7" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></>,
+  mic: <><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><path d="M12 19v3" /></>,
+  star: <path d="M12 2.5l2.94 5.96 6.58.96-4.76 4.64 1.12 6.55L12 17.52l-5.88 3.09 1.12-6.55L2.48 9.42l6.58-.96z" />,
+  stop: <rect width="12" height="12" x="6" y="6" rx="2" />,
+  play: <path d="M7 4.5v15l12-7.5z" />,
+  award: <><circle cx="12" cy="8" r="6" /><path d="M15.5 12.9 17 22l-5-3-5 3 1.5-9.1" /></>,
   report: <><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M10 9H8M16 13H8M16 17H8" /></>,
 };
 function Icon({ name, size = 18, label }) {
@@ -782,6 +851,304 @@ function Welcome({ canTeach, signedIn, notTeacher, onStudent, onTeacher, onSignI
 }
 
 /* ---------- words: study ---------- */
+/* ---------- saying it: the phone listens and checks ---------- */
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+const canRecord = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+const NUM_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];
+function normSay(s) {
+  return String(s || "").toLowerCase().replace(/[’‘`]/g, "'")
+    .replace(/\b(\w+)'m\b/g, "$1 am").replace(/\b(\w+)'re\b/g, "$1 are").replace(/\b(\w+)n't\b/g, "$1 not").replace(/\b(\w+)'ll\b/g, "$1 will")
+    .replace(/\b(it|that|what|where|who|how|there|here|he|she)'s\b/g, "$1 is").replace(/\bcan not\b/g, "cannot")
+    .replace(/\d+/g, (n) => (Number(n) <= 20 ? NUM_WORDS[Number(n)] : n))
+    .replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+}
+function editDistance(a, b) {
+  const m = a.length, n = b.length;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+}
+function sameSaid(heard, target) {
+  const h = normSay(heard), w = normSay(target);
+  if (!h || !w) return false;
+  if (h === w || (" " + h + " ").includes(" " + w + " ")) return true;
+  if (w.includes(" ") && w.includes(h) && h.length >= w.length * 0.7) return true;
+  return editDistance(h, w) <= Math.max(1, Math.floor(w.length * 0.25));
+}
+const canSay = (text) => !!text && !/_{2,}/.test(text) && /[a-z]/i.test(text);
+
+function pickMime() {
+  if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return "";
+  return ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"].find((m) => { try { return MediaRecorder.isTypeSupported(m); } catch (e) { return false; } }) || "";
+}
+const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+/* Records from the microphone, up to maxSecs. */
+function useRecorder(maxSecs) {
+  const { t } = useT();
+  const [state, setState] = useState("idle");
+  const [secs, setSecs] = useState(0);
+  const [blob, setBlob] = useState(null);
+  const [url, setUrl] = useState("");
+  const [error, setError] = useState("");
+  const r = useRef({ mr: null, stream: null, timer: null, t0: 0, audio: null, url: "" });
+  const setUrlSafe = (u) => { if (r.current.url) URL.revokeObjectURL(r.current.url); r.current.url = u; setUrl(u); };
+  const release = () => { const x = r.current; clearInterval(x.timer); if (x.stream) x.stream.getTracks().forEach((tr) => tr.stop()); x.stream = null; };
+  useEffect(() => () => {
+    const x = r.current;
+    if (x.mr && x.mr.state !== "inactive") { x.mr.onstop = null; try { x.mr.stop(); } catch (e) { /* already stopped */ } }
+    release();
+    if (x.url) URL.revokeObjectURL(x.url);
+  }, []);
+  const start = async () => {
+    setError("");
+    try { if (canSpeak) window.speechSynthesis.cancel(); } catch (e) { /* nothing playing */ }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch (e) { setError(e && (e.name === "NotAllowedError" || e.name === "SecurityError") ? t("micBlocked") : t("micNo")); return; }
+    const mime = pickMime();
+    let mr;
+    try { mr = new MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 32000 } : { audioBitsPerSecond: 32000 }); }
+    catch (e) { try { mr = new MediaRecorder(stream); } catch (e2) { stream.getTracks().forEach((x) => x.stop()); setError(t("micNo")); return; } }
+    const chunks = [];
+    mr.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    mr.onstop = () => {
+      const took = Math.max(1, Math.round((Date.now() - r.current.t0) / 1000));
+      release();
+      const b = new Blob(chunks, { type: (mr.mimeType || mime || "audio/webm").split(";")[0] });
+      if (!b.size) { setState("idle"); setError(t("micNothing")); return; }
+      setBlob(b); setSecs(Math.min(took, maxSecs)); setUrlSafe(URL.createObjectURL(b)); setState("done");
+    };
+    r.current.mr = mr; r.current.stream = stream; r.current.t0 = Date.now();
+    mr.start(1000);
+    setBlob(null); setSecs(0); setState("recording");
+    r.current.timer = setInterval(() => {
+      const s = Math.floor((Date.now() - r.current.t0) / 1000);
+      setSecs(s);
+      if (s >= maxSecs && mr.state !== "inactive") { try { mr.stop(); } catch (e) { /* stopped */ } }
+    }, 250);
+  };
+  const stop = () => { const mr = r.current.mr; if (mr && mr.state !== "inactive") { try { mr.stop(); } catch (e) { /* stopped */ } } };
+  const play = () => {
+    if (!r.current.url) return;
+    try { if (!r.current.audio) r.current.audio = new Audio(); r.current.audio.src = r.current.url; r.current.audio.play().catch(() => {}); } catch (e) { /* can't play */ }
+  };
+  const reset = () => { setBlob(null); setUrlSafe(""); setState("idle"); setSecs(0); setError(""); };
+  return { state, secs, blob, url, error, start, stop, play, reset };
+}
+
+/* Where the phone can't recognise speech: record yourself and compare. */
+function RecordCompare({ text }) {
+  const { t } = useT();
+  const rec = useRecorder(8);
+  if (!canRecord) return null;
+  return (
+    <div className="say-it">
+      <div className="say-row">
+        {rec.state === "recording"
+          ? <button className="btn sm rec" onClick={rec.stop}><Icon name="stop" size={15} />{t("stopRec")} {mmss(rec.secs)}</button>
+          : <button className="btn ghost sm" onClick={rec.start}><Icon name="mic" size={16} />{rec.url ? t("recordAgain") : t("recordMe")}</button>}
+        {rec.url && rec.state !== "recording" && <button className="btn ghost sm" onClick={rec.play}><Icon name="play" size={15} />{t("playMine")}</button>}
+        {rec.url && rec.state !== "recording" && canSpeak && <button className="btn ghost sm" onClick={() => speak(text)}><Icon name="volume" size={15} />{t("hearModel")}</button>}
+      </div>
+      {rec.error ? <p className="say-result error" role="alert">{rec.error}</p> : rec.url && <p className="hint">{t("compareHint")}</p>}
+    </div>
+  );
+}
+
+/* "Say it": listens once, then says whether it understood. */
+function SayIt({ text, compact = false }) {
+  const { t } = useT();
+  const [state, setState] = useState("idle");
+  const [heard, setHeard] = useState("");
+  const [err, setErr] = useState("");
+  const recRef = useRef(null);
+  useEffect(() => () => { try { if (recRef.current) recRef.current.abort(); } catch (e) { /* stopped */ } }, []);
+  useEffect(() => { setState("idle"); setHeard(""); setErr(""); }, [text]);
+  if (!canSay(text)) return null;
+  if (!SpeechRec) return compact ? null : <RecordCompare text={text} />;
+  const start = () => {
+    try { if (canSpeak) window.speechSynthesis.cancel(); } catch (e) { /* nothing playing */ }
+    let r;
+    try { r = new SpeechRec(); } catch (e) { setState("error"); setErr(t("micNo")); return; }
+    recRef.current = r;
+    r.lang = "en-US"; r.interimResults = false; r.maxAlternatives = 5; r.continuous = false;
+    let got = false;
+    r.onresult = (e) => {
+      got = true;
+      const alts = [];
+      for (let i = 0; i < e.results.length; i++) for (let j = 0; j < e.results[i].length; j++) alts.push(e.results[i][j].transcript);
+      const hit = alts.find((a) => sameSaid(a, text));
+      setHeard(String(hit || alts[0] || "").trim());
+      setState(hit ? "good" : "again");
+    };
+    r.onerror = (e) => {
+      got = true; setState("error");
+      setErr(e.error === "not-allowed" || e.error === "service-not-allowed" ? t("micBlocked") : e.error === "no-speech" ? t("micNothing") : t("micNo"));
+    };
+    r.onend = () => { if (!got) { setState("error"); setErr(t("micNothing")); } };
+    setState("listening"); setHeard(""); setErr("");
+    try { r.start(); } catch (e) { setState("error"); setErr(t("micNo")); }
+  };
+  const stop = () => { try { if (recRef.current) recRef.current.stop(); } catch (e) { /* stopped */ } };
+  const listening = state === "listening";
+  const msg = listening ? t("speakNow") : state === "good" ? t("saidRight", heard) : state === "again" ? t("saidWrong", heard) : state === "error" ? err : "";
+  if (compact) {
+    return (
+      <span className="say-compact">
+        <button className={"icon-btn" + (listening ? " listening" : "")} aria-label={listening ? t("listening") : t("sayItAria", text)} onClick={listening ? stop : start}><Icon name="mic" size={17} /></button>
+        <span className={"say-mark " + state} role="status" aria-label={msg}>{state === "good" ? <Icon name="check" size={16} /> : state === "again" || state === "error" ? <Icon name="again" size={15} /> : null}</span>
+      </span>
+    );
+  }
+  return (
+    <div className="say-it">
+      <button className={"btn sm" + (listening ? " rec" : " ghost")} onClick={listening ? stop : start}><Icon name="mic" size={16} />{listening ? t("listening") : t("sayIt")}</button>
+      {msg && <p className={"say-result " + state} role="status">{msg}</p>}
+    </div>
+  );
+}
+
+/* ---------- picture games for kids ---------- */
+function ListenTap({ deck }) {
+  const { t } = useT();
+  const pool = deck.cards.filter((c) => c.pic);
+  const rounds = Math.min(8, pool.length * 2);
+  const makeRound = (prevId) => {
+    const target = shuffle(pool.filter((c) => c.id !== prevId))[0] || pool[0];
+    const seen = new Set([target.pic]);
+    const others = shuffle(pool.filter((c) => c.id !== target.id)).filter((c) => (seen.has(c.pic) ? false : (seen.add(c.pic), true))).slice(0, 3);
+    return { target, options: shuffle([target, ...others]) };
+  };
+  const [started, setStarted] = useState(false);
+  const [n, setN] = useState(0);
+  const [round, setRound] = useState(null);
+  const [stars, setStars] = useState(0);
+  const [wrong, setWrong] = useState([]);
+  const [right, setRight] = useState(false);
+  const begin = () => { const r = makeRound(); setRound(r); setN(0); setStars(0); setWrong([]); setRight(false); setStarted(true); speak(r.target.en); };
+  const next = () => {
+    if (n + 1 >= rounds) { setN(rounds); return; }
+    const r = makeRound(round.target.id);
+    setRound(r); setN(n + 1); setWrong([]); setRight(false); speak(r.target.en);
+  };
+  const tap = (c) => {
+    if (right) return;
+    speak(c.en);
+    if (c.id === round.target.id) { setRight(true); if (!wrong.length) setStars((s) => s + 1); }
+    else setWrong((w) => [...w, c.id]);
+  };
+  if (!started) {
+    return (
+      <div className="seyes game-start">
+        <p className="game-title">{t("listenTitle")}</p>
+        <p className="muted">{canSpeak ? t("listenHow") : t("listenHowRead")}</p>
+        <button className="btn" onClick={begin}><Icon name="play" size={16} />{t("startGame")}</button>
+      </div>
+    );
+  }
+  if (n >= rounds) {
+    return (
+      <div>
+        <div className="seyes result">
+          <p className="game-stars big" aria-hidden="true">{Array.from({ length: Math.max(1, Math.round((stars / rounds) * 3)) }, (_, k) => <Icon key={k} name="star" size={34} />)}</p>
+          <p className="result-big">{t("starsOf", stars, rounds)}</p>
+        </div>
+        <button className="btn" onClick={begin}><Icon name="again" size={16} />{t("playAgain")}</button>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div className="game-bar">
+        <span className="muted small">{t("xOfY", n + 1, rounds)}</span>
+        <span className="game-stars" aria-label={t("starsN", stars)}>{Array.from({ length: stars }, (_, k) => <Icon key={k} name="star" size={16} />)}</span>
+      </div>
+      <div className="seyes game-ask">
+        {canSpeak
+          ? <button className="btn ghost" onClick={() => speak(round.target.en)}><Icon name="volume" size={18} />{t("hearAgain")}</button>
+          : <span className="face-word">{round.target.en}</span>}
+        <span className="face-hint">{t("tapPicture")}</span>
+      </div>
+      <div className="pic-grid">
+        {round.options.map((c, k) => {
+          const isR = right && c.id === round.target.id;
+          const isW = wrong.includes(c.id);
+          return (
+            <button key={c.id} className={"pic-opt" + (isR ? " right" : "") + (isW ? " wrong" : "")} onClick={() => tap(c)} disabled={isW || right}
+              aria-label={isR || isW ? c.en : t("pictureN", k + 1)}>
+              <span className="pic-big" aria-hidden="true">{c.pic}</span>
+              {(isR || isW) && <span className="pic-word">{c.en}</span>}
+            </button>
+          );
+        })}
+      </div>
+      {right && (
+        <div className="feedback">
+          <p className="verdict" role="status">{wrong.length ? t("gotIt") : t("yesStar")}</p>
+          <button className="btn" onClick={next}>{n + 1 < rounds ? t("nextQ") : t("seeScore")}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Memory({ deck }) {
+  const { t } = useT();
+  const pool = deck.cards.filter((c) => c.pic);
+  const pairs = Math.min(6, pool.length);
+  const deal = () => shuffle(shuffle(pool).slice(0, pairs).flatMap((c) => [{ key: c.id + "p", id: c.id, kind: "pic", c }, { key: c.id + "w", id: c.id, kind: "word", c }]));
+  const [tiles, setTiles] = useState(deal);
+  const [open, setOpen] = useState([]);
+  const [found, setFound] = useState([]);
+  const [moves, setMoves] = useState(0);
+  const busy = useRef(false);
+  const flip = (tile) => {
+    if (busy.current || open.includes(tile.key) || found.includes(tile.id)) return;
+    speak(tile.c.en);
+    if (!open.length) { setOpen([tile.key]); return; }
+    const first = tiles.find((x) => x.key === open[0]);
+    setMoves((m) => m + 1);
+    if (first && first.id === tile.id) { setFound((f) => [...f, tile.id]); setOpen([]); return; }
+    setOpen([open[0], tile.key]);
+    busy.current = true;
+    setTimeout(() => { setOpen([]); busy.current = false; }, 1100);
+  };
+  const restart = () => { setTiles(deal()); setOpen([]); setFound([]); setMoves(0); };
+  const won = found.length === pairs;
+  const starsWon = moves <= pairs + 2 ? 3 : moves <= pairs * 2 ? 2 : 1;
+  return (
+    <div>
+      <div className="game-bar">
+        <span className="muted small">{t("pairsFound", found.length, pairs)}</span>
+        <span className="muted small">{t("movesN", moves)}</span>
+      </div>
+      {won && (
+        <div className="seyes result">
+          <p className="game-stars big" aria-hidden="true">{Array.from({ length: starsWon }, (_, k) => <Icon key={k} name="star" size={34} />)}</p>
+          <p className="result-big" role="status">{t("allPairs", moves)}</p>
+        </div>
+      )}
+      <div className="mem-grid">
+        {tiles.map((x, k) => {
+          const shown = open.includes(x.key) || found.includes(x.id);
+          return (
+            <button key={x.key} className={"mem-tile" + (shown ? " shown" : "") + (found.includes(x.id) ? " found" : "")} onClick={() => flip(x)}
+              aria-label={shown ? x.c.en : t("cardN", k + 1)} aria-pressed={shown}>
+              {shown ? (x.kind === "pic" ? <span className="pic-mid" aria-hidden="true">{x.c.pic}</span> : <span className="mem-word">{x.c.en}</span>) : <span className="mem-back" aria-hidden="true">?</span>}
+            </button>
+          );
+        })}
+      </div>
+      {won ? <button className="btn" onClick={restart}><Icon name="again" size={16} />{t("playAgain")}</button> : <p className="hint">{t("memoryHow")}</p>}
+    </div>
+  );
+}
+
 function Flashcards({ cards }) {
   const { t } = useT();
   const [order, setOrder] = useState(() => cards.map((_, k) => k));
@@ -798,10 +1165,12 @@ function Flashcards({ cards }) {
       <div key={order[i]} className={"flip" + (flipped ? " is-flipped" : "")}>
         <button type="button" className="flip-inner" onClick={() => setFlipped((f) => !f)} aria-label={flipped ? t("ariaBack", card.fr) : t("ariaFront", card.en)}>
           <span className="face seyes face-front">
+            {card.pic && <span className="face-pic" aria-hidden="true">{card.pic}</span>}
             <span className="face-word">{card.en}</span>
             <span className="face-hint">{t("tapMeaning")}</span>
           </span>
           <span className="face seyes face-back">
+            {card.pic && <span className="face-pic small" aria-hidden="true">{card.pic}</span>}
             <span className="face-word">{card.fr}</span>
             {card.ex && <span className="face-ex">{card.ex}</span>}
           </span>
@@ -815,6 +1184,7 @@ function Flashcards({ cards }) {
           </button>
         )}
       </div>
+      <SayIt text={card.en} />
       <div className="card-nav">
         <button className="btn ghost" onClick={() => go(-1)}><Icon name="left" />{t("back")}</button>
         <button className="btn ghost" onClick={mix}><Icon name="shuffle" size={16} />{t("mix")}</button>
@@ -869,6 +1239,7 @@ function Quiz({ deck }) {
       <p className="muted small" style={{ marginBottom: 8 }}>{t("questionN", idx + 1, qs.length)}</p>
       <div className="seyes q-prompt">
         <span className="face-hint">{q.dir === "en" ? t("whatMeans") : t("howSay")}</span>
+        {q.pic && <span className="face-pic small" aria-hidden="true">{q.pic}</span>}
         <span className="face-word">{q.prompt}</span>
       </div>
       <div className="options">
@@ -900,15 +1271,21 @@ function Quiz({ deck }) {
 function Study({ deck, onBack, backLabel }) {
   const { t } = useT();
   const [mode, setMode] = useState("cards");
+  const games = deck.cards.filter((c) => c.pic).length >= 4;
   return (
     <section>
       <button className="back-link" onClick={onBack}><Icon name="left" />{backLabel || t("allLists")}</button>
       <h2 className="h">{deck.title}</h2>
       <div className="seg">
-        <button aria-pressed={mode === "cards"} onClick={() => setMode("cards")}>{t("flashcards")}</button>
+        <button aria-pressed={mode === "cards"} onClick={() => setMode("cards")}>{games ? t("cardsShort") : t("flashcards")}</button>
         <button aria-pressed={mode === "quiz"} onClick={() => setMode("quiz")}>{t("quiz")}</button>
+        {games && <button aria-pressed={mode === "listen"} onClick={() => setMode("listen")}>{t("listenGame")}</button>}
+        {games && <button aria-pressed={mode === "memory"} onClick={() => setMode("memory")}>{t("memoryGame")}</button>}
       </div>
-      {deck.cards.length === 0 ? <Empty text={t("emptyList")} /> : mode === "cards" ? <Flashcards cards={deck.cards} /> : <Quiz deck={deck} />}
+      {deck.cards.length === 0 ? <Empty text={t("emptyList")} />
+        : mode === "listen" && games ? <ListenTap key={deck.id} deck={deck} />
+        : mode === "memory" && games ? <Memory key={deck.id} deck={deck} />
+        : mode === "quiz" ? <Quiz deck={deck} /> : <Flashcards cards={deck.cards} />}
     </section>
   );
 }
@@ -945,6 +1322,7 @@ function DeckEditor({ deck, groups, onBack, onPractice, onChange, onDelete }) {
   const [en, setEn] = useState("");
   const [fr, setFr] = useState("");
   const [ex, setEx] = useState("");
+  const [pic, setPic] = useState("");
   const [bulk, setBulk] = useState("");
   const [showBulk, setShowBulk] = useState(false);
   const enRef = useRef(null);
@@ -954,8 +1332,10 @@ function DeckEditor({ deck, groups, onBack, onPractice, onChange, onDelete }) {
   const saveTitle = () => { const t = title.trim(); if (t && t !== deck.title) onChange({ ...deck, title: t }); else setTitle(deck.title); };
   const addCard = () => {
     if (!en.trim() || !fr.trim()) return;
-    onChange({ ...deck, cards: [...deck.cards, { id: uid(), en: en.trim(), fr: fr.trim(), ex: ex.trim() }] });
-    setEn(""); setFr(""); setEx("");
+    const card = { id: uid(), en: en.trim(), fr: fr.trim(), ex: ex.trim() };
+    if (pic.trim()) card.pic = pic.trim().slice(0, 16);
+    onChange({ ...deck, cards: [...deck.cards, card] });
+    setEn(""); setFr(""); setEx(""); setPic("");
     if (enRef.current) enRef.current.focus();
   };
   const addBulk = () => { if (!parsed.length) return; onChange({ ...deck, cards: [...deck.cards, ...parsed] }); setBulk(""); setShowBulk(false); };
@@ -981,15 +1361,19 @@ function DeckEditor({ deck, groups, onBack, onPractice, onChange, onDelete }) {
           <Field label="French"><input id="word-fr" className="inp" value={fr} placeholder="la fenêtre" onChange={(e) => setFr(e.target.value)} onKeyDown={enter} /></Field>
         </div>
         <Field label="Example sentence (optional)"><input id="word-ex" className="inp" value={ex} placeholder="Open the window, please." onChange={(e) => setEx(e.target.value)} onKeyDown={enter} /></Field>
+        <Field label="Picture (optional): one emoji, like 🍎">
+          <input id="word-pic" className="inp pic-inp" value={pic} placeholder="🪟" maxLength={16} onChange={(e) => setPic(e.target.value)} onKeyDown={enter} />
+          <span className="hint">Use your phone's emoji keyboard. Lists with 4 or more pictures get the kids' games.</span>
+        </Field>
         <div className="form-actions">
           <button className="btn" onClick={addCard} disabled={!en.trim() || !fr.trim()}><Icon name="plus" size={16} />Add word</button>
           <button className="btn ghost" onClick={() => setShowBulk((s) => !s)}>{showBulk ? "Hide paste box" : "Paste many words"}</button>
         </div>
         {showBulk && (
           <div style={{ marginTop: 16 }}>
-            <Field label="One word per line: English = French | example">
+            <Field label="One word per line: English = French | example | picture">
               <textarea id="word-bulk" className="inp" rows={5} value={bulk} onChange={(e) => setBulk(e.target.value)}
-                placeholder={"pencil = le crayon | I write with a pencil.\nruler = la règle"} />
+                placeholder={"pencil = le crayon | I write with a pencil. | ✏️\nruler = la règle"} />
             </Field>
             <button className="btn" onClick={addBulk} disabled={!parsed.length}>Add {parsed.length} {parsed.length === 1 ? "word" : "words"}</button>
           </div>
@@ -1001,6 +1385,7 @@ function DeckEditor({ deck, groups, onBack, onPractice, onChange, onDelete }) {
         <ul>
           {deck.cards.map((c) => (
             <li key={c.id} className="word-row">
+              {c.pic && <span className="row-pic" aria-hidden="true">{c.pic}</span>}
               <div className="row-main">
                 <span className="row-title">{c.en}</span>
                 <span className="row-sub">{c.fr}</span>
@@ -1072,7 +1457,7 @@ function WordsTeacher({ decks, groups, saveDecks, openId, setOpenId, sample }) {
 }
 
 /* ---------- lessons & homework ---------- */
-function LessonEntry({ lesson: l, teacher = false, isDone = false, onToggle, onEdit, onDelete, onSaveToLibrary }) {
+function LessonEntry({ lesson: l, teacher = false, isDone = false, onToggle, onEdit, onDelete, onSaveToLibrary, voice }) {
   const { t, lang } = useT();
   const [libLevel, setLibLevel] = useState(null);
   const d = l.date ? parseISO(l.date) : null;
@@ -1086,6 +1471,7 @@ function LessonEntry({ lesson: l, teacher = false, isDone = false, onToggle, onE
         <h3>{l.title}</h3>
         {teacher && <p className="muted small">For {l.group || EVERYONE}</p>}
         {l.notes && <p className="notes">{l.notes}</p>}
+        {!teacher && <PracticeSay items={practiceItems(l.notes)} />}
         {l.homework && (
           <div className="hw">
             <p className="hw-head">{t("homework")}{l.due && <span>{t("due", fmtDate(l.due, lang))}</span>}</p>
@@ -1096,6 +1482,7 @@ function LessonEntry({ lesson: l, teacher = false, isDone = false, onToggle, onE
               </button>
             )}
             {!teacher && !isDone && pastDue && <p className="late">{t("pastDue")}</p>}
+            {!teacher && voice && <VoiceHomework lesson={l} me={voice.me} sent={voice.sent} reply={voice.reply} onSent={voice.onSent} />}
           </div>
         )}
         {teacher && (
@@ -1117,11 +1504,12 @@ function LessonEntry({ lesson: l, teacher = false, isDone = false, onToggle, onE
   );
 }
 
-function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks, roster = [] }) {
+function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks, roster = [], voiceNotes = {}, progressMap = {} }) {
   const [mode, setMode] = useState("lessons");
   const [form, setForm] = useState(null);
   const lib = useLibrary(db, userId);
   const plansH = usePlans(db, userId);
+  const newVoice = Object.values(voiceNotes).filter((v) => !v.heard).length;
   const pending = useRef(null);
   const [libKey, setLibKey] = useState(0); // tapping Library again goes back to its first page
   const blank = () => ({ id: null, date: todayISO(), group: groups[1] || EVERYONE, title: "", notes: "", homework: "", due: "" });
@@ -1160,10 +1548,11 @@ function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userI
         <div className="seg">
           <button aria-pressed={mode === "lessons"} onClick={() => setMode("lessons")}>Lessons</button>
           <button aria-pressed={mode === "library"} onClick={() => { pending.current = null; setMode("library"); setLibKey((k) => k + 1); }}>Library</button>
+          <button aria-pressed={mode === "voice"} onClick={() => { pending.current = null; setMode("voice"); }}>Voice notes{newVoice ? ` (${newVoice})` : ""}</button>
         </div>
       )}
-      {mode === "library" ? (
-        <CourseLibrary key={libKey} saved={lib.items} onUse={usePlan} decks={decks} saveDecks={saveDecks} groups={groups} flash={flash} roster={roster} plansH={plansH}
+      {mode === "voice" ? <VoiceInbox notes={voiceNotes} progressMap={progressMap} flash={flash} /> : mode === "library" ? (
+        <CourseLibrary key={libKey} progressMap={progressMap} saved={lib.items} onUse={usePlan} decks={decks} saveDecks={saveDecks} groups={groups} flash={flash} roster={roster} plansH={plansH}
           onRemoveSaved={(id) => lib.remove(id).catch(() => flash("That didn't save. Check your connection and try again."))} />
       ) : (
         <>
@@ -1208,8 +1597,171 @@ function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userI
   );
 }
 
-function HomeworkStudent({ lessons, me, done, onToggle }) {
+/* ---------- voice notes: a student's recorded homework, kept in Firestore in parts ---------- */
+const VOICE_PART = 700000;
+const blobToBase64 = (b) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1] || ""); fr.onerror = () => rej(fr.error); fr.readAsDataURL(b); });
+async function sendVoice(blob, secs, lesson, me) {
+  const data = await blobToBase64(blob);
+  const n = Math.ceil(data.length / VOICE_PART);
+  if (!n || n > 6) throw new Error("too-long");
+  const db = FB.db;
+  const ref = db.collection("voice").doc(uid() + uid());
+  const batch = db.batch();
+  batch.set(ref, {
+    sid: me.id, code: me.code, name: String(me.name || "").slice(0, 120), group: String(me.group || "").slice(0, 120),
+    title: String(lesson.title || "").slice(0, 200), lessonId: String(lesson.id || "").slice(0, 60),
+    mime: (blob.type || "audio/webm").slice(0, 40), secs: Math.round(secs), parts: n, at: new Date().toISOString(),
+  });
+  for (let k = 0; k < n; k++) batch.set(ref.collection("parts").doc(String(k)), { d: data.slice(k * VOICE_PART, (k + 1) * VOICE_PART) });
+  await Promise.race([batch.commit(), new Promise((_, rej) => setTimeout(() => rej(new Error("slow")), 60000))]);
+  return ref.id;
+}
+async function loadVoice(v) {
+  const parts = await Promise.all(Array.from({ length: v.parts || 0 }, (_, k) => FB.db.doc(`voice/${v.id}/parts/${k}`).get()));
+  const b64 = parts.map((s) => (s.exists ? (s.data() || {}).d || "" : "")).join("");
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: v.mime || "audio/mp4" }));
+}
+function deleteVoice(v) {
+  const db = FB.db;
+  const ref = db.doc("voice/" + v.id);
+  const batch = db.batch();
+  for (let k = 0; k < (v.parts || 0); k++) batch.delete(ref.collection("parts").doc(String(k)));
+  batch.delete(ref);
+  return batch.commit();
+}
+
+/* progress/{studentId}: skills the teacher ticked, and replies to voice notes. Students read their own. */
+function useProgressDoc(sid) {
+  const [doc, setDoc] = useState(null);
+  useEffect(() => {
+    setDoc(null);
+    if (!sid || !FB) return undefined;
+    let un = () => {};
+    try { un = FB.db.doc("progress/" + sid).onSnapshot((s) => setDoc(s.exists ? s.data() || {} : {}), () => setDoc({})); } catch (e) { setDoc({}); }
+    return () => un();
+  }, [sid]);
+  return doc;
+}
+function useCollectionMap(path, on) {
+  const [map, setMap] = useState({});
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (!on || !FB) { setMap({}); setReady(false); return undefined; }
+    let un = () => {};
+    try {
+      un = FB.db.collection(path).onSnapshot((qs) => {
+        const next = {};
+        qs.docs.forEach((d) => { next[d.id] = { ...(d.data() || {}), id: d.id }; });
+        setMap(next); setReady(true);
+      }, () => setReady(true));
+    } catch (e) { setReady(true); }
+    return () => un();
+  }, [path, on]);
+  return { map, ready };
+}
+const saveReply = (sid, vid, reply) => FB.db.doc("progress/" + sid).set({ replies: { [vid]: reply }, updated: new Date().toISOString() }, { merge: true });
+
+function VoiceHomework({ lesson, me, sent = [], reply, onSent }) {
+  const { t, lang } = useT();
+  const rec = useRecorder(120);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  if (!canRecord || !me || me.id === "guest" || !me.code) return null;
+  const last = sent[sent.length - 1];
+  const send = async () => {
+    setBusy(true); setErr("");
+    try {
+      const id = await sendVoice(rec.blob, rec.secs, lesson, me);
+      onSent({ id, at: new Date().toISOString(), secs: rec.secs });
+      rec.reset(); setOpen(false);
+    } catch (e) { setErr(e && e.message === "too-long" ? t("voiceTooLong") : t("voiceFail")); }
+    setBusy(false);
+  };
+  return (
+    <div className="voice-hw">
+      {reply && (
+        <div className="voice-reply">
+          <p className="voice-stars" aria-label={t("starsN", reply.stars || 0)}>{Array.from({ length: reply.stars || 0 }, (_, k) => <Icon key={k} name="star" size={20} />)}</p>
+          {reply.note && <p className="voice-note">“{reply.note}”</p>}
+          <p className="muted small">{t("teacherReplied")}</p>
+        </div>
+      )}
+      {last && !open && <p className="muted small voice-sent"><Icon name="check" size={14} />{t("voiceSent", fmtDate(last.at.slice(0, 10), lang))}</p>}
+      {!open ? (
+        <button className="btn ghost sm" onClick={() => setOpen(true)}><Icon name="mic" size={16} />{sent.length ? t("recordAnother") : t("recordAnswer")}</button>
+      ) : (
+        <div className="recorder">
+          <p className="hint">{t("recordHint")}</p>
+          {rec.state === "recording" ? (
+            <button className="btn rec" onClick={rec.stop}><Icon name="stop" size={16} />{t("stopRec")} · {mmss(rec.secs)}</button>
+          ) : rec.state === "done" ? (
+            <>
+              <audio controls src={rec.url} className="voice-audio" />
+              <div className="pay-actions">
+                <button className="btn" onClick={send} disabled={busy}>{busy ? t("sending") : t("sendTeacher")}</button>
+                <button className="btn ghost sm" onClick={rec.reset} disabled={busy}>{t("recordAgain")}</button>
+              </div>
+            </>
+          ) : (
+            <div className="pay-actions">
+              <button className="btn" onClick={rec.start}><Icon name="mic" size={16} />{t("startRec")}</button>
+              <button className="btn ghost sm" onClick={() => { rec.reset(); setOpen(false); }}>{t("cancel")}</button>
+            </div>
+          )}
+          {(rec.error || err) && <p className="say-result error" role="alert">{rec.error || err}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Phrases worth saying out loud, taken from a lesson's notes: quoted phrases and the "New words" line. */
+function practiceItems(text) {
+  const out = [];
+  const add = (s) => {
+    const x = String(s || "").trim().replace(/^[“"']+|[”"']+$/g, "").trim();
+    if (x && /[a-z]/i.test(x) && x.length <= 80 && !out.some((y) => y.toLowerCase() === x.toLowerCase())) out.push(x);
+  };
+  String(text || "").split("\n").forEach((line) => {
+    const m = line.match(/^\s*(new words|words|vocabulary)\s*:\s*(.+)$/i);
+    if (m) m[2].split(/[,;]/).forEach((w) => { const x = w.replace(/\(.*?\)/g, "").replace(/[.!]+$/, "").trim(); if (x && x.split(/\s+/).length <= 4) add(x); });
+    (line.match(/[“"]([^“”"]{2,80})[”"]/g) || []).forEach((q) => add(q.slice(1, -1)));
+  });
+  return out.slice(0, 16);
+}
+function PracticeSay({ items }) {
   const { t } = useT();
+  const [open, setOpen] = useState(false);
+  if (!items.length || !canSpeak) return null;
+  return (
+    <div className="practice">
+      <button className="btn ghost sm" aria-expanded={open} onClick={() => setOpen((o) => !o)}><Icon name="volume" size={16} />{t("practiceTitle", items.length)}</button>
+      {open && (
+        <>
+          <p className="hint">{SpeechRec ? t("practiceHint") : t("practiceHintNoMic")}</p>
+          <ul className="practice-list">
+            {items.map((x) => (
+              <li key={x}>
+                <span className="practice-text">{x}</span>
+                <button className="icon-btn" aria-label={t("hearIt", x)} onClick={() => speak(x)}><Icon name="volume" size={17} /></button>
+                {SpeechRec && (canSay(x) ? <SayIt text={x} compact /> : <span className="say-compact say-gap" aria-hidden="true" />)}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+function HomeworkStudent({ lessons, me, done, onToggle, prog, voiceSent = {}, onVoiceSent }) {
+  const { t } = useT();
+  const replies = Object.values((prog && prog.replies) || {});
+  const replyFor = (id) => replies.filter((r) => r.lessonId === id).sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")))[0];
   const list = lessons.filter((l) => forGroup(l.group, me.group)).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   return (
     <section>
@@ -1217,7 +1769,8 @@ function HomeworkStudent({ lessons, me, done, onToggle }) {
       {list.length === 0 ? <Empty text={t("noLessons")} /> : (
         <ol className="entries">
           {list.map((l) => (
-            <LessonEntry key={l.id} lesson={l} isDone={!!done[l.id]} onToggle={() => onToggle(l.id)} />
+            <LessonEntry key={l.id} lesson={l} isDone={!!done[l.id]} onToggle={() => onToggle(l.id)}
+              voice={me && me.id !== "guest" ? { me, sent: arr(voiceSent[l.id]), reply: replyFor(l.id), onSent: (x) => onVoiceSent(l.id, x) } : null} />
           ))}
         </ol>
       )}
@@ -2195,36 +2748,42 @@ function WordListOffers({ lists, decks, saveDecks, groups, flash }) {
   const [group, setGroup] = useState(EVERYONE);
   const added = (w) => decks.some((d) => d.title === w.title);
   const add = (w) => {
-    const d = { id: uid(), title: w.title, group, cards: arr(w.cards).map((c) => ({ id: uid(), en: String(c.en || ""), fr: String(c.fr || ""), ex: String(c.ex || "") })).filter((c) => c.en && c.fr) };
-    saveDecks([d, ...decks]);
+    const cards = arr(w.cards).map((c) => { const x = { id: uid(), en: String(c.en || ""), fr: String(c.fr || ""), ex: String(c.ex || "") }; if (c.pic) x.pic = String(c.pic); return x; }).filter((c) => c.en && c.fr);
+    saveDecks([{ id: uid(), title: w.title, group, cards }, ...decks]);
     setOpenId(null);
     flash(`${w.title} is in Words now, for ${group}.`);
   };
+  const parts = [["Picture lists for kids", lists.filter((w) => w.kids)], ["More word lists", lists.filter((w) => !w.kids)]].filter(([, l]) => l.length);
   return (
     <div className="day-block">
       <p className="day-name">Word lists</p>
-      <p className="hint">Ready-made lists with the French. Add one and your students can practice it with flashcards and quizzes.</p>
-      <ul className="rows">
-        {lists.map((w) => (
-          <li key={w.id} className="lib-row">
-            <div className="row-main">
-              <span className="row-title">{w.title}</span>
-              <span className="row-sub">{arr(w.cards).length} words. {w.about}</span>
-            </div>
-            <div className="pay-actions">
-              {added(w) ? <span className="muted small"><Icon name="check" size={15} /> In Words</span>
-                : openId !== w.id && <button className="btn sm" onClick={() => { setGroup(groups[1] || EVERYONE); setOpenId(w.id); }}>Add to Words</button>}
-            </div>
-            {openId === w.id && (
-              <div className="inline-add lib-add">
-                <select className="inp" aria-label={`Who ${w.title} is for`} value={group} onChange={(e) => setGroup(e.target.value)}>{groups.map((g) => <option key={g} value={g}>{g}</option>)}</select>
-                <button className="btn sm" onClick={() => add(w)}>Add</button>
-                <button className="btn ghost sm" onClick={() => setOpenId(null)}>Cancel</button>
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
+      <p className="hint">Ready-made lists with the French. Add one and your students can practice it with flashcards and quizzes. Lists with pictures also get two games for kids: Listen and Memory.</p>
+      {parts.map(([label, part]) => (
+        <div key={label}>
+          <p className="sub-h">{label}</p>
+          <ul className="rows">
+            {part.map((w) => (
+              <li key={w.id} className="lib-row">
+                <div className="row-main">
+                  <span className="row-title">{w.kids && arr(w.cards)[0] && <span aria-hidden="true">{arr(w.cards)[0].pic} </span>}{w.title}</span>
+                  <span className="row-sub">{arr(w.cards).length} words. {w.about}</span>
+                </div>
+                <div className="pay-actions">
+                  {added(w) ? <span className="muted small"><Icon name="check" size={15} /> In Words</span>
+                    : openId !== w.id && <button className="btn sm" onClick={() => { setGroup(groups[1] || EVERYONE); setOpenId(w.id); }}>Add to Words</button>}
+                </div>
+                {openId === w.id && (
+                  <div className="inline-add lib-add">
+                    <select className="inp" aria-label={`Who ${w.title} is for`} value={group} onChange={(e) => setGroup(e.target.value)}>{groups.map((g) => <option key={g} value={g}>{g}</option>)}</select>
+                    <button className="btn sm" onClick={() => add(w)}>Add</button>
+                    <button className="btn ghost sm" onClick={() => setOpenId(null)}>Cancel</button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }
@@ -2355,7 +2914,7 @@ function AddLessons({ student, courses, have, onAddItems, onAddCustom, onBack })
   );
 }
 
-function CourseLibrary({ saved, onUse, onRemoveSaved, decks, saveDecks, groups, flash, roster = [], plansH }) {
+function CourseLibrary({ saved, onUse, onRemoveSaved, decks, saveDecks, groups, flash, roster = [], plansH, progressMap = {} }) {
   const { status, data, retry } = useCourses();
   const [nav, setNav] = useState({ view: "home" });
   const [q, setQ] = useState("");
@@ -2413,10 +2972,14 @@ function CourseLibrary({ saved, onUse, onRemoveSaved, decks, saveDecks, groups, 
   };
 
   /* one student's list */
-  if ((nav.view === "student" || nav.view === "add" || nav.view === "plan") && plansOn) {
+  if ((nav.view === "student" || nav.view === "add" || nav.view === "plan" || nav.view === "skills") && plansOn) {
     const r = roster.find((x) => x.id === nav.studentId);
     if (!r) { setTimeout(() => go({ view: "home" }), 0); return null; }
     const entries = entriesOf(r.id);
+    if (nav.view === "skills") {
+      const planCourseIds = [...new Set(planOf(r.id).filter((x) => !x.custom).map((x) => x.course))];
+      return <SkillsEditor student={r} courses={courses} planCourseIds={planCourseIds} prog={progressMap[r.id]} flash={flash} onBack={() => go({ view: "student", studentId: r.id })} />;
+    }
     if (nav.view === "add") {
       const have = new Set(planOf(r.id).filter((x) => !x.custom).map((x) => x.course + "/" + x.item));
       return (
@@ -2460,7 +3023,10 @@ function CourseLibrary({ saved, onUse, onRemoveSaved, decks, saveDecks, groups, 
           {r.group && r.group !== r.name ? `Group: ${r.group}. ` : ""}
           {entries.length ? `${done} of ${entries.length} lessons taught.` : "No lessons on the list yet."}
         </p>
-        <div className="lib-use"><button className="btn" onClick={() => go({ view: "add", studentId: r.id })}><Icon name="plus" size={16} />Add lessons</button></div>
+        <div className="lib-use pay-actions">
+          <button className="btn" onClick={() => go({ view: "add", studentId: r.id })}><Icon name="plus" size={16} />Add lessons</button>
+          <button className="btn ghost" onClick={() => go({ view: "skills", studentId: r.id })}><Icon name="award" size={16} />What {r.name} can do{(() => { const n = Object.keys(((progressMap[r.id] || {}).skills) || {}).length; return n ? ` (${n})` : ""; })()}</button>
+        </div>
         {entries.length === 0 ? <Empty text={`Add a whole course for ${r.name}, pick single lessons, or write your own.`} /> : (
           <ul className="rows">
             {entries.map((e, k) => (
@@ -2607,6 +3173,184 @@ function CourseLibrary({ saved, onUse, onRemoveSaved, decks, saveDecks, groups, 
         </>
       )}
     </>
+  );
+}
+
+/* ---------- "What I can do": skills from the lesson plans, ticked by the teacher ---------- */
+function skillRows(courses, skills, extraIds = []) {
+  const ticked = Object.keys(skills || {});
+  const ids = new Set(extraIds);
+  ticked.forEach((k) => ids.add(k.split("/")[0]));
+  return courses.filter((c) => ids.has(c.id) && arr(c.skills).length);
+}
+function ProgressStudent({ me, prog }) {
+  const { t, lang } = useT();
+  const { status, data } = useCourses();
+  const skills = (prog && prog.skills) || {};
+  const replies = Object.values((prog && prog.replies) || {});
+  const stars = replies.reduce((s, r) => s + (Number(r.stars) || 0), 0);
+  const done = Object.keys(skills).length;
+  const courses = status === "ready" ? skillRows(data.courses, skills, arr(prog && prog.courses)) : [];
+  return (
+    <section>
+      <h2 className="h">{t("progressTitle")}</h2>
+      <div className="seyes progress-sum">
+        <p className="progress-big">{done}</p>
+        <p>{t("skillsCount", done)}</p>
+        {stars > 0 && <p className="progress-stars"><Icon name="star" size={18} />{t("starsFromTeacher", stars)}</p>}
+      </div>
+      {prog === null || status === "loading" ? <p className="muted">{t("loadingProgress")}</p>
+        : courses.length === 0 ? <Empty text={t("noSkillsYet")} /> : courses.map((c) => {
+          const units = [];
+          arr(c.skills).forEach((s) => { let u = units.find((x) => x.name === s.unit); if (!u) { u = { name: s.unit, fr: s.unitFr || s.unit, list: [] }; units.push(u); } u.list.push(s); });
+          return units.map((u) => (
+            <div key={c.id + u.name} className="day-block">
+              <p className="day-name">{lang === "fr" ? u.fr : u.name}</p>
+              <ul className="skill-list">
+                {u.list.map((s) => {
+                  const when = skills[c.id + "/" + s.id];
+                  return (
+                    <li key={s.id} className={when ? "got" : ""}>
+                      <span className="skill-mark" aria-hidden="true">{when ? <Icon name="check" size={15} /> : null}</span>
+                      <span className="skill-text">{lang === "fr" ? s.fr : s.en}
+                        <span className="muted small skill-when">{when ? t("canDoSince", fmtDate(when, lang)) : t("comingNext")}</span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ));
+        })}
+    </section>
+  );
+}
+
+function SkillsEditor({ student, courses, planCourseIds, prog, onBack, flash }) {
+  const skills = (prog && prog.skills) || {};
+  const [extra, setExtra] = useState([]);
+  const shownIds = [...new Set([...planCourseIds, ...arr(prog && prog.courses), ...extra])];
+  const shown = skillRows(courses, skills, shownIds);
+  const others = courses.filter((c) => arr(c.skills).length && !shown.some((x) => x.id === c.id));
+  const save = (nextSkills, ids) => FB.db.doc("progress/" + student.id).set({ skills: nextSkills, courses: ids, updated: new Date().toISOString() }, { mergeFields: ["skills", "courses", "updated"] })
+    .catch(() => flash("That didn't save. Check your connection and try again."));
+  const toggle = (key) => {
+    const next = { ...skills };
+    if (next[key]) delete next[key]; else next[key] = todayISO();
+    save(next, shown.map((c) => c.id));
+  };
+  const total = shown.reduce((n, c) => n + arr(c.skills).length, 0);
+  const got = shown.reduce((n, c) => n + arr(c.skills).filter((s) => skills[c.id + "/" + s.id]).length, 0);
+  return (
+    <section>
+      <button className="back-link" onClick={onBack}><Icon name="left" />{student.name}'s lessons</button>
+      <h3 className="lib-title">What {student.name} can do</h3>
+      <p className="hint">Tick a skill when {student.name} can do it without help. {student.name} and their family see the list, in English or French, in the Progress tab with their code.</p>
+      {shown.length > 0 && <p className="muted lib-about">{got} of {total} ticked.</p>}
+      {shown.length === 0 && <Empty text={`Add a course to ${student.name}'s lessons, or pick one below, to see its skills.`} />}
+      {shown.map((c) => {
+        const units = [];
+        arr(c.skills).forEach((s) => { let u = units.find((x) => x.name === s.unit); if (!u) { u = { name: s.unit, list: [] }; units.push(u); } u.list.push(s); });
+        return (
+          <div key={c.id} className="day-block">
+            <p className="day-name">{c.title}</p>
+            {units.map((u) => (
+              <div key={u.name} className="skill-unit">
+                <p className="sub-h">{u.name}</p>
+                {u.list.map((s) => {
+                  const key = c.id + "/" + s.id;
+                  return (
+                    <label key={s.id} className="check skill-check">
+                      <input type="checkbox" checked={!!skills[key]} onChange={() => toggle(key)} />
+                      <span>{s.en}{skills[key] && <span className="muted small"> · {fmtDate(skills[key])}</span>}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        );
+      })}
+      {others.length > 0 && (
+        <div className="inline-add">
+          <select className="inp" aria-label="Show skills from another course" value="" onChange={(e) => { if (e.target.value) setExtra((x) => [...x, e.target.value]); }}>
+            <option value="">Show skills from another course...</option>
+            {others.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+          </select>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ---------- the teacher's voice-note inbox ---------- */
+function VoiceNote({ v, reply, flash }) {
+  const [url, setUrl] = useState("");
+  const [failed, setFailed] = useState(false);
+  const [stars, setStars] = useState(reply ? reply.stars || 0 : 0);
+  const [note, setNote] = useState(reply ? reply.note || "" : "");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let live = true;
+    let made = "";
+    loadVoice(v).then((u) => { made = u; if (live) setUrl(u); else URL.revokeObjectURL(u); }, () => { if (live) setFailed(true); });
+    if (!v.heard) FB.db.doc("voice/" + v.id).set({ heard: true }, { merge: true }).catch(() => {});
+    return () => { live = false; if (made) URL.revokeObjectURL(made); };
+  }, [v.id]);
+  const send = () => {
+    setBusy(true);
+    const r = { stars, note: note.trim(), title: v.title || "", lessonId: v.lessonId || "", at: todayISO() };
+    Promise.all([saveReply(v.sid, v.id, r), FB.db.doc("voice/" + v.id).set({ heard: true, replied: true }, { merge: true })])
+      .then(() => flash(`Reply sent. ${v.name} sees it under that homework.`), () => flash("That didn't save. Check your connection and try again."))
+      .then(() => setBusy(false));
+  };
+  return (
+    <div className="voice-open">
+      {failed ? <p className="say-result error">This recording didn't load. Check your connection and try again.</p>
+        : url ? <audio controls src={url} className="voice-audio" /> : <p className="muted small">Loading the recording...</p>}
+      <p className="sub-h">Your reply</p>
+      <div className="star-pick" role="group" aria-label="Stars">
+        {[1, 2, 3].map((n) => (
+          <button key={n} className={"star-btn" + (stars >= n ? " on" : "")} aria-label={`${n} ${n === 1 ? "star" : "stars"}`} aria-pressed={stars === n} onClick={() => setStars(stars === n ? 0 : n)}>
+            <Icon name="star" size={26} />
+          </button>
+        ))}
+      </div>
+      <Field label="A short note (optional)">
+        <textarea className="inp" rows={2} value={note} placeholder="Great pronunciation! Next time, say 'three' with your tongue between your teeth." onChange={(e) => setNote(e.target.value)} />
+      </Field>
+      <div className="pay-actions">
+        <button className="btn" onClick={send} disabled={busy || (!stars && !note.trim())}>{reply ? "Update reply" : "Send reply"}</button>
+        <ConfirmButton label="Delete recording" onConfirm={() => deleteVoice(v).then(() => flash("Recording deleted."), () => flash("That didn't delete. Try again."))} />
+      </div>
+    </div>
+  );
+}
+function VoiceInbox({ notes, progressMap, flash }) {
+  const [openId, setOpenId] = useState(null);
+  const list = Object.values(notes).sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
+  if (!list.length) return <Empty text="When students record their homework, their voice notes show up here." />;
+  return (
+    <ul className="rows voice-list">
+      {list.map((v) => {
+        const reply = ((progressMap[v.sid] || {}).replies || {})[v.id];
+        const isOpen = openId === v.id;
+        const d = v.at ? new Date(v.at) : null;
+        const when = d ? d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) + ", " + d.toTimeString().slice(0, 5) : "";
+        return (
+          <li key={v.id}>
+            <button className="row-btn" aria-expanded={isOpen} onClick={() => setOpenId(isOpen ? null : v.id)}>
+              <span className="row-main">
+                <span className="row-title">{v.name}{!v.heard && <span className="new-chip">New</span>}</span>
+                <span className="row-sub">{v.title ? v.title + ". " : ""}{when}. {mmss(v.secs || 0)}{reply ? `. Replied${reply.stars ? " " + "★".repeat(reply.stars) : ""}` : ""}</span>
+              </span>
+              <Icon name={isOpen ? "x" : "play"} size={16} />
+            </button>
+            {isOpen && <VoiceNote v={v} reply={reply} flash={flash} />}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -3424,6 +4168,9 @@ function App() {
   const attToday = useAttendance(isTeacher ? db : null, userId, thisMonth);
   const moneyNow = useMoney(isTeacher ? db : null, userId, thisMonth);
   const bizH = useBiz(isTeacher ? db : null, userId);
+  const progressAll = useCollectionMap("progress", isTeacher);
+  const voiceAll = useCollectionMap("voice", isTeacher);
+  const [voiceSent, setVoiceSent] = useState(() => ls.get("bm:voice", {}) || {});
 
   const flash = (msg) => { setToast(msg); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(""), 3200); };
   const saveFail = () => flash("That didn't save. Check your connection and try again.");
@@ -3477,6 +4224,11 @@ function App() {
   }, [roster]);
 
   const meR = !me ? null : me.id === "guest" ? GUEST : studentRec || null;
+  const progDoc = useProgressDoc(!isTeacher && meR && meR.id !== "guest" ? meR.id : null);
+  const addVoiceSent = (lessonId, x) => {
+    const next = { ...voiceSent, [lessonId]: [...arr(voiceSent[lessonId]), x].slice(-5) };
+    setVoiceSent(next); ls.set("bm:voice", next);
+  };
 
   const toggleLang = () => { const next = lang === "fr" ? "en" : "fr"; setLang(next); ls.set("bm:lang", next); };
   const toggleDone = (lessonId) => {
@@ -3503,7 +4255,9 @@ function App() {
   const T = (k) => STR[uiLang][k];
   const tabs = isTeacher
     ? [{ id: "classes", label: "Classes", icon: "calendar" }, { id: "lessons", label: "Lessons", icon: "clipboard" }, { id: "words", label: "Words", icon: "book" }, { id: "students", label: "Students", icon: "users" }, { id: "business", label: "Business", icon: "briefcase" }]
-    : [{ id: "words", label: T("tabWords"), icon: "book" }, { id: "homework", label: T("tabHomework"), icon: "clipboard" }, { id: "classes", label: T("tabClasses"), icon: "calendar" }, { id: "pay", label: T("tabPay"), icon: "wallet" }];
+    : [{ id: "words", label: T("tabWords"), icon: "book" }, { id: "homework", label: T("tabHomework"), icon: "clipboard" },
+      ...(me && me.id !== "guest" ? [{ id: "progress", label: T("tabProgress"), icon: "award" }] : []),
+      { id: "classes", label: T("tabClasses"), icon: "calendar" }, { id: "pay", label: T("tabPay"), icon: "wallet" }];
   const current = tabs.some((t) => t.id === tab) ? tab : tabs[0].id;
 
   if (!FB) return <Notice text={CONFIGURED ? "Bright Minds could not load. Check your internet connection, then open the page again." : "This app isn't connected to its database yet."} />;
@@ -3541,7 +4295,7 @@ function App() {
           isTeacher groups={groups} saveSchedule={saveContent("schedule")} flash={flash} roster={roster} att={attToday} />
       </>
     );
-    else if (current === "lessons") screen = <LessonsTeacher lessons={view.lessons} groups={groups} saveLessons={saveContent("lessons")} flash={flash} sample={null} db={db} userId={userId} decks={view.decks} saveDecks={saveContent("decks")} roster={roster} />;
+    else if (current === "lessons") screen = <LessonsTeacher lessons={view.lessons} groups={groups} saveLessons={saveContent("lessons")} flash={flash} sample={null} db={db} userId={userId} decks={view.decks} saveDecks={saveContent("decks")} roster={roster} voiceNotes={voiceAll.map} progressMap={progressAll.map} />;
     else if (current === "words") screen = <WordsTeacher decks={view.decks} groups={groups} saveDecks={saveContent("decks")} openId={openDeck} setOpenId={setOpenDeck} sample={null} />;
     else if (current === "business") screen = (
       <BusinessTeacher bizH={bizH} db={db} userId={userId} flash={flash} pay={view.pay} downloads={downloads}
@@ -3556,12 +4310,14 @@ function App() {
   } else {
     const st = view.settings.showStatus ? meR.st : null;
     if (current === "words") screen = <WordsStudent decks={view.decks} me={meR} />;
-    else if (current === "homework") screen = <HomeworkStudent lessons={view.lessons} me={meR} done={done} onToggle={toggleDone} />;
+    else if (current === "homework") screen = <HomeworkStudent lessons={view.lessons} me={meR} done={done} onToggle={toggleDone} prog={progDoc} voiceSent={voiceSent} onVoiceSent={addVoiceSent} />;
+    else if (current === "progress") screen = <ProgressStudent me={meR} prog={progDoc} />;
     else if (current === "pay") screen = <PayStudent pay={view.pay} me={meR} st={st} />;
     else screen = <Classes schedule={view.schedule} changes={view.changes} me={meR} st={st} updated={st && st.at ? st.at : null} />;
   }
 
   const today = todayISO();
+  const voiceNew = isTeacher ? Object.values(voiceAll.map).filter((v) => !v.heard).length : 0;
   const hwCount = isTeacher ? 0 : view.lessons.filter((l) => l.homework && forGroup(l.group, meR.group) && !done[l.id] && (!l.due || l.due >= today)).length;
   const fresh = isTeacher && rosterH.ready && roster.length === 0 && !view.lessons.length && !view.schedule.length;
 
@@ -3603,6 +4359,7 @@ function App() {
                 <Icon name={t.icon} size={22} />
                 <span className="tab-label">{t.label}</span>
                 {t.id === "homework" && hwCount > 0 && <span className="badge" aria-label={`${hwCount}`}>{hwCount}</span>}
+                {t.id === "lessons" && voiceNew > 0 && <span className="badge" aria-label={`${voiceNew} new voice notes`}>{voiceNew}</span>}
               </button>
             ))}
           </div>

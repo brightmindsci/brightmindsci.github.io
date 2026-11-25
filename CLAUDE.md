@@ -24,7 +24,8 @@ The teacher's lesson plans, shown to the teacher only in Lessons → Library. Th
 - Shape: `{ updated, courses: [{ id, title, level, about, items: [{ id, section, sectionIntro?, title, body, send? }] }], wordLists: [{ id, title, about, cards: [{ en, fr, ex }] }] }`. Keep ids stable; items show in file order, grouped by `section`.
 - `body` is light markdown: `###` headings, `**bold**`, `_italic_`, `- ` and `1. ` lists (indent 2+ spaces for a sub-item), `| tables |` (the first row is the header).
 - `send` is what "Use for a class" fills into a new lesson for students: `{ title, notes, homework }`. Leave it out for pages that aren't a class (routines, checklists, quizzes).
-- A word list's "Add to Words" copies it into the site's word lists for the group the teacher picks.
+- A word list's "Add to Words" copies it into the site's word lists for the group the teacher picks. Cards may have `pic` (one emoji); lists marked `kids: true` are the picture lists. A word list with 4 or more pictures gets the Listen and Memory games.
+- `skills` on a course: `[{ id, unit, unitFr, en, fr }]`, the "I can..." statements the teacher ticks per student (Library → a student → What <name> can do). Students read them in their language, so write both. Keep ids stable: ticks are stored as `<courseId>/<skillId>`.
 - To add plans from one of the teacher's Claude docs: read the doc with the Claude Docs tools, turn it into a course or items here, run `node src/build.js` (it fails on invalid JSON), commit and push.
 
 ## Making a change
@@ -38,6 +39,8 @@ The teacher's lesson plans, shown to the teacher only in Lessons → Library. Th
 - `site/content`: lessons, word lists, class times, announcements, prices, group counts. Everyone reads; the teacher writes.
 - `students/{code}`: one doc per student, keyed by their code, with their name, group and status (`st`: classes left, paid). Anyone can `get` a single code; only the teacher can list or write.
 - `data/users/{uid}/...`: the teacher's private records (fees, payments, attendance, schools, lesson library). Teacher only.
+- `progress/{studentId}`: what a student can do and the teacher's replies to their voice notes, `{ skills: { "<courseId>/<skillId>": "YYYY-MM-DD" }, courses: [courseIds], replies: { <voiceId>: { stars, note, title, lessonId, at } }, updated }`. Anyone can `get` one (the id is the student's private id, not their code); only the teacher can list or write. Students see it in the Progress tab, and replies under the matching homework.
+- `voice/{id}` and `voice/{id}/parts/{0..5}`: a student's recorded homework. The student creates them without signing in; the rules check the code belongs to that student id and limit the fields and sizes. The audio is base64 split into parts of up to 700,000 characters. Only the teacher can read, update (`heard`, `replied`) or delete them (Lessons → Voice notes).
 - `data/users/{uid}/plans/{studentId}`: each student's own lesson list in Lessons → Library, `{ items: [{ id, course, item } | { id, custom: { title, notes, homework } }, used?: "YYYY-MM-DD"], updated }`. `course`/`item` are ids from `courses.json`, so keep those ids stable. "Use for <name>'s class" sets `used` when the new lesson is saved.
 
 If a change adds a new collection or path, update the rules too, or the app will get permission errors.

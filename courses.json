@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-24",
+ "updated": "2026-11-25",
  "courses": [
   {
    "id": "kids-20",
@@ -261,6 +261,134 @@
      "title": "Progress checklists",
      "body": "Tick each item after the unit's review lesson. Anything not ticked goes into the review step of the next lessons.\n\n### Unit 1 (after Lesson 8)\n- Answers \"What's your name?\" with \"My name is ___.\"\n- Answers \"How old are you?\" with \"I'm six.\"\n- Names at least 7 of the 9 colors\n- Counts to 10 without help\n- Touches the right face or body part when you name it\n- Says how she feels: \"I'm happy,\" \"I'm tired,\" \"I'm hungry\"\n- Introduces herself in 4 short sentences\n\n### Unit 2 (after Lesson 16)\n- Says \"This is my ___\" about her family\n- Names at least 10 animals\n- Says \"I like ___\" and \"I don't like ___\"\n- Asks \"Can I have ___, please?\" and says \"Thank you\"\n- Names at least 5 clothes and follows \"Put on your ___\"\n- Answers \"How's the weather?\"\n\n### Unit 3 (after Lesson 20)\n- Says \"I can ___\" with at least 4 actions\n- Answers \"Can you ___?\" with \"Yes, I can!\" or \"No\"\n- Says \"Merry Christmas!\" and \"Happy New Year!\"\n- Answers \"Where's the ___?\" using in, on or under\n- Performs her show for her parents"
     }
+   ],
+   "skills": [
+    {
+     "id": "u1-1",
+     "unit": "Unit 1: All about me",
+     "unitFr": "Unité 1 : Tout sur moi",
+     "en": "I can say my name: \"My name is…\"",
+     "fr": "Je sais dire mon prénom : « My name is… »"
+    },
+    {
+     "id": "u1-2",
+     "unit": "Unit 1: All about me",
+     "unitFr": "Unité 1 : Tout sur moi",
+     "en": "I can say how old I am: \"I'm six.\"",
+     "fr": "Je sais dire mon âge : « I'm six. »"
+    },
+    {
+     "id": "u1-3",
+     "unit": "Unit 1: All about me",
+     "unitFr": "Unité 1 : Tout sur moi",
+     "en": "I can name 7 colors",
+     "fr": "Je sais nommer 7 couleurs"
+    },
+    {
+     "id": "u1-4",
+     "unit": "Unit 1: All about me",
+     "unitFr": "Unité 1 : Tout sur moi",
+     "en": "I can count to 10",
+     "fr": "Je sais compter jusqu'à 10"
+    },
+    {
+     "id": "u1-5",
+     "unit": "Unit 1: All about me",
+     "unitFr": "Unité 1 : Tout sur moi",
+     "en": "I can point to my face and body when I hear the word",
+     "fr": "Je sais montrer mon visage et mon corps quand j'entends le mot"
+    },
+    {
+     "id": "u1-6",
+     "unit": "Unit 1: All about me",
+     "unitFr": "Unité 1 : Tout sur moi",
+     "en": "I can say how I feel: \"I'm happy\", \"I'm tired\"",
+     "fr": "Je sais dire comment je me sens : « I'm happy », « I'm tired »"
+    },
+    {
+     "id": "u1-7",
+     "unit": "Unit 1: All about me",
+     "unitFr": "Unité 1 : Tout sur moi",
+     "en": "I can introduce myself in 4 short sentences",
+     "fr": "Je sais me présenter en 4 petites phrases"
+    },
+    {
+     "id": "u2-1",
+     "unit": "Unit 2: My world",
+     "unitFr": "Unité 2 : Mon monde",
+     "en": "I can show my family: \"This is my mom\"",
+     "fr": "Je sais présenter ma famille : « This is my mom »"
+    },
+    {
+     "id": "u2-2",
+     "unit": "Unit 2: My world",
+     "unitFr": "Unité 2 : Mon monde",
+     "en": "I can name 10 animals",
+     "fr": "Je sais nommer 10 animaux"
+    },
+    {
+     "id": "u2-3",
+     "unit": "Unit 2: My world",
+     "unitFr": "Unité 2 : Mon monde",
+     "en": "I can say \"I like…\" and \"I don't like…\"",
+     "fr": "Je sais dire « I like… » et « I don't like… »"
+    },
+    {
+     "id": "u2-4",
+     "unit": "Unit 2: My world",
+     "unitFr": "Unité 2 : Mon monde",
+     "en": "I can ask \"Can I have…, please?\" and say \"Thank you\"",
+     "fr": "Je sais demander « Can I have…, please? » et dire « Thank you »"
+    },
+    {
+     "id": "u2-5",
+     "unit": "Unit 2: My world",
+     "unitFr": "Unité 2 : Mon monde",
+     "en": "I can name 5 clothes",
+     "fr": "Je sais nommer 5 vêtements"
+    },
+    {
+     "id": "u2-6",
+     "unit": "Unit 2: My world",
+     "unitFr": "Unité 2 : Mon monde",
+     "en": "I can say what the weather is like",
+     "fr": "Je sais dire le temps qu'il fait"
+    },
+    {
+     "id": "u3-1",
+     "unit": "Unit 3: Fun and celebrations",
+     "unitFr": "Unité 3 : Fêtes et jeux",
+     "en": "I can say \"I can…\" with 4 actions",
+     "fr": "Je sais dire « I can… » avec 4 actions"
+    },
+    {
+     "id": "u3-2",
+     "unit": "Unit 3: Fun and celebrations",
+     "unitFr": "Unité 3 : Fêtes et jeux",
+     "en": "I can answer \"Can you…?\" with \"Yes, I can!\"",
+     "fr": "Je sais répondre à « Can you…? » par « Yes, I can! »"
+    },
+    {
+     "id": "u3-3",
+     "unit": "Unit 3: Fun and celebrations",
+     "unitFr": "Unité 3 : Fêtes et jeux",
+     "en": "I can say \"Merry Christmas!\" and \"Happy New Year!\"",
+     "fr": "Je sais dire « Merry Christmas! » et « Happy New Year! »"
+    },
+    {
+     "id": "u3-4",
+     "unit": "Unit 3: Fun and celebrations",
+     "unitFr": "Unité 3 : Fêtes et jeux",
+     "en": "I can say where things are: in, on, under",
+     "fr": "Je sais dire où sont les choses : in, on, under"
+    },
+    {
+     "id": "u3-5",
+     "unit": "Unit 3: Fun and celebrations",
+     "unitFr": "Unité 3 : Fêtes et jeux",
+     "en": "I did my English show for my family",
+     "fr": "J'ai fait mon spectacle en anglais pour ma famille"
+    }
    ]
   },
   {
@@ -417,6 +545,127 @@
      "section": "Checklists",
      "title": "Progress checklists",
      "body": "Write the date in each person's column when they can do it without help. Check during Lessons 4, 8 and 10; anything still blank goes into the review step of the next lessons.\n\n### Unit 1 (after Lesson 4)\n| Can do | Him | Her |\n| Greets, says goodbye and asks \"How are you?\" |  |  |\n| Says their name and asks \"What's your name?\" |  |  |\n| Spells their name |  |  |\n| Counts to 100 and gives a phone number |  |  |\n| Says their age correctly (\"I'm 35\") |  |  |\n| Says where they're from and what they do |  |  |\n| Talks about family (I have…, his / her) |  |  |\n\n### Unit 2 (after Lesson 8)\n| Can do | Him | Her |\n| Tells the time and the day |  |  |\n| Says what time they get up and go to work |  |  |\n| Names 10 foods and asks \"How much is it?\" |  |  |\n| Orders politely (\"I'd like…, please\") |  |  |\n| Asks \"Where is…?\" and understands left, right, straight |  |  |\n| Says what they like (\"Do you like…?\") |  |  |\n\n### Unit 3 (after Lesson 10)\n| Can do | Him | Her |\n| Him: greets a traveler and asks for the passport and boarding pass |  |  |\n| Him: gives a gate, a time and simple directions |  |  |\n| Her: says 5 sentences about her job |  |  |\n| Holds a 10-minute simple conversation with no notes |  |  |"
+    }
+   ],
+   "skills": [
+    {
+     "id": "u1-1",
+     "unit": "Unit 1: Hello and me",
+     "unitFr": "Unité 1 : Bonjour et moi",
+     "en": "I can greet people, say goodbye and ask \"How are you?\"",
+     "fr": "Je sais saluer, dire au revoir et demander « How are you? »"
+    },
+    {
+     "id": "u1-2",
+     "unit": "Unit 1: Hello and me",
+     "unitFr": "Unité 1 : Bonjour et moi",
+     "en": "I can say my name and ask \"What's your name?\"",
+     "fr": "Je sais dire mon nom et demander « What's your name? »"
+    },
+    {
+     "id": "u1-3",
+     "unit": "Unit 1: Hello and me",
+     "unitFr": "Unité 1 : Bonjour et moi",
+     "en": "I can spell my name",
+     "fr": "Je sais épeler mon nom"
+    },
+    {
+     "id": "u1-4",
+     "unit": "Unit 1: Hello and me",
+     "unitFr": "Unité 1 : Bonjour et moi",
+     "en": "I can count to 100 and give my phone number",
+     "fr": "Je sais compter jusqu'à 100 et donner mon numéro de téléphone"
+    },
+    {
+     "id": "u1-5",
+     "unit": "Unit 1: Hello and me",
+     "unitFr": "Unité 1 : Bonjour et moi",
+     "en": "I can say my age correctly: \"I'm 35\"",
+     "fr": "Je sais dire mon âge correctement : « I'm 35 »"
+    },
+    {
+     "id": "u1-6",
+     "unit": "Unit 1: Hello and me",
+     "unitFr": "Unité 1 : Bonjour et moi",
+     "en": "I can say where I'm from and what I do",
+     "fr": "Je sais dire d'où je viens et ce que je fais"
+    },
+    {
+     "id": "u1-7",
+     "unit": "Unit 1: Hello and me",
+     "unitFr": "Unité 1 : Bonjour et moi",
+     "en": "I can talk about my family",
+     "fr": "Je sais parler de ma famille"
+    },
+    {
+     "id": "u2-1",
+     "unit": "Unit 2: Everyday life",
+     "unitFr": "Unité 2 : La vie de tous les jours",
+     "en": "I can tell the time and the day",
+     "fr": "Je sais dire l'heure et le jour"
+    },
+    {
+     "id": "u2-2",
+     "unit": "Unit 2: Everyday life",
+     "unitFr": "Unité 2 : La vie de tous les jours",
+     "en": "I can say what time I get up and go to work",
+     "fr": "Je sais dire à quelle heure je me lève et je vais au travail"
+    },
+    {
+     "id": "u2-3",
+     "unit": "Unit 2: Everyday life",
+     "unitFr": "Unité 2 : La vie de tous les jours",
+     "en": "I can name 10 foods and ask \"How much is it?\"",
+     "fr": "Je sais nommer 10 aliments et demander « How much is it? »"
+    },
+    {
+     "id": "u2-4",
+     "unit": "Unit 2: Everyday life",
+     "unitFr": "Unité 2 : La vie de tous les jours",
+     "en": "I can order politely: \"I'd like…, please\"",
+     "fr": "Je sais commander poliment : « I'd like…, please »"
+    },
+    {
+     "id": "u2-5",
+     "unit": "Unit 2: Everyday life",
+     "unitFr": "Unité 2 : La vie de tous les jours",
+     "en": "I can ask \"Where is…?\" and understand left, right and straight",
+     "fr": "Je sais demander « Where is…? » et comprendre left, right et straight"
+    },
+    {
+     "id": "u2-6",
+     "unit": "Unit 2: Everyday life",
+     "unitFr": "Unité 2 : La vie de tous les jours",
+     "en": "I can say what I like: \"Do you like…?\"",
+     "fr": "Je sais dire ce que j'aime : « Do you like…? »"
+    },
+    {
+     "id": "u3-1",
+     "unit": "Unit 3: At the airport",
+     "unitFr": "Unité 3 : À l'aéroport",
+     "en": "I can greet a traveler and ask for a passport and boarding pass",
+     "fr": "Je sais accueillir un voyageur et demander son passeport et sa carte d'embarquement"
+    },
+    {
+     "id": "u3-2",
+     "unit": "Unit 3: At the airport",
+     "unitFr": "Unité 3 : À l'aéroport",
+     "en": "I can give a gate, a time and simple directions",
+     "fr": "Je sais indiquer une porte, une heure et un chemin simple"
+    },
+    {
+     "id": "u3-3",
+     "unit": "Unit 3: At the airport",
+     "unitFr": "Unité 3 : À l'aéroport",
+     "en": "I can say 5 sentences about my job",
+     "fr": "Je sais dire 5 phrases sur mon travail"
+    },
+    {
+     "id": "u3-4",
+     "unit": "Unit 3: At the airport",
+     "unitFr": "Unité 3 : À l'aéroport",
+     "en": "I can hold a 10-minute simple conversation with no notes",
+     "fr": "Je sais tenir une conversation simple de 10 minutes sans notes"
     }
    ]
   },
@@ -706,6 +955,127 @@
      "title": "Progress tracker",
      "body": "Tick each item when she does it without help. Check at lessons 8, 16 and 24, as a game rather than a test.\n\n### Month 1 (lesson 8)\n- Says hello, goodbye and \"My name is…\"\n- Answers \"How are you?\" with a feeling\n- Follows stand up, sit down, look, listen\n- Names 8 or more colors\n- Counts to 10 and says \"I'm six\"\n- Names 8 or more body parts\n\n### Month 2 (lesson 16)\n- Introduces her family: \"This is my mom\"\n- Names 8 or more animals\n- Names 8 or more foods and says \"I like… / I don't like…\"\n- Asks politely: \"A mango, please\"\n- Names 5 or more clothes with a color: \"a blue shirt\"\n\n### Month 3 (lesson 24)\n- Uses in, on and under\n- Says \"I can… / I can't…\"\n- Describes the weather\n- Says the days of the week\n- Sings the alphabet song and knows the first sound of 10 or more letters\n- Performs the show for her parents\n\n### Parent update (after lessons 8, 16 and 24)\nKeep it to three lines, in whichever language the parents prefer:\n1. What she can do now (from the ticked list above).\n2. One thing to practice at home this month, such as colors at breakfast or counting steps.\n3. One song or phrase the family can use with her every day."
     }
+   ],
+   "skills": [
+    {
+     "id": "m1-1",
+     "unit": "Month 1",
+     "unitFr": "Mois 1",
+     "en": "I can say hello, goodbye and \"My name is…\"",
+     "fr": "Je sais dire bonjour, au revoir et « My name is… »"
+    },
+    {
+     "id": "m1-2",
+     "unit": "Month 1",
+     "unitFr": "Mois 1",
+     "en": "I can answer \"How are you?\"",
+     "fr": "Je sais répondre à « How are you? »"
+    },
+    {
+     "id": "m1-3",
+     "unit": "Month 1",
+     "unitFr": "Mois 1",
+     "en": "I can follow stand up, sit down, look and listen",
+     "fr": "Je comprends stand up, sit down, look et listen"
+    },
+    {
+     "id": "m1-4",
+     "unit": "Month 1",
+     "unitFr": "Mois 1",
+     "en": "I can name 8 colors",
+     "fr": "Je sais nommer 8 couleurs"
+    },
+    {
+     "id": "m1-5",
+     "unit": "Month 1",
+     "unitFr": "Mois 1",
+     "en": "I can count to 10 and say \"I'm six\"",
+     "fr": "Je sais compter jusqu'à 10 et dire « I'm six »"
+    },
+    {
+     "id": "m1-6",
+     "unit": "Month 1",
+     "unitFr": "Mois 1",
+     "en": "I can name 8 body parts",
+     "fr": "Je sais nommer 8 parties du corps"
+    },
+    {
+     "id": "m2-1",
+     "unit": "Month 2",
+     "unitFr": "Mois 2",
+     "en": "I can show my family: \"This is my mom\"",
+     "fr": "Je sais présenter ma famille : « This is my mom »"
+    },
+    {
+     "id": "m2-2",
+     "unit": "Month 2",
+     "unitFr": "Mois 2",
+     "en": "I can name 8 animals",
+     "fr": "Je sais nommer 8 animaux"
+    },
+    {
+     "id": "m2-3",
+     "unit": "Month 2",
+     "unitFr": "Mois 2",
+     "en": "I can name 8 foods and say what I like",
+     "fr": "Je sais nommer 8 aliments et dire ce que j'aime"
+    },
+    {
+     "id": "m2-4",
+     "unit": "Month 2",
+     "unitFr": "Mois 2",
+     "en": "I can ask politely: \"A mango, please\"",
+     "fr": "Je sais demander poliment : « A mango, please »"
+    },
+    {
+     "id": "m2-5",
+     "unit": "Month 2",
+     "unitFr": "Mois 2",
+     "en": "I can name 5 clothes with a color: \"a blue shirt\"",
+     "fr": "Je sais nommer 5 vêtements avec une couleur : « a blue shirt »"
+    },
+    {
+     "id": "m3-1",
+     "unit": "Month 3",
+     "unitFr": "Mois 3",
+     "en": "I can use in, on and under",
+     "fr": "Je sais utiliser in, on et under"
+    },
+    {
+     "id": "m3-2",
+     "unit": "Month 3",
+     "unitFr": "Mois 3",
+     "en": "I can say \"I can…\" and \"I can't…\"",
+     "fr": "Je sais dire « I can… » et « I can't… »"
+    },
+    {
+     "id": "m3-3",
+     "unit": "Month 3",
+     "unitFr": "Mois 3",
+     "en": "I can say what the weather is like",
+     "fr": "Je sais dire le temps qu'il fait"
+    },
+    {
+     "id": "m3-4",
+     "unit": "Month 3",
+     "unitFr": "Mois 3",
+     "en": "I can say the days of the week",
+     "fr": "Je sais dire les jours de la semaine"
+    },
+    {
+     "id": "m3-5",
+     "unit": "Month 3",
+     "unitFr": "Mois 3",
+     "en": "I can sing the alphabet song",
+     "fr": "Je sais chanter la chanson de l'alphabet"
+    },
+    {
+     "id": "m3-6",
+     "unit": "Month 3",
+     "unitFr": "Mois 3",
+     "en": "I did my English show for my family",
+     "fr": "J'ai fait mon spectacle en anglais pour ma famille"
+    }
    ]
   },
   {
@@ -872,6 +1242,78 @@
      "title": "Teaching tips",
      "body": "Keep it short, physical and the same every week.\n- **Stay in English.** Use gestures, pictures and actions so children understand without translation. Switch to French only for safety or a quick instruction.\n- **Move often.** Petite section can focus for 3–5 minutes, grande section up to 7–8. Change activity before they get restless, not after.\n- **Use the same signals.** A clap pattern means \"listen,\" hands up means \"stop.\" Teach them in week 1 and use them every class.\n- **Praise in English.** \"Good job!\", \"Great!\", \"High five!\" They'll pick these up quickly.\n- **Don't force shy children to speak.** Pointing and doing the actions is real learning at this age.\n- **Write two lines after each class.** Note which words each section struggled with and review them first thing the next week."
     }
+   ],
+   "skills": [
+    {
+     "id": "p-1",
+     "unit": "This year",
+     "unitFr": "Cette année",
+     "en": "I can sing the hello and goodbye songs",
+     "fr": "Je sais chanter les chansons bonjour et au revoir"
+    },
+    {
+     "id": "p-2",
+     "unit": "This year",
+     "unitFr": "Cette année",
+     "en": "I can point to red, blue, yellow and green",
+     "fr": "Je sais montrer rouge, bleu, jaune et vert"
+    },
+    {
+     "id": "p-3",
+     "unit": "This year",
+     "unitFr": "Cette année",
+     "en": "I can say \"It's red\"",
+     "fr": "Je sais dire « It's red »"
+    },
+    {
+     "id": "p-4",
+     "unit": "This year",
+     "unitFr": "Cette année",
+     "en": "I can count to 5",
+     "fr": "Je sais compter jusqu'à 5"
+    },
+    {
+     "id": "p-5",
+     "unit": "This year",
+     "unitFr": "Cette année",
+     "en": "I can count to 10",
+     "fr": "Je sais compter jusqu'à 10"
+    },
+    {
+     "id": "p-6",
+     "unit": "This year",
+     "unitFr": "Cette année",
+     "en": "I can touch my head, eyes and nose when I hear the word",
+     "fr": "Je sais toucher ma tête, mes yeux et mon nez quand j'entends le mot"
+    },
+    {
+     "id": "p-7",
+     "unit": "This year",
+     "unitFr": "Cette année",
+     "en": "I can name 6 animals and their sounds",
+     "fr": "Je sais nommer 6 animaux et leurs cris"
+    },
+    {
+     "id": "p-8",
+     "unit": "This year",
+     "unitFr": "Cette année",
+     "en": "I can name 5 fruits and say \"I like mangoes\"",
+     "fr": "Je sais nommer 5 fruits et dire « I like mangoes »"
+    },
+    {
+     "id": "p-9",
+     "unit": "This year",
+     "unitFr": "Cette année",
+     "en": "I can say \"This is my mommy\"",
+     "fr": "Je sais dire « This is my mommy »"
+    },
+    {
+     "id": "p-10",
+     "unit": "This year",
+     "unitFr": "Cette année",
+     "en": "I can say \"It's sunny\" and \"It's raining\"",
+     "fr": "Je sais dire « It's sunny » et « It's raining »"
+    }
    ]
   },
   {
@@ -891,10 +1333,643 @@
       "homework": "Practice the past tense word lists in the app."
      }
     }
+   ],
+   "skills": [
+    {
+     "id": "pt-1",
+     "unit": "The past tense",
+     "unitFr": "Le passé",
+     "en": "I can say 5 things I did yesterday",
+     "fr": "Je sais dire 5 choses que j'ai faites hier"
+    },
+    {
+     "id": "pt-2",
+     "unit": "The past tense",
+     "unitFr": "Le passé",
+     "en": "I know the past of the 20 most common irregular verbs",
+     "fr": "Je connais le passé des 20 verbes irréguliers les plus courants"
+    },
+    {
+     "id": "pt-3",
+     "unit": "The past tense",
+     "unitFr": "Le passé",
+     "en": "I know all 60 irregular verbs on the list",
+     "fr": "Je connais les 60 verbes irréguliers de la liste"
+    },
+    {
+     "id": "pt-4",
+     "unit": "The past tense",
+     "unitFr": "Le passé",
+     "en": "I can spell -ed endings correctly: stopped, studied",
+     "fr": "J'écris bien les terminaisons en -ed : stopped, studied"
+    },
+    {
+     "id": "pt-5",
+     "unit": "The past tense",
+     "unitFr": "Le passé",
+     "en": "I can say -ed endings correctly: worked, played, wanted",
+     "fr": "Je prononce bien les terminaisons en -ed : worked, played, wanted"
+    }
    ]
   }
  ],
  "wordLists": [
+  {
+   "id": "wl-pic-colors",
+   "title": "Colors (pictures)",
+   "about": "With pictures, for kids.",
+   "kids": true,
+   "cards": [
+    {
+     "en": "red",
+     "fr": "rouge",
+     "ex": "The apple is red.",
+     "pic": "🔴"
+    },
+    {
+     "en": "blue",
+     "fr": "bleu",
+     "ex": "The sky is blue.",
+     "pic": "🔵"
+    },
+    {
+     "en": "yellow",
+     "fr": "jaune",
+     "ex": "The sun is yellow.",
+     "pic": "🟡"
+    },
+    {
+     "en": "green",
+     "fr": "vert",
+     "ex": "The leaf is green.",
+     "pic": "🟢"
+    },
+    {
+     "en": "orange",
+     "fr": "orange",
+     "ex": "The orange is orange.",
+     "pic": "🟠"
+    },
+    {
+     "en": "purple",
+     "fr": "violet",
+     "ex": "I have a purple pen.",
+     "pic": "🟣"
+    },
+    {
+     "en": "pink",
+     "fr": "rose",
+     "ex": "The flower is pink.",
+     "pic": "🌸"
+    },
+    {
+     "en": "black",
+     "fr": "noir",
+     "ex": "The cat is black.",
+     "pic": "⚫"
+    },
+    {
+     "en": "white",
+     "fr": "blanc",
+     "ex": "The milk is white.",
+     "pic": "⚪"
+    },
+    {
+     "en": "brown",
+     "fr": "marron",
+     "ex": "The dog is brown.",
+     "pic": "🟤"
+    }
+   ]
+  },
+  {
+   "id": "wl-pic-numbers",
+   "title": "Numbers 1–10 (pictures)",
+   "about": "With pictures, for kids.",
+   "kids": true,
+   "cards": [
+    {
+     "en": "one",
+     "fr": "un",
+     "ex": "I have one nose.",
+     "pic": "1️⃣"
+    },
+    {
+     "en": "two",
+     "fr": "deux",
+     "ex": "I have two eyes.",
+     "pic": "2️⃣"
+    },
+    {
+     "en": "three",
+     "fr": "trois",
+     "ex": "Three little ducks.",
+     "pic": "3️⃣"
+    },
+    {
+     "en": "four",
+     "fr": "quatre",
+     "ex": "A dog has four legs.",
+     "pic": "4️⃣"
+    },
+    {
+     "en": "five",
+     "fr": "cinq",
+     "ex": "I have five fingers.",
+     "pic": "5️⃣"
+    },
+    {
+     "en": "six",
+     "fr": "six",
+     "ex": "I'm six.",
+     "pic": "6️⃣"
+    },
+    {
+     "en": "seven",
+     "fr": "sept",
+     "ex": "Seven days in a week.",
+     "pic": "7️⃣"
+    },
+    {
+     "en": "eight",
+     "fr": "huit",
+     "ex": "Eight green apples.",
+     "pic": "8️⃣"
+    },
+    {
+     "en": "nine",
+     "fr": "neuf",
+     "ex": "Nine red balloons.",
+     "pic": "9️⃣"
+    },
+    {
+     "en": "ten",
+     "fr": "dix",
+     "ex": "I have ten toes.",
+     "pic": "🔟"
+    }
+   ]
+  },
+  {
+   "id": "wl-pic-body",
+   "title": "My body (pictures)",
+   "about": "With pictures, for kids.",
+   "kids": true,
+   "cards": [
+    {
+     "en": "eyes",
+     "fr": "les yeux",
+     "ex": "Close your eyes.",
+     "pic": "👀"
+    },
+    {
+     "en": "nose",
+     "fr": "le nez",
+     "ex": "Touch your nose.",
+     "pic": "👃"
+    },
+    {
+     "en": "mouth",
+     "fr": "la bouche",
+     "ex": "Open your mouth.",
+     "pic": "👄"
+    },
+    {
+     "en": "ear",
+     "fr": "l'oreille",
+     "ex": "I listen with my ears.",
+     "pic": "👂"
+    },
+    {
+     "en": "hand",
+     "fr": "la main",
+     "ex": "Raise your hand.",
+     "pic": "✋"
+    },
+    {
+     "en": "foot",
+     "fr": "le pied",
+     "ex": "Stamp your foot.",
+     "pic": "🦶"
+    },
+    {
+     "en": "leg",
+     "fr": "la jambe",
+     "ex": "I have two legs.",
+     "pic": "🦵"
+    },
+    {
+     "en": "arm",
+     "fr": "le bras",
+     "ex": "Wave your arm.",
+     "pic": "💪"
+    },
+    {
+     "en": "tooth",
+     "fr": "la dent",
+     "ex": "Brush your teeth.",
+     "pic": "🦷"
+    }
+   ]
+  },
+  {
+   "id": "wl-pic-family",
+   "title": "My family (pictures)",
+   "about": "With pictures, for kids.",
+   "kids": true,
+   "cards": [
+    {
+     "en": "mother",
+     "fr": "la mère",
+     "ex": "This is my mother.",
+     "pic": "👩"
+    },
+    {
+     "en": "father",
+     "fr": "le père",
+     "ex": "This is my father.",
+     "pic": "👨"
+    },
+    {
+     "en": "baby",
+     "fr": "le bébé",
+     "ex": "The baby is sleeping.",
+     "pic": "👶"
+    },
+    {
+     "en": "brother",
+     "fr": "le frère",
+     "ex": "This is my brother.",
+     "pic": "👦"
+    },
+    {
+     "en": "sister",
+     "fr": "la sœur",
+     "ex": "This is my sister.",
+     "pic": "👧"
+    },
+    {
+     "en": "grandmother",
+     "fr": "la grand-mère",
+     "ex": "I love my grandmother.",
+     "pic": "👵"
+    },
+    {
+     "en": "grandfather",
+     "fr": "le grand-père",
+     "ex": "My grandfather is tall.",
+     "pic": "👴"
+    },
+    {
+     "en": "family",
+     "fr": "la famille",
+     "ex": "I love my family.",
+     "pic": "👪"
+    }
+   ]
+  },
+  {
+   "id": "wl-pic-animals",
+   "title": "Animals (pictures)",
+   "about": "With pictures, for kids.",
+   "kids": true,
+   "cards": [
+    {
+     "en": "dog",
+     "fr": "le chien",
+     "ex": "The dog says woof.",
+     "pic": "🐶"
+    },
+    {
+     "en": "cat",
+     "fr": "le chat",
+     "ex": "The cat says meow.",
+     "pic": "🐱"
+    },
+    {
+     "en": "chicken",
+     "fr": "la poule",
+     "ex": "The chicken says cluck.",
+     "pic": "🐔"
+    },
+    {
+     "en": "cow",
+     "fr": "la vache",
+     "ex": "The cow says moo.",
+     "pic": "🐄"
+    },
+    {
+     "en": "goat",
+     "fr": "la chèvre",
+     "ex": "The goat eats grass.",
+     "pic": "🐐"
+    },
+    {
+     "en": "duck",
+     "fr": "le canard",
+     "ex": "The duck can swim.",
+     "pic": "🦆"
+    },
+    {
+     "en": "fish",
+     "fr": "le poisson",
+     "ex": "The fish is in the water.",
+     "pic": "🐟"
+    },
+    {
+     "en": "elephant",
+     "fr": "l'éléphant",
+     "ex": "The elephant is big.",
+     "pic": "🐘"
+    },
+    {
+     "en": "lion",
+     "fr": "le lion",
+     "ex": "The lion says roar.",
+     "pic": "🦁"
+    },
+    {
+     "en": "monkey",
+     "fr": "le singe",
+     "ex": "The monkey can climb.",
+     "pic": "🐒"
+    }
+   ]
+  },
+  {
+   "id": "wl-pic-food",
+   "title": "Food and drinks (pictures)",
+   "about": "With pictures, for kids.",
+   "kids": true,
+   "cards": [
+    {
+     "en": "banana",
+     "fr": "la banane",
+     "ex": "I like bananas.",
+     "pic": "🍌"
+    },
+    {
+     "en": "mango",
+     "fr": "la mangue",
+     "ex": "The mango is sweet.",
+     "pic": "🥭"
+    },
+    {
+     "en": "orange",
+     "fr": "l'orange",
+     "ex": "An orange, please.",
+     "pic": "🍊"
+    },
+    {
+     "en": "pineapple",
+     "fr": "l'ananas",
+     "ex": "I like pineapple.",
+     "pic": "🍍"
+    },
+    {
+     "en": "apple",
+     "fr": "la pomme",
+     "ex": "An apple is red.",
+     "pic": "🍎"
+    },
+    {
+     "en": "water",
+     "fr": "l'eau",
+     "ex": "Can I have water, please?",
+     "pic": "💧"
+    },
+    {
+     "en": "bread",
+     "fr": "le pain",
+     "ex": "I eat bread for breakfast.",
+     "pic": "🍞"
+    },
+    {
+     "en": "rice",
+     "fr": "le riz",
+     "ex": "We eat rice.",
+     "pic": "🍚"
+    },
+    {
+     "en": "milk",
+     "fr": "le lait",
+     "ex": "I drink milk.",
+     "pic": "🥛"
+    },
+    {
+     "en": "egg",
+     "fr": "l'œuf",
+     "ex": "I like eggs.",
+     "pic": "🥚"
+    }
+   ]
+  },
+  {
+   "id": "wl-pic-clothes",
+   "title": "Clothes (pictures)",
+   "about": "With pictures, for kids.",
+   "kids": true,
+   "cards": [
+    {
+     "en": "T-shirt",
+     "fr": "le tee-shirt",
+     "ex": "Put on your T-shirt.",
+     "pic": "👕"
+    },
+    {
+     "en": "trousers",
+     "fr": "le pantalon",
+     "ex": "My trousers are blue.",
+     "pic": "👖"
+    },
+    {
+     "en": "dress",
+     "fr": "la robe",
+     "ex": "She has a pink dress.",
+     "pic": "👗"
+    },
+    {
+     "en": "shoes",
+     "fr": "les chaussures",
+     "ex": "Put on your shoes.",
+     "pic": "👟"
+    },
+    {
+     "en": "socks",
+     "fr": "les chaussettes",
+     "ex": "My socks are white.",
+     "pic": "🧦"
+    },
+    {
+     "en": "cap",
+     "fr": "la casquette",
+     "ex": "I have a red cap.",
+     "pic": "🧢"
+    },
+    {
+     "en": "hat",
+     "fr": "le chapeau",
+     "ex": "Put on your hat.",
+     "pic": "👒"
+    },
+    {
+     "en": "coat",
+     "fr": "le manteau",
+     "ex": "Take off your coat.",
+     "pic": "🧥"
+    }
+   ]
+  },
+  {
+   "id": "wl-pic-weather",
+   "title": "Weather (pictures)",
+   "about": "With pictures, for kids.",
+   "kids": true,
+   "cards": [
+    {
+     "en": "sunny",
+     "fr": "ensoleillé",
+     "ex": "It's sunny today.",
+     "pic": "☀️"
+    },
+    {
+     "en": "rainy",
+     "fr": "pluvieux",
+     "ex": "It's rainy. Take an umbrella.",
+     "pic": "🌧️"
+    },
+    {
+     "en": "cloudy",
+     "fr": "nuageux",
+     "ex": "It's cloudy.",
+     "pic": "☁️"
+    },
+    {
+     "en": "windy",
+     "fr": "venteux",
+     "ex": "It's windy.",
+     "pic": "💨"
+    },
+    {
+     "en": "hot",
+     "fr": "chaud",
+     "ex": "It's hot!",
+     "pic": "🥵"
+    },
+    {
+     "en": "rainbow",
+     "fr": "l'arc-en-ciel",
+     "ex": "Look, a rainbow!",
+     "pic": "🌈"
+    },
+    {
+     "en": "storm",
+     "fr": "l'orage",
+     "ex": "There's a storm.",
+     "pic": "⛈️"
+    }
+   ]
+  },
+  {
+   "id": "wl-pic-feelings",
+   "title": "Feelings (pictures)",
+   "about": "With pictures, for kids.",
+   "kids": true,
+   "cards": [
+    {
+     "en": "happy",
+     "fr": "content",
+     "ex": "I'm happy.",
+     "pic": "😀"
+    },
+    {
+     "en": "sad",
+     "fr": "triste",
+     "ex": "I'm sad.",
+     "pic": "😢"
+    },
+    {
+     "en": "angry",
+     "fr": "en colère",
+     "ex": "I'm angry.",
+     "pic": "😠"
+    },
+    {
+     "en": "tired",
+     "fr": "fatigué",
+     "ex": "I'm tired.",
+     "pic": "😴"
+    },
+    {
+     "en": "hungry",
+     "fr": "affamé",
+     "ex": "I'm hungry.",
+     "pic": "😋"
+    },
+    {
+     "en": "scared",
+     "fr": "effrayé",
+     "ex": "I'm scared.",
+     "pic": "😨"
+    },
+    {
+     "en": "surprised",
+     "fr": "surpris",
+     "ex": "I'm surprised!",
+     "pic": "😮"
+    }
+   ]
+  },
+  {
+   "id": "wl-pic-classroom",
+   "title": "In my bag (pictures)",
+   "about": "With pictures, for kids.",
+   "kids": true,
+   "cards": [
+    {
+     "en": "pencil",
+     "fr": "le crayon",
+     "ex": "I write with a pencil.",
+     "pic": "✏️"
+    },
+    {
+     "en": "book",
+     "fr": "le livre",
+     "ex": "Open your book.",
+     "pic": "📖"
+    },
+    {
+     "en": "bag",
+     "fr": "le sac",
+     "ex": "My bag is blue.",
+     "pic": "🎒"
+    },
+    {
+     "en": "scissors",
+     "fr": "les ciseaux",
+     "ex": "Cut with the scissors.",
+     "pic": "✂️"
+    },
+    {
+     "en": "crayon",
+     "fr": "le crayon de couleur",
+     "ex": "I color with a crayon.",
+     "pic": "🖍️"
+    },
+    {
+     "en": "ruler",
+     "fr": "la règle",
+     "ex": "I have a ruler.",
+     "pic": "📏"
+    },
+    {
+     "en": "ball",
+     "fr": "le ballon",
+     "ex": "Kick the ball!",
+     "pic": "⚽"
+    }
+   ]
+  },
   {
    "id": "wl-irregular-verbs-1-20",
    "title": "Irregular verbs 1–20",
