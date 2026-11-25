@@ -118,6 +118,14 @@ const STR = {
     paid: (m) => `${cap(m)}: paid`, partial: (m) => `${cap(m)}: partly paid`, unpaid: (m) => `${cap(m)}: not paid yet`,
     announcement: "Announcement",
     codeOffline: "Your code couldn't be checked. Check your internet connection and try again.", teacherSignIn: "Teacher sign-in",
+    installTitle: "Put Bright Minds on your Home Screen", installLead: "Then it opens in one tap, like an app. Nothing to download, no App Store.",
+    installShow: "Show me how", installNotNow: "Not now", installNow: "Install Bright Minds", installOr: "Or follow the steps below.",
+    installWhich: "Which phone do you have?", installIphone: "iPhone or iPad", installAndroid: "Android",
+    iosSteps: (host) => [`Open **${host}** in **Safari**.`, "Tap **⋯** at the bottom of the screen, next to the address, then tap **Share**. On an older iPhone, tap the Share button straight away: the square with an arrow pointing up.", "Scroll down the list and tap **Add to Home Screen**.", "If you see **Open as Web App**, leave it switched on. Then tap **Add**."],
+    androidSteps: (host) => [`Open **${host}** in **Chrome**.`, "Tap **⋮** in the top right corner.", "Tap **Add to Home screen** or **Install app**.", "Tap **Install** (or **Add**)."],
+    installAfter: "The Bright Minds icon is now on your Home Screen, next to your other apps. Open it from there. The first time, type your code once more.",
+    installDone: "You're already using Bright Minds from your Home Screen.", installShare: "Send these steps to someone",
+    installCopy: "Copy the link", installWa: "Send on WhatsApp", installWaText: (link) => `To put Bright Minds on your phone like an app, follow these steps: ${link}`,
     offline: "Bright Minds can't be reached right now. Check your internet connection, then open the page again.", opening: "Opening Bright Minds...",
     seeClasses: "New student? See classes and prices", haveCode: "I have a code",
     joinTagline: "English classes for children and adults, in person and online.", classesPrices: "Classes and prices",
@@ -161,6 +169,14 @@ const STR = {
     paid: (m) => `${cap(m)} : payé`, partial: (m) => `${cap(m)} : payé en partie`, unpaid: (m) => `${cap(m)} : pas encore payé`,
     announcement: "Annonce",
     codeOffline: "Le code n'a pas pu être vérifié. Vérifiez votre connexion internet et réessayez.", teacherSignIn: "Connexion professeur",
+    installTitle: "Mettez Bright Minds sur votre écran d'accueil", installLead: "Elle s'ouvrira d'un seul geste, comme une application. Rien à télécharger, pas besoin de l'App Store.",
+    installShow: "Montrez-moi comment", installNotNow: "Plus tard", installNow: "Installer Bright Minds", installOr: "Ou suivez les étapes ci-dessous.",
+    installWhich: "Quel téléphone avez-vous ?", installIphone: "iPhone ou iPad", installAndroid: "Android",
+    iosSteps: (host) => [`Ouvrez **${host}** dans **Safari**.`, "Touchez **⋯** en bas de l'écran, à côté de l'adresse, puis **Partager**. Sur un iPhone plus ancien, touchez directement le bouton Partager : le carré avec une flèche vers le haut.", "Faites défiler la liste et touchez **Sur l'écran d'accueil**.", "Si vous voyez l'option **app web**, laissez-la activée. Puis touchez **Ajouter**."],
+    androidSteps: (host) => [`Ouvrez **${host}** dans **Chrome**.`, "Touchez **⋮** en haut à droite.", "Touchez **Ajouter à l'écran d'accueil** ou **Installer l'application**.", "Touchez **Installer** (ou **Ajouter**)."],
+    installAfter: "L'icône Bright Minds est maintenant sur votre écran d'accueil, à côté de vos autres applications. Ouvrez-la depuis là. La première fois, tapez encore une fois votre code.",
+    installDone: "Vous utilisez déjà Bright Minds depuis votre écran d'accueil.", installShare: "Envoyer ces étapes à quelqu'un",
+    installCopy: "Copier le lien", installWa: "Envoyer sur WhatsApp", installWaText: (link) => `Pour mettre Bright Minds sur votre téléphone comme une application, suivez ces étapes : ${link}`,
     offline: "Bright Minds est inaccessible pour le moment. Vérifiez votre connexion internet, puis rouvrez la page.", opening: "Ouverture de Bright Minds...",
     seeClasses: "Nouvel élève ? Voir les cours et les prix", haveCode: "J'ai un code",
     joinTagline: "Cours d'anglais pour enfants et adultes, en présentiel et en ligne.", classesPrices: "Cours et prix",
@@ -522,9 +538,11 @@ function computeStatuses(roster, fees, pays, taken, month) {
 }
 
 /* Messages the teacher sends on WhatsApp, in each family's language. */
+const SITE_URL = (() => { try { return window.location.origin + window.location.pathname.replace(/index\.html$/, ""); } catch (e) { return ""; } })();
+const SITE_HOST = (() => { try { return window.location.host || "brightmindsci.github.io"; } catch (e) { return "brightmindsci.github.io"; } })();
 const codeText = (r, lang) => (lang === "fr"
-  ? `Bonjour ${r.name} ! Votre code Bright Minds est ${r.code}. Ouvrez l'application des cours et tapez ce code.`
-  : `Hi ${r.name}! Your Bright Minds code is ${r.code}. Open the class app and type it in.`);
+  ? `Bonjour ${r.name} ! Votre code Bright Minds est ${r.code}. Ouvrez ${SITE_URL} et tapez ce code.\n\nPour la garder sur votre téléphone comme une application : ${SITE_URL}#install`
+  : `Hi ${r.name}! Your Bright Minds code is ${r.code}. Open ${SITE_URL} and type it in.\n\nTo keep it on your phone like an app: ${SITE_URL}#install`);
 function reminderText(r, month, pay) {
   const fr = r.lang === "fr";
   const m = monthLabel(month, r.lang);
@@ -622,6 +640,101 @@ function WaButton({ phone, text, children, ghost = false }) {
 }
 
 /* ---------- welcome ---------- */
+/* ---------- putting the site on the Home Screen, like an app ---------- */
+const deviceKind = () => {
+  const ua = navigator.userAgent || "";
+  if (/iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) return "ios";
+  return /Android/i.test(ua) ? "android" : "other";
+};
+const isHomeScreenApp = () => {
+  try { return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true; } catch (e) { return false; }
+};
+let installEvt = null; // Chrome on Android offers its own install prompt; keep it for our button
+const installSubs = new Set();
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; installSubs.forEach((f) => f()); });
+window.addEventListener("appinstalled", () => { installEvt = null; installSubs.forEach((f) => f()); });
+function useInstallPrompt() {
+  const [, bump] = useState(0);
+  useEffect(() => { const f = () => bump((n) => n + 1); installSubs.add(f); return () => { installSubs.delete(f); }; }, []);
+  const run = async () => {
+    const e = installEvt;
+    if (!e) return;
+    installEvt = null;
+    try { await e.prompt(); await e.userChoice; } catch (err) { /* the phone shows its own message */ }
+    installSubs.forEach((f) => f());
+  };
+  return { can: !!installEvt, run };
+}
+const openInstall = () => { window.location.hash = "#install"; window.scrollTo(0, 0); };
+
+function InstallGuide() {
+  const { t } = useT();
+  const [os, setOs] = useState(() => (deviceKind() === "android" ? "android" : "ios"));
+  const ip = useInstallPrompt();
+  const steps = t(os === "ios" ? "iosSteps" : "androidSteps", SITE_HOST);
+  return (
+    <>
+      <p className="day-name">{t("installWhich")}</p>
+      <div className="seg install-seg">
+        <button aria-pressed={os === "ios"} onClick={() => setOs("ios")}>{t("installIphone")}</button>
+        <button aria-pressed={os === "android"} onClick={() => setOs("android")}>{t("installAndroid")}</button>
+      </div>
+      {os === "android" && ip.can && (
+        <div className="lib-use"><button className="btn" onClick={ip.run}>{t("installNow")}</button><p className="hint">{t("installOr")}</p></div>
+      )}
+      <ol className="install-steps">
+        {steps.map((step, k) => <li key={os + k}><span className="step-n" aria-hidden="true">{k + 1}</span><span>{mdInline(step, os + k)}</span></li>)}
+      </ol>
+      <p className="note">{t("installAfter")}</p>
+    </>
+  );
+}
+
+function InstallPage({ onBack, onLang }) {
+  const { t } = useT();
+  const link = SITE_URL + "#install";
+  return (
+    <div className="welcome">
+      <div className="welcome-lang between">
+        <button className="link" onClick={onBack}>{t("back")}</button>
+        <button className="link" onClick={onLang} aria-label={t("otherLangName")}>{t("otherLang")}</button>
+      </div>
+      <img src="icon-192.png" alt="" width="64" height="64" className="install-icon big" />
+      <h1 className="install-h">{t("installTitle")}</h1>
+      {isHomeScreenApp() ? <p className="note">{t("installDone")}</p> : <p className="hint">{t("installLead")}</p>}
+      <InstallGuide />
+      <div className="day-block">
+        <p className="day-name">{t("installShare")}</p>
+        <p className="install-link">{link}</p>
+        <div className="pay-actions">
+          <a className="btn sm" href={"https://wa.me/?text=" + encodeURIComponent(t("installWaText", link))} target="_blank" rel="noopener noreferrer"><Icon name="chat" size={16} />{t("installWa")}</a>
+          <CopyButton text={link} label={t("installCopy")} caption={t("installCopy")} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InstallCard({ onHide }) {
+  const { t } = useT();
+  const ip = useInstallPrompt();
+  if (isHomeScreenApp()) return null;
+  return (
+    <div className="install-card">
+      <img src="icon-192.png" alt="" width="44" height="44" className="install-icon" />
+      <div className="install-text">
+        <p className="install-card-title">{t("installTitle")}</p>
+        <p className="hint">{t("installLead")}</p>
+        <div className="pay-actions">
+          {ip.can ? <button className="btn sm" onClick={ip.run}>{t("installNow")}</button> : <button className="btn sm" onClick={openInstall}>{t("installShow")}</button>}
+          {ip.can && <button className="btn ghost sm" onClick={openInstall}>{t("installShow")}</button>}
+          {onHide && <button className="btn ghost sm" onClick={onHide}>{t("installNotNow")}</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Welcome({ canTeach, signedIn, notTeacher, onStudent, onTeacher, onSignIn, onSignOut, onLang, onJoin }) {
   const { t } = useT();
   const [code, setCode] = useState("");
@@ -658,6 +771,7 @@ function Welcome({ canTeach, signedIn, notTeacher, onStudent, onTeacher, onSignI
         <button className="btn ghost" onClick={() => onStudent(null)}>{t("noCode")}</button>
         {canTeach && <button className="btn" onClick={onTeacher}>Open teacher view</button>}
       </div>
+      <InstallCard />
       <div className="teacher-link">
         {notTeacher
           ? <p className="hint">{notTeacher} isn't the teacher account. <button className="link" onClick={onSignOut}>Sign out</button></p>
@@ -3293,6 +3407,8 @@ function App() {
   const [lang, setLang] = useState(() => ls.get("bm:lang") || (/^fr/i.test(navigator.language || "") ? "fr" : "en"));
   const [user, setUser] = useState(undefined);
   const [joinView, setJoinView] = useState(() => (window.location.hash || "") === "#join");
+  const [installView, setInstallView] = useState(() => (window.location.hash || "") === "#install");
+  const [installHidden, setInstallHidden] = useState(() => !!ls.get("bm:installHidden"));
   const [tab, setTab] = useState(null);
   const [openDeck, setOpenDeck] = useState(null);
   const [toast, setToast] = useState("");
@@ -3319,7 +3435,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const onHash = () => setJoinView((window.location.hash || "") === "#join");
+    const onHash = () => { const h = window.location.hash || ""; setJoinView(h === "#join"); setInstallView(h === "#install"); };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
@@ -3392,6 +3508,14 @@ function App() {
 
   if (!FB) return <Notice text={CONFIGURED ? "Bright Minds could not load. Check your internet connection, then open the page again." : "This app isn't connected to its database yet."} />;
   if (role === "teacher" && user === undefined) return <p className="boot" role="status">Opening Bright Minds...</p>;
+  if (installView) {
+    const closeInstall = () => {
+      setInstallView(false);
+      try { history.replaceState(null, "", window.location.pathname + window.location.search); } catch (e) { window.location.hash = ""; }
+      window.scrollTo(0, 0);
+    };
+    return <LangCtx.Provider value={lang}><InstallPage onBack={closeInstall} onLang={toggleLang} /></LangCtx.Provider>;
+  }
   if (!content) return error ? <Notice text={STR[lang].offline} /> : <p className="boot" role="status">{STR[lang].opening}</p>;
   if (!isTeacher && me && me.id !== "guest" && studentRec === undefined) return <p className="boot" role="status">{STR[lang].opening}</p>;
 
@@ -3465,6 +3589,7 @@ function App() {
         </header>
         <main>
           {fresh && <p className="note">Welcome to your own Bright Minds. To bring in everything from the Claude version, go to Business, then Settings, and use Move in.</p>}
+          {!isTeacher && !installHidden && current === tabs[0].id && <InstallCard onHide={() => { setInstallHidden(true); ls.set("bm:installHidden", true); }} />}
           {!isTeacher && <StudentNotices notices={view.notices} me={meR} />}
           {screen}
         </main>

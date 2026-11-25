@@ -279,3 +279,18 @@ a.btn{text-decoration:none}
 .pick-list{padding:4px 0 12px 4px}
 .pick-list .check{font-weight:400;align-items:flex-start}
 .pick-list .check input{flex:none;margin-top:1px}
+
+/* Home Screen guide */
+.install-card{display:flex;gap:14px;align-items:flex-start;padding:16px;margin:20px 0;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.install-icon{flex:none;border-radius:11px;box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.install-icon.big{border-radius:15px;margin:8px 0 14px}
+.install-text{min-width:0}
+.install-card-title{font-weight:700;font-size:16px;margin:0 0 4px;color:var(--ink)}
+.install-card .hint{margin:0}
+.install-card .pay-actions{margin-top:12px;flex-wrap:wrap}
+.install-h{font-size:24px;line-height:1.25;margin:0 0 8px;text-wrap:balance;color:var(--ink)}
+.install-seg{margin:6px 0 18px}
+.install-steps{list-style:none;padding:0;margin:0 0 16px}
+.install-steps li{display:flex;gap:12px;align-items:flex-start;margin-bottom:16px;font-size:16px;line-height:1.5}
+.step-n{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--ink);color:var(--on-ink);font-size:14px;font-weight:700}
+.install-link{font-size:14px;word-break:break-all;color:var(--ink-soft);margin:0 0 10px}
