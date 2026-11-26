@@ -1663,7 +1663,7 @@ var __rest = (this && this.__rest) || function (s, e) {
                     React.createElement(Icon, { name: "volume", size: 17 })),
                 React.createElement(ConfirmButton, { iconOnly: true, label: `Delete ${c.en}`, onConfirm: () => onChange(Object.assign(Object.assign({}, deck), { cards: deck.cards.filter((x) => x.id !== c.id) })) }))))))));
     }
-    function WordsTeacher({ decks, groups, saveDecks, openId, setOpenId, sample }) {
+    function WordsTeacher({ decks, groups, saveDecks, openId, setOpenId, sample, embedded = false }) {
         const [practice, setPractice] = useState(false);
         const [newTitle, setNewTitle] = useState("");
         const deck = decks.find((d) => d.id === openId);
@@ -1682,7 +1682,7 @@ var __rest = (this && this.__rest) || function (s, e) {
             setOpenId(d.id);
         };
         return (React.createElement("section", null,
-            React.createElement("h2", { className: "h" }, "Word lists"),
+            !embedded && React.createElement("h2", { className: "h" }, "Word lists"),
             React.createElement("div", { className: "inline-add" },
                 React.createElement("input", { id: "new-list", className: "inp", "aria-label": "New list name", placeholder: "New list, e.g. Colors", value: newTitle, onChange: (e) => setNewTitle(e.target.value), onKeyDown: (e) => e.key === "Enter" && add() }),
                 React.createElement("button", { className: "btn", onClick: add, disabled: !newTitle.trim() },
@@ -1771,7 +1771,7 @@ var __rest = (this && this.__rest) || function (s, e) {
             })),
             React.createElement("span", { className: "hint" }, value.length ? "Tap every student or group that gets this." : "Pick at least one student or group.")));
     }
-    function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks, roster = [], voiceNotes = {}, progressMap = {}, plansH, hw, people = roster, start = null }) {
+    function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks, roster = [], voiceNotes = {}, progressMap = {}, plansH, hw, people = roster, start = null, openDeck = null, setOpenDeck = () => { } }) {
         const [mode, setMode] = useState(() => (start && start.mode) || "lessons");
         const [form, setForm] = useState(null);
         const lib = useLibrary(db, userId);
@@ -1819,36 +1819,38 @@ var __rest = (this && this.__rest) || function (s, e) {
                 mode === "lessons" && !form && React.createElement("button", { className: "btn sm", onClick: () => setForm(blank()) },
                     React.createElement(Icon, { name: "plus", size: 16 }),
                     "New lesson")),
-            lib.on && (React.createElement("div", { className: "seg" },
+            lib.on && (React.createElement("div", { className: "seg seg-lessons" },
                 React.createElement("button", { "aria-pressed": mode === "lessons", onClick: () => setMode("lessons") }, "Lessons"),
+                React.createElement("button", { "aria-pressed": mode === "words", onClick: () => { pending.current = null; setMode("words"); } }, "Words"),
                 React.createElement("button", { "aria-pressed": mode === "library", onClick: () => { pending.current = null; setMode("library"); setLibKey((k) => k + 1); } }, "Library"),
                 React.createElement("button", { "aria-pressed": mode === "voice", onClick: () => { pending.current = null; setMode("voice"); } },
-                    "Voice notes",
-                    newVoice ? ` (${newVoice})` : ""))),
-            mode === "voice" ? React.createElement(VoiceInbox, { notes: voiceNotes, progressMap: progressMap, flash: flash }) : mode === "library" ? (React.createElement(CourseLibrary, { key: libKey, startNav: libKey === 0 && start ? start.nav : null, progressMap: progressMap, saved: lib.items, onUse: usePlan, decks: decks, saveDecks: saveDecks, groups: groups, flash: flash, roster: roster, plansH: plansH, onRemoveSaved: (id) => lib.remove(id).catch(() => flash("That didn't save. Check your connection and try again.")) })) : (React.createElement(React.Fragment, null,
-                form && (React.createElement("div", { className: "form" },
-                    React.createElement(AskClaude, { sample: sample, title: "Draft with Claude", label: "What's the lesson about?", placeholder: "Present continuous for adult beginners", button: "Draft", makePrompt: lessonPrompt, onResult: (d) => {
-                            if (!d || !d.title)
-                                return false;
-                            setForm((f) => (Object.assign(Object.assign({}, f), { title: String(d.title), notes: String(d.notes || ""), homework: String(d.homework || "") })));
-                            return true;
-                        } }),
-                    React.createElement(Field, { label: "Title" },
-                        React.createElement("input", { id: "lesson-title", className: "inp", value: form.title, placeholder: "Telling the time", onChange: upd("title") })),
-                    React.createElement(GroupPicker, { id: "lesson-for", groups: groups, roster: roster, value: arr(form.groups), onChange: (gs) => setForm(Object.assign(Object.assign({}, form), { groups: gs })) }),
-                    React.createElement(Field, { label: "What we did" },
-                        React.createElement("textarea", { id: "lesson-notes", className: "inp", value: form.notes, placeholder: "New words, a song, a short dialogue...", onChange: upd("notes") })),
-                    React.createElement(Field, { label: "Homework (optional)" },
-                        React.createElement("textarea", { id: "lesson-hw", className: "inp", value: form.homework, placeholder: "Write 5 sentences with the new words.", onChange: upd("homework") })),
-                    React.createElement("div", { className: "grid2" },
-                        React.createElement(Field, { label: "Date" },
-                            React.createElement("input", { id: "lesson-date", className: "inp", type: "date", value: form.date, onChange: upd("date") })),
-                        React.createElement(Field, { label: "Due date" },
-                            React.createElement("input", { id: "lesson-due", className: "inp", type: "date", value: form.due, onChange: upd("due") }))),
-                    React.createElement("div", { className: "form-actions" },
-                        React.createElement("button", { className: "btn", onClick: submit, disabled: !form.title.trim() || !arr(form.groups).length }, "Save lesson"),
-                        React.createElement("button", { className: "btn ghost", onClick: () => { pending.current = null; setForm(null); } }, "Cancel")))),
-                sorted.length === 0 ? (!form && React.createElement(Empty, { text: "Add your first lesson to give students their notes and homework, or open Library to use one of your lesson plans." })) : (React.createElement("ol", { className: "entries" }, sorted.map((l) => (React.createElement(LessonEntry, { key: l.id, lesson: l, teacher: true, onEdit: () => { setForm(Object.assign(Object.assign({}, l), { groups: lessonGroups(l) })); window.scrollTo(0, 0); }, onDelete: () => saveLessons(lessons.filter((x) => x.id !== l.id)), onSaveToLibrary: lib.on ? (level) => saveToLib(l, level) : null, hwCheck: l.homework && hw && hw.on ? React.createElement(HomeworkToggle, { lesson: l, people: people, hw: hw, voiceList: voiceList, flash: flash }) : null })))))))));
+                    "Voice",
+                    newVoice ? React.createElement("span", { className: "seg-count", "aria-label": `${newVoice} new` }, newVoice) : ""))),
+            mode === "words" ? React.createElement(WordsTeacher, { embedded: true, decks: decks, groups: groups, saveDecks: saveDecks, openId: openDeck, setOpenId: setOpenDeck, sample: sample })
+                : mode === "voice" ? React.createElement(VoiceInbox, { notes: voiceNotes, progressMap: progressMap, flash: flash }) : mode === "library" ? (React.createElement(CourseLibrary, { key: libKey, startNav: libKey === 0 && start ? start.nav : null, progressMap: progressMap, saved: lib.items, onUse: usePlan, decks: decks, saveDecks: saveDecks, groups: groups, flash: flash, roster: roster, plansH: plansH, onRemoveSaved: (id) => lib.remove(id).catch(() => flash("That didn't save. Check your connection and try again.")) })) : (React.createElement(React.Fragment, null,
+                    form && (React.createElement("div", { className: "form" },
+                        React.createElement(AskClaude, { sample: sample, title: "Draft with Claude", label: "What's the lesson about?", placeholder: "Present continuous for adult beginners", button: "Draft", makePrompt: lessonPrompt, onResult: (d) => {
+                                if (!d || !d.title)
+                                    return false;
+                                setForm((f) => (Object.assign(Object.assign({}, f), { title: String(d.title), notes: String(d.notes || ""), homework: String(d.homework || "") })));
+                                return true;
+                            } }),
+                        React.createElement(Field, { label: "Title" },
+                            React.createElement("input", { id: "lesson-title", className: "inp", value: form.title, placeholder: "Telling the time", onChange: upd("title") })),
+                        React.createElement(GroupPicker, { id: "lesson-for", groups: groups, roster: roster, value: arr(form.groups), onChange: (gs) => setForm(Object.assign(Object.assign({}, form), { groups: gs })) }),
+                        React.createElement(Field, { label: "What we did" },
+                            React.createElement("textarea", { id: "lesson-notes", className: "inp", value: form.notes, placeholder: "New words, a song, a short dialogue...", onChange: upd("notes") })),
+                        React.createElement(Field, { label: "Homework (optional)" },
+                            React.createElement("textarea", { id: "lesson-hw", className: "inp", value: form.homework, placeholder: "Write 5 sentences with the new words.", onChange: upd("homework") })),
+                        React.createElement("div", { className: "grid2" },
+                            React.createElement(Field, { label: "Date" },
+                                React.createElement("input", { id: "lesson-date", className: "inp", type: "date", value: form.date, onChange: upd("date") })),
+                            React.createElement(Field, { label: "Due date" },
+                                React.createElement("input", { id: "lesson-due", className: "inp", type: "date", value: form.due, onChange: upd("due") }))),
+                        React.createElement("div", { className: "form-actions" },
+                            React.createElement("button", { className: "btn", onClick: submit, disabled: !form.title.trim() || !arr(form.groups).length }, "Save lesson"),
+                            React.createElement("button", { className: "btn ghost", onClick: () => { pending.current = null; setForm(null); } }, "Cancel")))),
+                    sorted.length === 0 ? (!form && React.createElement(Empty, { text: "Add your first lesson to give students their notes and homework, or open Library to use one of your lesson plans." })) : (React.createElement("ol", { className: "entries" }, sorted.map((l) => (React.createElement(LessonEntry, { key: l.id, lesson: l, teacher: true, onEdit: () => { setForm(Object.assign(Object.assign({}, l), { groups: lessonGroups(l) })); window.scrollTo(0, 0); }, onDelete: () => saveLessons(lessons.filter((x) => x.id !== l.id)), onSaveToLibrary: lib.on ? (level) => saveToLib(l, level) : null, hwCheck: l.homework && hw && hw.on ? React.createElement(HomeworkToggle, { lesson: l, people: people, hw: hw, voiceList: voiceList, flash: flash }) : null })))))))));
     }
     /* ---------- voice notes: a student's recorded homework, kept in Firestore in parts ---------- */
     const VOICE_PART = 700000;
@@ -2993,7 +2995,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                 x.pic = String(c.pic); return x; }).filter((c) => c.en && c.fr);
             saveDecks([{ id: uid(), title: w.title, group, cards }, ...decks]);
             setOpenId(null);
-            flash(`${w.title} is in Words now, for ${group}.`);
+            flash(`${w.title} is in Lessons, Words now, for ${group}.`);
         };
         const parts = [["Picture lists for kids", lists.filter((w) => w.kids)], ["More word lists", lists.filter((w) => !w.kids)]].filter(([, l]) => l.length);
         return (React.createElement("div", { className: "day-block" },
@@ -5282,7 +5284,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         const uiLang = isTeacher ? "en" : lang;
         const T = (k) => STR[uiLang][k];
         const tabs = isTeacher
-            ? [{ id: "today", label: "Today", icon: "sun" }, { id: "classes", label: "Classes", icon: "calendar" }, { id: "lessons", label: "Lessons", icon: "clipboard" }, { id: "words", label: "Words", icon: "book" }, { id: "students", label: "Students", icon: "users" }, { id: "business", label: "Business", icon: "briefcase" }]
+            ? [{ id: "today", label: "Today", icon: "sun" }, { id: "classes", label: "Classes", icon: "calendar" }, { id: "lessons", label: "Lessons", icon: "clipboard" }, { id: "students", label: "Students", icon: "users" }, { id: "business", label: "Business", icon: "briefcase" }]
             : [{ id: "words", label: T("tabWords"), icon: "book" }, { id: "homework", label: T("tabHomework"), icon: "clipboard" },
                 ...(me && me.id !== "guest" ? [{ id: "progress", label: T("tabProgress"), icon: "award" }] : []),
                 { id: "classes", label: T("tabClasses"), icon: "calendar" }, { id: "pay", label: T("tabPay"), icon: "wallet" }];
@@ -5336,9 +5338,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                     React.createElement(NoticesTeacher, { notices: view.notices, groups: groups, saveNotices: saveContent("notices"), flash: flash }),
                     React.createElement(Classes, { schedule: view.schedule, changes: view.changes, saveChanges: saveContent("changes"), notices: view.notices, saveNotices: saveContent("notices"), isTeacher: true, groups: groups, saveSchedule: saveContent("schedule"), flash: flash, roster: people, att: attToday, lessons: view.lessons })));
             else if (current === "lessons")
-                screen = React.createElement(LessonsTeacher, { key: jump ? JSON.stringify(jump) : "lessons", start: jump && jump.lessons, lessons: view.lessons, groups: groups, saveLessons: saveContent("lessons"), flash: flash, sample: null, db: db, userId: userId, decks: view.decks, saveDecks: saveContent("decks"), roster: roster, people: people, voiceNotes: voiceAll.map, progressMap: progressAll.map, plansH: plansH, hw: hwChecks });
-            else if (current === "words")
-                screen = React.createElement(WordsTeacher, { decks: view.decks, groups: groups, saveDecks: saveContent("decks"), openId: openDeck, setOpenId: setOpenDeck, sample: null });
+                screen = React.createElement(LessonsTeacher, { key: jump ? JSON.stringify(jump) : "lessons", start: jump && jump.lessons, lessons: view.lessons, groups: groups, saveLessons: saveContent("lessons"), flash: flash, sample: null, db: db, userId: userId, decks: view.decks, saveDecks: saveContent("decks"), roster: roster, people: people, voiceNotes: voiceAll.map, progressMap: progressAll.map, plansH: plansH, hw: hwChecks, openDeck: openDeck, setOpenDeck: setOpenDeck });
             else if (current === "business")
                 screen = (React.createElement(BusinessTeacher, { bizH: bizH, db: db, userId: userId, flash: flash, pay: view.pay, downloads: downloads, roster: roster, schedule: view.schedule, changes: view.changes, join: view.join, saveJoin: saveContent("join"), groups: groups }));
             else
@@ -5366,7 +5366,6 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                 React.createElement("header", { className: "top" },
                     React.createElement("span", { className: "brand" }, "Bright Minds"),
                     React.createElement("div", { className: "who" }, isTeacher ? (React.createElement(React.Fragment, null,
-                        React.createElement("span", null, "Teacher"),
                         React.createElement("button", { className: "link", onClick: toStudentView }, "Student view"),
                         React.createElement("button", { className: "link", onClick: signOut }, "Sign out"))) : (React.createElement(React.Fragment, null,
                         React.createElement("span", null, meR.id === "guest" ? "" : meR.name),

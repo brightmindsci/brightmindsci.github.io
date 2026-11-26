@@ -488,3 +488,10 @@ a.btn{text-decoration:none}
 .absent-line{font-size:14px;font-weight:700;color:var(--bad);margin-top:8px}
 .report-notes{margin-bottom:12px}
 @media (max-width:360px){.file-grid{grid-template-columns:1fr}}
+
+/* Lessons: Lessons, Words, Library, Voice in one row */
+.seg-lessons{display:flex;max-width:100%}
+.seg-lessons button{flex:1 1 auto;padding:8px 10px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:5px}
+.seg-count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:var(--on-accent);font-size:11px;font-weight:700}
+.seg button[aria-pressed="true"] .seg-count{background:var(--on-accent);color:var(--accent)}
+@media (max-width:360px){.seg-lessons button{padding:8px 6px;font-size:14px}.seg-lessons{padding:2px}}

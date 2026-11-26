@@ -1419,7 +1419,7 @@ function DeckEditor({ deck, groups, onBack, onPractice, onChange, onDelete }) {
   );
 }
 
-function WordsTeacher({ decks, groups, saveDecks, openId, setOpenId, sample }) {
+function WordsTeacher({ decks, groups, saveDecks, openId, setOpenId, sample, embedded = false }) {
   const [practice, setPractice] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const deck = decks.find((d) => d.id === openId);
@@ -1440,7 +1440,7 @@ function WordsTeacher({ decks, groups, saveDecks, openId, setOpenId, sample }) {
   };
   return (
     <section>
-      <h2 className="h">Word lists</h2>
+      {!embedded && <h2 className="h">Word lists</h2>}
       <div className="inline-add">
         <input id="new-list" className="inp" aria-label="New list name" placeholder="New list, e.g. Colors" value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
@@ -1551,7 +1551,7 @@ function GroupPicker({ id, groups, value, onChange, roster = [] }) {
   );
 }
 
-function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks, roster = [], voiceNotes = {}, progressMap = {}, plansH, hw, people = roster, start = null }) {
+function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks, roster = [], voiceNotes = {}, progressMap = {}, plansH, hw, people = roster, start = null, openDeck = null, setOpenDeck = () => {} }) {
   const [mode, setMode] = useState(() => (start && start.mode) || "lessons");
   const [form, setForm] = useState(null);
   const lib = useLibrary(db, userId);
@@ -1594,13 +1594,15 @@ function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userI
         {mode === "lessons" && !form && <button className="btn sm" onClick={() => setForm(blank())}><Icon name="plus" size={16} />New lesson</button>}
       </div>
       {lib.on && (
-        <div className="seg">
+        <div className="seg seg-lessons">
           <button aria-pressed={mode === "lessons"} onClick={() => setMode("lessons")}>Lessons</button>
+          <button aria-pressed={mode === "words"} onClick={() => { pending.current = null; setMode("words"); }}>Words</button>
           <button aria-pressed={mode === "library"} onClick={() => { pending.current = null; setMode("library"); setLibKey((k) => k + 1); }}>Library</button>
-          <button aria-pressed={mode === "voice"} onClick={() => { pending.current = null; setMode("voice"); }}>Voice notes{newVoice ? ` (${newVoice})` : ""}</button>
+          <button aria-pressed={mode === "voice"} onClick={() => { pending.current = null; setMode("voice"); }}>Voice{newVoice ? <span className="seg-count" aria-label={`${newVoice} new`}>{newVoice}</span> : ""}</button>
         </div>
       )}
-      {mode === "voice" ? <VoiceInbox notes={voiceNotes} progressMap={progressMap} flash={flash} /> : mode === "library" ? (
+      {mode === "words" ? <WordsTeacher embedded decks={decks} groups={groups} saveDecks={saveDecks} openId={openDeck} setOpenId={setOpenDeck} sample={sample} />
+        : mode === "voice" ? <VoiceInbox notes={voiceNotes} progressMap={progressMap} flash={flash} /> : mode === "library" ? (
         <CourseLibrary key={libKey} startNav={libKey === 0 && start ? start.nav : null} progressMap={progressMap} saved={lib.items} onUse={usePlan} decks={decks} saveDecks={saveDecks} groups={groups} flash={flash} roster={roster} plansH={plansH}
           onRemoveSaved={(id) => lib.remove(id).catch(() => flash("That didn't save. Check your connection and try again."))} />
       ) : (
@@ -2820,7 +2822,7 @@ function WordListOffers({ lists, decks, saveDecks, groups, flash }) {
     const cards = arr(w.cards).map((c) => { const x = { id: uid(), en: String(c.en || ""), fr: String(c.fr || ""), ex: String(c.ex || "") }; if (c.pic) x.pic = String(c.pic); return x; }).filter((c) => c.en && c.fr);
     saveDecks([{ id: uid(), title: w.title, group, cards }, ...decks]);
     setOpenId(null);
-    flash(`${w.title} is in Words now, for ${group}.`);
+    flash(`${w.title} is in Lessons, Words now, for ${group}.`);
   };
   const parts = [["Picture lists for kids", lists.filter((w) => w.kids)], ["More word lists", lists.filter((w) => !w.kids)]].filter(([, l]) => l.length);
   return (
@@ -5087,7 +5089,7 @@ function App() {
   const uiLang = isTeacher ? "en" : lang;
   const T = (k) => STR[uiLang][k];
   const tabs = isTeacher
-    ? [{ id: "today", label: "Today", icon: "sun" }, { id: "classes", label: "Classes", icon: "calendar" }, { id: "lessons", label: "Lessons", icon: "clipboard" }, { id: "words", label: "Words", icon: "book" }, { id: "students", label: "Students", icon: "users" }, { id: "business", label: "Business", icon: "briefcase" }]
+    ? [{ id: "today", label: "Today", icon: "sun" }, { id: "classes", label: "Classes", icon: "calendar" }, { id: "lessons", label: "Lessons", icon: "clipboard" }, { id: "students", label: "Students", icon: "users" }, { id: "business", label: "Business", icon: "briefcase" }]
     : [{ id: "words", label: T("tabWords"), icon: "book" }, { id: "homework", label: T("tabHomework"), icon: "clipboard" },
       ...(me && me.id !== "guest" ? [{ id: "progress", label: T("tabProgress"), icon: "award" }] : []),
       { id: "classes", label: T("tabClasses"), icon: "calendar" }, { id: "pay", label: T("tabPay"), icon: "wallet" }];
@@ -5139,8 +5141,7 @@ function App() {
           isTeacher groups={groups} saveSchedule={saveContent("schedule")} flash={flash} roster={people} att={attToday} lessons={view.lessons} />
       </>
     );
-    else if (current === "lessons") screen = <LessonsTeacher key={jump ? JSON.stringify(jump) : "lessons"} start={jump && jump.lessons} lessons={view.lessons} groups={groups} saveLessons={saveContent("lessons")} flash={flash} sample={null} db={db} userId={userId} decks={view.decks} saveDecks={saveContent("decks")} roster={roster} people={people} voiceNotes={voiceAll.map} progressMap={progressAll.map} plansH={plansH} hw={hwChecks} />;
-    else if (current === "words") screen = <WordsTeacher decks={view.decks} groups={groups} saveDecks={saveContent("decks")} openId={openDeck} setOpenId={setOpenDeck} sample={null} />;
+    else if (current === "lessons") screen = <LessonsTeacher key={jump ? JSON.stringify(jump) : "lessons"} start={jump && jump.lessons} lessons={view.lessons} groups={groups} saveLessons={saveContent("lessons")} flash={flash} sample={null} db={db} userId={userId} decks={view.decks} saveDecks={saveContent("decks")} roster={roster} people={people} voiceNotes={voiceAll.map} progressMap={progressAll.map} plansH={plansH} hw={hwChecks} openDeck={openDeck} setOpenDeck={setOpenDeck} />;
     else if (current === "business") screen = (
       <BusinessTeacher bizH={bizH} db={db} userId={userId} flash={flash} pay={view.pay} downloads={downloads}
         roster={roster} schedule={view.schedule} changes={view.changes} join={view.join} saveJoin={saveContent("join")} groups={groups} />
@@ -5173,7 +5174,6 @@ function App() {
           <div className="who">
             {isTeacher ? (
               <>
-                <span>Teacher</span>
                 <button className="link" onClick={toStudentView}>Student view</button>
                 <button className="link" onClick={signOut}>Sign out</button>
               </>
