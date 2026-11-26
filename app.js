@@ -149,7 +149,7 @@ var __rest = (this && this.__rest) || function (s, e) {
         en: {
             tagline: "English words, homework and class times in one place.",
             enterCode: "Enter your code", codeHint: "Your teacher sent you a code with 4 numbers.", yourCode: "Your code", open: "Open",
-            codeShort: "Your code has 4 numbers.", codeWrong: "That code doesn't match. Check it with your teacher.", noCode: "Practice words without a code",
+            codeShort: "Your code has 4 numbers.", codeWrong: "That code doesn't match. Check it with your teacher.", noCode: "Try the app for free",
             switchUser: "Switch", otherLang: "Français", otherLangName: "Lire en français",
             tabWords: "Vocab", tabHomework: "Homework", tabClasses: "Classes", tabPay: "Pay",
             words: "Vocabulary", noLists: "Your teacher hasn't added any word lists yet.", nWords: (n) => `${n} ${n === 1 ? "word" : "words"}`,
@@ -196,6 +196,16 @@ var __rest = (this && this.__rest) || function (s, e) {
             trialHint: "This opens WhatsApp with a message ready to send.",
             yourLevel: (l) => `Your level: ${l}`, changesTitle: "Changes to classes", makeupLabel: "Make-up class",
             cancelledOn: (d, t) => `${d} at ${t}: cancelled`, makeupOn: (d, t) => `Make-up class on ${d} at ${t}`,
+            trialBadge: "Free trial", trialBanner: "You're trying Bright Minds for free. Students get their own lessons, homework and progress.",
+            trialBack: "Back to the app", trialPrices: "Classes and prices", trialWrite: "Message the teacher",
+            trialWaMsg: "Hello! I tried the Bright Minds app and I'd like to know more about the English classes.",
+            sampleTag: "Sample", sampleProgress: "An example of what a family sees: after each class, the teacher ticks what the student can now do in English.",
+            trialReplyLabel: "Example of a reply from the teacher", trialReplyNote: "Very good! Say “red” with a strong r. See you on Saturday!",
+            trialTryRecord: "Try recording your answer", trialVoiceHint: "Here you only hear yourself. Students send it to their teacher, who listens and replies with stars and advice.",
+            trialClassesTitle: "Your classes", trialClasses: "Once you're enrolled, your class times, changes and classes left show here. Have a look at the classes and prices to choose a group.",
+            trialPhrases: "Everyday phrases", trialLessonTitle: "Hello and colors",
+            trialLessonNotes: "New words: red, blue, yellow, green\nKey sentences: \"What's your name?\" \"My name is Awa.\" \"It's red.\"",
+            trialLessonHw: "Look around you and say the color of 3 things in English. Then record your answer.",
             tabProgress: "Progress", cardsShort: "Cards", listenGame: "Listen", memoryGame: "Memory",
             sayIt: "Say it", sayItAria: (w) => `Say "${w}"`, hearIt: (w) => `Hear "${w}"`, listening: "Listening... tap to stop", speakNow: "Say it now.",
             saidRight: (h) => `Great! I heard "${h}".`, saidWrong: (h) => (h ? `I heard "${h}". Listen and try again.` : "Listen and try again."),
@@ -222,7 +232,7 @@ var __rest = (this && this.__rest) || function (s, e) {
         fr: {
             tagline: "Vocabulaire, devoirs et horaires de cours d'anglais, au même endroit.",
             enterCode: "Entrez votre code", codeHint: "Votre professeur vous a envoyé un code à 4 chiffres.", yourCode: "Votre code", open: "Ouvrir",
-            codeShort: "Le code a 4 chiffres.", codeWrong: "Ce code ne correspond pas. Vérifiez-le avec votre professeur.", noCode: "Réviser le vocabulaire sans code",
+            codeShort: "Le code a 4 chiffres.", codeWrong: "Ce code ne correspond pas. Vérifiez-le avec votre professeur.", noCode: "Essayer l'application gratuitement",
             switchUser: "Changer", otherLang: "English", otherLangName: "Read in English",
             tabWords: "Vocab", tabHomework: "Devoirs", tabClasses: "Cours", tabPay: "Payer",
             words: "Vocabulaire", noLists: "Votre professeur n'a pas encore ajouté de liste de mots.", nWords: (n) => `${n} mot${n > 1 ? "s" : ""}`,
@@ -269,6 +279,16 @@ var __rest = (this && this.__rest) || function (s, e) {
             trialHint: "WhatsApp s'ouvre avec un message prêt à envoyer.",
             yourLevel: (l) => `Votre niveau : ${l}`, changesTitle: "Changements", makeupLabel: "Rattrapage",
             cancelledOn: (d, t) => `${cap(d)} à ${t} : annulé`, makeupOn: (d, t) => `Cours de rattrapage le ${d} à ${t}`,
+            trialBadge: "Essai gratuit", trialBanner: "Vous essayez Bright Minds gratuitement. Les élèves ont leurs propres leçons, devoirs et progrès.",
+            trialBack: "Retour à l'application", trialPrices: "Cours et prix", trialWrite: "Écrire au professeur",
+            trialWaMsg: "Bonjour ! J'ai essayé l'application Bright Minds et je voudrais en savoir plus sur les cours d'anglais.",
+            sampleTag: "Exemple", sampleProgress: "Voici un exemple de ce que voit une famille : après chaque cours, le professeur coche ce que l'élève sait maintenant faire en anglais.",
+            trialReplyLabel: "Exemple de réponse du professeur", trialReplyNote: "Très bien ! Prononce bien le r de « red ». À samedi !",
+            trialTryRecord: "Essayer d'enregistrer ta réponse", trialVoiceHint: "Ici, tu t'écoutes seulement. Les élèves l'envoient à leur professeur, qui écoute et répond avec des étoiles et des conseils.",
+            trialClassesTitle: "Vos cours", trialClasses: "Une fois inscrit, vos horaires, les changements et les cours qu'il vous reste s'affichent ici. Regardez les cours et les prix pour choisir un groupe.",
+            trialPhrases: "Phrases de tous les jours", trialLessonTitle: "Bonjour et les couleurs",
+            trialLessonNotes: "Nouveaux mots : red, blue, yellow, green\nPhrases clés : \"What's your name?\" \"My name is Awa.\" \"It's red.\"",
+            trialLessonHw: "Regarde autour de toi et dis en anglais la couleur de 3 objets. Puis enregistre ta réponse.",
             tabProgress: "Progrès", cardsShort: "Cartes", listenGame: "Écouter", memoryGame: "Mémoire",
             sayIt: "Dites-le", sayItAria: (w) => `Dire « ${w} »`, hearIt: (w) => `Écouter « ${w} »`, listening: "J'écoute... touchez pour arrêter", speakNow: "Dites-le maintenant.",
             saidRight: (h) => `Bravo ! J'ai entendu « ${h} ».`, saidWrong: (h) => (h ? `J'ai entendu « ${h} ». Écoutez et réessayez.` : "Écoutez et réessayez."),
@@ -1719,7 +1739,9 @@ var __rest = (this && this.__rest) || function (s, e) {
                 React.createElement("span", { className: "d-day" }, d.getDate()),
                 React.createElement("span", { className: "d-mon" }, d.toLocaleDateString(LOCALE[lang], { month: "short" })))),
             React.createElement("div", { className: "entry-body" },
-                React.createElement("h3", null, l.title),
+                React.createElement("h3", null,
+                    l.title,
+                    l.sample && React.createElement("span", { className: "sample-tag" }, t("sampleTag"))),
                 teacher && React.createElement("p", { className: "muted small" },
                     "For ",
                     lessonGroups(l).join(", ")),
@@ -1734,7 +1756,7 @@ var __rest = (this && this.__rest) || function (s, e) {
                         React.createElement(Icon, { name: "check", size: 16 }),
                         t("done")) : t("markDone"))),
                     !teacher && !isDone && pastDue && React.createElement("p", { className: "late" }, t("pastDue")),
-                    !teacher && voice && React.createElement(VoiceHomework, { lesson: l, me: voice.me, sent: voice.sent, reply: voice.reply, onSent: voice.onSent }),
+                    !teacher && voice && (voice.trial ? React.createElement(TrialVoice, null) : React.createElement(VoiceHomework, { lesson: l, me: voice.me, sent: voice.sent, reply: voice.reply, onSent: voice.onSent })),
                     teacher && hwCheck)),
                 teacher && (React.createElement("div", { className: "entry-actions" },
                     React.createElement("button", { className: "btn ghost sm", onClick: onEdit },
@@ -1998,7 +2020,7 @@ var __rest = (this && this.__rest) || function (s, e) {
                 out.push(x);
         };
         String(text || "").split("\n").forEach((line) => {
-            const m = line.match(/^\s*(new words|words|vocabulary)\s*:\s*(.+)$/i);
+            const m = line.match(/^\s*(new words|words|vocabulary|nouveaux mots|mots|vocabulaire)\s*:\s*(.+)$/i);
             if (m)
                 m[2].split(/[,;]/).forEach((w) => { const x = w.replace(/\(.*?\)/g, "").replace(/[.!]+$/, "").trim(); if (x && x.split(/\s+/).length <= 4)
                     add(x); });
@@ -2030,7 +2052,7 @@ var __rest = (this && this.__rest) || function (s, e) {
         const list = lessons.filter((l) => forGroup(lessonGroups(l), me.group)).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
         return (React.createElement("section", null,
             React.createElement("h2", { className: "h" }, t("homework")),
-            list.length === 0 ? React.createElement(Empty, { text: t("noLessons") }) : (React.createElement("ol", { className: "entries" }, list.map((l) => (React.createElement(LessonEntry, { key: l.id, lesson: l, isDone: !!done[l.id], onToggle: () => onToggle(l.id), voice: me && me.id !== "guest" ? { me, sent: arr(voiceSent[l.id]), reply: replyFor(l.id), onSent: (x) => onVoiceSent(l.id, x) } : null })))))));
+            list.length === 0 ? React.createElement(Empty, { text: t("noLessons") }) : (React.createElement("ol", { className: "entries" }, list.map((l) => (React.createElement(LessonEntry, { key: l.id, lesson: l, isDone: !!done[l.id], onToggle: () => onToggle(l.id), voice: l.sample ? { trial: true } : me && me.id !== "guest" ? { me, sent: arr(voiceSent[l.id]), reply: replyFor(l.id), onSent: (x) => onVoiceSent(l.id, x) } : null })))))));
     }
     /* ---------- announcements ---------- */
     const activeNotice = (n, today) => !n.until || n.until >= today;
@@ -3369,7 +3391,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         ticked.forEach((k) => ids.add(k.split("/")[0]));
         return courses.filter((c) => ids.has(c.id) && arr(c.skills).length);
     }
-    function ProgressStudent({ me, prog }) {
+    function ProgressStudent({ me, prog, sample = false }) {
         const { t, lang } = useT();
         const { status, data } = useCourses();
         const skills = (prog && prog.skills) || {};
@@ -3378,7 +3400,10 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         const done = Object.keys(skills).length;
         const courses = status === "ready" ? skillRows(data.courses, skills, arr(prog && prog.courses)) : [];
         return (React.createElement("section", null,
-            React.createElement("h2", { className: "h" }, t("progressTitle")),
+            React.createElement("h2", { className: "h" },
+                t("progressTitle"),
+                sample && React.createElement("span", { className: "sample-tag" }, t("sampleTag"))),
+            sample && React.createElement("p", { className: "hint" }, t("sampleProgress")),
             React.createElement("div", { className: "panel rings progress-sum" },
                 React.createElement("p", { className: "progress-big" }, done),
                 React.createElement("p", null, t("skillsCount", done)),
@@ -4316,7 +4341,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
             err && React.createElement("p", { className: "err", role: "alert" }, err),
             React.createElement("button", { className: "btn", onClick: save }, "Save join page")));
     }
-    function JoinPage({ join, pay, schedule, counts = {}, onBack, onLang }) {
+    function JoinPage({ join, pay, schedule, counts = {}, onBack, onLang, backLabel }) {
         const { t, lang } = useT();
         const contact = join.contact || pay.whatsapp;
         const per = { month: t("perMonth"), class: t("perClass"), hour: t("perHour") };
@@ -4327,7 +4352,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         });
         return (React.createElement("div", { className: "welcome" },
             React.createElement("div", { className: "welcome-lang between" },
-                React.createElement("button", { className: "link", onClick: onBack }, t("haveCode")),
+                React.createElement("button", { className: "link", onClick: onBack }, backLabel || t("haveCode")),
                 React.createElement("button", { className: "link", onClick: onLang, "aria-label": t("otherLangName") }, t("otherLang"))),
             React.createElement("div", { className: "panel rings welcome-page" },
                 React.createElement("h1", { className: "welcome-title" }, "Bright Minds"),
@@ -4369,6 +4394,89 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                                 : React.createElement(BizSettings, { biz: bizH.biz, saveBiz: bizH.save, schedule: schedule, pay: pay, flash: flash })));
     }
     /* ---------- live data from the database ---------- */
+    /* ---------- free trial: what visitors without a code see. Sample content only, kept on the phone: nothing is saved to the database. ---------- */
+    const TRIAL_LISTS = [["wl-pic-colors", "Colors", "Les couleurs"], ["wl-pic-animals", "Animals", "Les animaux"], ["wl-pic-numbers", "Numbers 1–10", "Les nombres 1–10"], ["wl-pic-food", "Food and drinks", "À manger et à boire"]];
+    const TRIAL_PHRASES = [["Hello! How are you?", "Bonjour ! Comment ça va ?"], ["I'm fine, thank you.", "Je vais bien, merci."], ["My name is Awa.", "Je m'appelle Awa."],
+        ["Nice to meet you.", "Enchanté."], ["Where are you from?", "Tu viens d'où ?"], ["How much is it?", "C'est combien ?"], ["Thank you very much.", "Merci beaucoup."], ["See you tomorrow!", "À demain !"]];
+    function trialDecks(wordLists, lang) {
+        const fr = lang === "fr";
+        const pics = TRIAL_LISTS.map(([id, en, frT]) => {
+            const w = arr(wordLists).find((x) => x.id === id);
+            return w ? { id: "trial-" + id, title: fr ? frT : en, group: EVERYONE, cards: arr(w.cards).map((c, k) => ({ id: id + k, en: c.en, fr: c.fr, ex: c.ex || "", pic: c.pic || "" })) } : null;
+        }).filter(Boolean);
+        const phrases = { id: "trial-phrases", title: STR[lang].trialPhrases, group: EVERYONE, cards: TRIAL_PHRASES.map(([en, f], k) => ({ id: "tp" + k, en, fr: f, ex: "" })) };
+        return [...pics, phrases];
+    }
+    function trialLesson(lang) {
+        const s = STR[lang];
+        const today = todayISO();
+        return { id: "trial-lesson", sample: true, date: today, due: addDays(today, 3), group: EVERYONE, title: s.trialLessonTitle, notes: s.trialLessonNotes, homework: s.trialLessonHw };
+    }
+    const trialProgress = () => {
+        const today = todayISO();
+        return { skills: { "kids-20/u1-1": addDays(today, -12), "kids-20/u1-2": addDays(today, -8), "kids-20/u1-3": addDays(today, -3) }, courses: ["kids-20"], replies: { a: { stars: 3 }, b: { stars: 2 } } };
+    };
+    /* Vocab with sample picture lists from the lesson plans, plus any list the teacher shares with everyone. */
+    function TrialWords({ decks, me }) {
+        const { lang } = useT();
+        const { data } = useCourses();
+        const all = [...decks.filter((d) => forGroup(d.group, EVERYONE)), ...trialDecks(data ? data.wordLists : [], lang)];
+        return React.createElement(WordsStudent, { decks: all, me: me });
+    }
+    /* Recording works, but stays on the phone. A sample reply shows what the teacher sends back. */
+    function TrialVoice() {
+        const { t } = useT();
+        const rec = useRecorder(60);
+        const [open, setOpen] = useState(false);
+        return (React.createElement("div", { className: "voice-hw" },
+            React.createElement("div", { className: "voice-reply trial-reply" },
+                React.createElement("p", { className: "muted small" }, t("trialReplyLabel")),
+                React.createElement("p", { className: "voice-stars", "aria-label": t("starsN", 3) }, [0, 1, 2].map((k) => React.createElement(Icon, { key: k, name: "star", size: 20 }))),
+                React.createElement("p", { className: "voice-note" },
+                    "\u201C",
+                    t("trialReplyNote"),
+                    "\u201D")),
+            canRecord && (!open ? (React.createElement("button", { className: "btn ghost sm", onClick: () => setOpen(true) },
+                React.createElement(Icon, { name: "mic", size: 16 }),
+                t("trialTryRecord"))) : (React.createElement("div", { className: "recorder" },
+                React.createElement("p", { className: "hint" }, t("trialVoiceHint")),
+                rec.state === "recording" ? (React.createElement("button", { className: "btn rec", onClick: rec.stop },
+                    React.createElement(Icon, { name: "stop", size: 16 }),
+                    t("stopRec"),
+                    " \u00B7 ",
+                    mmss(rec.secs))) : rec.state === "done" ? (React.createElement(React.Fragment, null,
+                    React.createElement("audio", { controls: true, src: rec.url, className: "voice-audio" }),
+                    React.createElement("div", { className: "pay-actions" },
+                        React.createElement("button", { className: "btn ghost sm", onClick: rec.reset }, t("recordAgain"))))) : (React.createElement("div", { className: "pay-actions" },
+                    React.createElement("button", { className: "btn", onClick: rec.start },
+                        React.createElement(Icon, { name: "mic", size: 16 }),
+                        t("startRec")),
+                    React.createElement("button", { className: "btn ghost sm", onClick: () => { rec.reset(); setOpen(false); } }, t("cancel")))),
+                rec.error && React.createElement("p", { className: "say-result error", role: "alert" }, rec.error))))));
+    }
+    function TrialBanner({ contact, onJoin }) {
+        const { t } = useT();
+        return (React.createElement("div", { className: "trial-banner", role: "region", "aria-label": t("trialBadge") },
+            React.createElement("p", null,
+                React.createElement("strong", null,
+                    t("trialBadge"),
+                    "."),
+                " ",
+                t("trialBanner")),
+            React.createElement("div", { className: "trial-actions" },
+                React.createElement("button", { className: "btn sm", onClick: onJoin }, t("trialPrices")),
+                contact && React.createElement("a", { className: "btn ghost sm", href: waLink(contact, t("trialWaMsg")), target: "_blank", rel: "noopener noreferrer" },
+                    React.createElement(Icon, { name: "chat", size: 16 }),
+                    t("trialWrite")))));
+    }
+    function TrialClasses({ onJoin }) {
+        const { t } = useT();
+        return (React.createElement("section", null,
+            React.createElement("h2", { className: "h" }, t("trialClassesTitle")),
+            React.createElement("div", { className: "panel rings next" },
+                React.createElement("p", null, t("trialClasses")),
+                React.createElement("button", { className: "btn join", onClick: onJoin }, t("trialPrices")))));
+    }
     /* ---------- the teacher's day: Today, class logs, homework checks, messages, student pages, to-do ---------- */
     const addDays = (iso, n) => { const d = parseISO(iso); d.setDate(d.getDate() + n); return isoOf(d); };
     const longDate = (iso, lang = "en") => parseISO(iso).toLocaleDateString(LOCALE[lang], { weekday: "long", day: "numeric", month: "long" });
@@ -5189,8 +5297,30 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
             FB.auth.getRedirectResult().catch(() => { });
             return FB.auth.onAuthStateChanged((u) => { checkTeacher(u).then(() => setUser(u || null), () => setUser(u || null)); });
         }, []);
+        /* brightmindsci.github.io/#essai (or #try) opens the free trial straight away, for links in ads.
+           A student who already has a code, or the teacher, keeps their own view. */
+        const openTrialFromLink = () => {
+            const h = (window.location.hash || "").toLowerCase();
+            if (h !== "#essai" && h !== "#try")
+                return;
+            try {
+                history.replaceState(null, "", window.location.pathname + window.location.search);
+            }
+            catch (e) { /* ignore */ }
+            if (ls.get("bm:role") === "teacher")
+                return;
+            const cur = ls.get("bm:me");
+            if (cur && cur.id !== "guest")
+                return;
+            setMe(GUEST);
+            ls.set("bm:me", GUEST);
+            setRole("student");
+            ls.set("bm:role", "student");
+            setTab("words");
+        };
+        useEffect(() => { openTrialFromLink(); }, []);
         useEffect(() => {
-            const onHash = () => { const h = window.location.hash || ""; setJoinView(h === "#join"); setInstallView(h === "#install"); };
+            const onHash = () => { openTrialFromLink(); const h = window.location.hash || ""; setJoinView(h === "#join"); setInstallView(h === "#install"); };
             window.addEventListener("hashchange", onHash);
             return () => window.removeEventListener("hashchange", onHash);
         }, []);
@@ -5286,8 +5416,9 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         const tabs = isTeacher
             ? [{ id: "today", label: "Today", icon: "sun" }, { id: "classes", label: "Classes", icon: "calendar" }, { id: "lessons", label: "Lessons", icon: "clipboard" }, { id: "students", label: "Students", icon: "users" }, { id: "business", label: "Business", icon: "briefcase" }]
             : [{ id: "words", label: T("tabWords"), icon: "book" }, { id: "homework", label: T("tabHomework"), icon: "clipboard" },
-                ...(me && me.id !== "guest" ? [{ id: "progress", label: T("tabProgress"), icon: "award" }] : []),
-                { id: "classes", label: T("tabClasses"), icon: "calendar" }, { id: "pay", label: T("tabPay"), icon: "wallet" }];
+                { id: "progress", label: T("tabProgress"), icon: "award" },
+                { id: "classes", label: T("tabClasses"), icon: "calendar" },
+                ...(me && me.id === "guest" ? [] : [{ id: "pay", label: T("tabPay"), icon: "wallet" }])];
         const current = tabs.some((t) => t.id === tab) ? tab : tabs[0].id;
         if (!FB)
             return React.createElement(Notice, { text: CONFIGURED ? "Bright Minds could not load. Check your internet connection, then open the page again." : "This app isn't connected to its database yet." });
@@ -5312,10 +5443,12 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         if (!isTeacher && me && me.id !== "guest" && studentRec === undefined)
             return React.createElement("p", { className: "boot", role: "status" }, STR[lang].opening);
         const view = content;
-        if (!isTeacher && !meR) {
+        const trialOn = !isTeacher && !!meR && meR.id === "guest";
+        const openJoin = () => { setJoinView(true); window.scrollTo(0, 0); };
+        if (!isTeacher && (!meR || joinView)) {
             return (React.createElement(LangCtx.Provider, { value: lang },
                 joinView
-                    ? React.createElement(JoinPage, { join: view.join, pay: view.pay, schedule: view.schedule, counts: view.groupCounts, onBack: () => { setJoinView(false); if (window.location.hash === "#join") {
+                    ? React.createElement(JoinPage, { backLabel: trialOn ? STR[lang].trialBack : "", join: view.join, pay: view.pay, schedule: view.schedule, counts: view.groupCounts, onBack: () => { setJoinView(false); if (window.location.hash === "#join") {
                             try {
                                 history.replaceState(null, "", window.location.pathname + window.location.search);
                             }
@@ -5346,7 +5479,17 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         }
         else {
             const st = view.settings.showStatus ? meR.st : null;
-            if (current === "words")
+            if (trialOn) {
+                if (current === "words")
+                    screen = React.createElement(TrialWords, { decks: view.decks, me: meR });
+                else if (current === "homework")
+                    screen = React.createElement(HomeworkStudent, { lessons: [trialLesson(lang), ...view.lessons], me: meR, done: done, onToggle: toggleDone, prog: null });
+                else if (current === "progress")
+                    screen = React.createElement(ProgressStudent, { me: meR, prog: trialProgress(), sample: true });
+                else
+                    screen = React.createElement(TrialClasses, { onJoin: openJoin });
+            }
+            else if (current === "words")
                 screen = React.createElement(WordsStudent, { decks: view.decks, me: meR });
             else if (current === "homework")
                 screen = React.createElement(HomeworkStudent, { lessons: view.lessons, me: meR, done: done, onToggle: toggleDone, prog: progDoc, voiceSent: voiceSent, onVoiceSent: addVoiceSent });
@@ -5359,7 +5502,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         }
         const today = todayISO();
         const voiceNew = isTeacher ? Object.values(voiceAll.map).filter((v) => !v.heard).length : 0;
-        const hwCount = isTeacher ? 0 : view.lessons.filter((l) => l.homework && forGroup(lessonGroups(l), meR.group) && !done[l.id] && (!l.due || l.due >= today)).length;
+        const hwCount = isTeacher ? 0 : (trialOn ? [trialLesson(lang), ...view.lessons] : view.lessons).filter((l) => l.homework && forGroup(lessonGroups(l), meR.group) && !done[l.id] && (!l.due || l.due >= today)).length;
         const fresh = isTeacher && rosterH.ready && roster.length === 0 && !view.lessons.length && !view.schedule.length;
         return (React.createElement(LangCtx.Provider, { value: uiLang },
             React.createElement("div", { className: "shell" },
@@ -5368,13 +5511,14 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                     React.createElement("div", { className: "who" }, isTeacher ? (React.createElement(React.Fragment, null,
                         React.createElement("button", { className: "link", onClick: toStudentView }, "Student view"),
                         React.createElement("button", { className: "link", onClick: signOut }, "Sign out"))) : (React.createElement(React.Fragment, null,
-                        React.createElement("span", null, meR.id === "guest" ? "" : meR.name),
+                        meR.id === "guest" ? React.createElement("span", { className: "trial-chip" }, STR[lang].trialBadge) : React.createElement("span", null, meR.name),
                         React.createElement("button", { className: "link", onClick: toggleLang, "aria-label": STR[lang].otherLangName }, STR[lang].otherLang),
                         React.createElement("button", { className: "link", onClick: switchStudent }, STR[lang].switchUser),
                         canTeach && React.createElement("button", { className: "link", onClick: toTeacher }, "Teacher view"))))),
                 React.createElement("main", null,
                     fresh && React.createElement("p", { className: "note" }, "Welcome to your own Bright Minds. To bring in everything from the Claude version, go to Business, then Settings, and use Move in."),
-                    !isTeacher && !installHidden && current === tabs[0].id && React.createElement(InstallCard, { onHide: () => { setInstallHidden(true); ls.set("bm:installHidden", true); } }),
+                    trialOn && React.createElement(TrialBanner, { contact: view.join.contact || view.pay.whatsapp, onJoin: openJoin }),
+                    !isTeacher && !trialOn && !installHidden && current === tabs[0].id && React.createElement(InstallCard, { onHide: () => { setInstallHidden(true); ls.set("bm:installHidden", true); } }),
                     !isTeacher && React.createElement(StudentNotices, { notices: view.notices, me: meR }),
                     screen)),
             React.createElement("div", { className: "dock" },

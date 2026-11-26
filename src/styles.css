@@ -488,3 +488,13 @@ a.btn{text-decoration:none}
 .seg-count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:var(--on-accent);font-size:11px;font-weight:700}
 .seg button[aria-pressed="true"] .seg-count{background:var(--on-accent);color:var(--accent)}
 @media (max-width:360px){.seg-lessons button{padding:8px 6px;font-size:14px}.seg-lessons{padding:2px}}
+
+/* free trial */
+.trial-banner{padding:12px 14px;margin-bottom:18px;border-radius:16px;background:var(--accent-soft);border:1px solid var(--line)}
+.trial-banner p{font-size:15px;margin-bottom:10px}
+.trial-banner strong{color:var(--accent)}
+.trial-actions{display:flex;flex-wrap:wrap;gap:8px}
+.trial-chip{display:inline-block;font-size:13px;font-weight:700;padding:2px 10px;border-radius:999px;background:var(--accent);color:var(--on-accent);max-width:none}
+.who>span.trial-chip{max-width:none}
+.sample-tag{display:inline-block;margin-left:8px;font-family:var(--font-body);font-size:12px;font-weight:700;padding:1px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent);vertical-align:3px;letter-spacing:.02em}
+.trial-reply{border-style:dashed}
