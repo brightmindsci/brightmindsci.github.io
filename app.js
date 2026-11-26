@@ -1032,7 +1032,7 @@ var __rest = (this && this.__rest) || function (s, e) {
             setErr("");
             try {
                 const s = await FB.db.doc("students/" + code).get();
-                if (s.exists)
+                if (s.exists && isStudentRecord(s.data()))
                     onStudent(Object.assign(Object.assign({}, s.data()), { code }));
                 else
                     setErr(t("codeWrong"));
@@ -2568,7 +2568,7 @@ var __rest = (this && this.__rest) || function (s, e) {
         const saveFailed = (e) => flash(e && e.code === "quota_exceeded" ? "Your private storage is full. Delete some old records, then try again." : "That didn't save. Check your connection and try again.");
         const groupNames = [...new Set(roster.map((r) => r.group).filter((g) => g && g !== EVERYONE))];
         const ctx = { schedule, changes, places };
-        const rows = roster.map((s) => (Object.assign(Object.assign({}, s), studentMonth(s, money.fees, money.pays, att.taken, ctx)))).sort((a, b) => a.name.localeCompare(b.name));
+        const rows = roster.map((s) => (Object.assign(Object.assign({}, s), studentMonth(s, money.fees, money.pays, att.taken, ctx)))).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
         const placeOptions = useMemo(() => {
             const m = new Map();
             [...schedule.map(placeName), ...places.map((p) => p.name), "Home"].forEach((n) => { if (n && !m.has(placeKey(n)))
@@ -5037,7 +5037,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
             .map((l) => ({ l, t: hwTally(l, people, hw.checks, voiceList) })).filter((x) => x.t.total && x.t.open)
             .sort((a, b) => String(a.l.due || a.l.date).localeCompare(String(b.l.due || b.l.date)));
         const rows = money.ready ? people.map((r) => (Object.assign(Object.assign({}, r), studentMonth(r, money.fees, money.pays, att.taken)))) : [];
-        const toPay = rows.filter((r) => r.fee > 0 && r.paid < r.fee).sort((a, b) => a.name.localeCompare(b.name));
+        const toPay = rows.filter((r) => r.fee > 0 && r.paid < r.fee).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
         const thisMonth = monthKey(new Date());
         if (mode === "messages")
             return React.createElement(FamilyMessages, { people: people, groups: groups, schedule: schedule, changes: changes, lessons: lessons, hw: hw, voiceList: voiceList, onBack: () => { setMode("home"); window.scrollTo(0, 0); } });
@@ -5191,16 +5191,22 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         }, [on]);
         return state;
     }
+    /* A real student record always has an id and a name. A record with neither is a leftover (only "classes left / paid"),
+       from a status written just as a student was removed or given a new code: it is kept out of the list and cleaned up. */
+    const isStudentRecord = (d) => !!d && typeof d.id === "string" && !!d.id && typeof d.name === "string";
     function useRoster(on) {
-        const [state, setState] = useState({ roster: [], ready: false });
+        const [state, setState] = useState({ roster: [], leftovers: [], ready: false });
         useEffect(() => {
             if (!on) {
-                setState({ roster: [], ready: false });
+                setState({ roster: [], leftovers: [], ready: false });
                 return undefined;
             }
             let un = () => { };
             try {
-                un = FB.db.collection("students").onSnapshot((qs) => setState({ roster: qs.docs.map((d) => (Object.assign(Object.assign({}, d.data()), { code: d.id }))), ready: true }), () => setState((x) => (Object.assign(Object.assign({}, x), { ready: true }))));
+                un = FB.db.collection("students").onSnapshot((qs) => {
+                    const all = qs.docs.map((d) => (Object.assign(Object.assign({}, d.data()), { code: d.id })));
+                    setState({ roster: all.filter(isStudentRecord), leftovers: all.filter((x) => !isStudentRecord(x) && !x.id && !x.name).map((x) => x.code), ready: true });
+                }, () => setState((x) => (Object.assign(Object.assign({}, x), { ready: true }))));
             }
             catch (e) {
                 setState((x) => (Object.assign(Object.assign({}, x), { ready: true })));
@@ -5219,7 +5225,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
             setState({ code, doc: undefined });
             let un = () => { };
             try {
-                un = FB.db.doc("students/" + code).onSnapshot((s) => setState({ code, doc: s.exists ? Object.assign(Object.assign({}, s.data()), { code }) : null }), () => setState({ code, doc: null }));
+                un = FB.db.doc("students/" + code).onSnapshot((s) => setState({ code, doc: s.exists && isStudentRecord(s.data()) ? Object.assign(Object.assign({}, s.data()), { code }) : null }), () => setState({ code, doc: null }));
             }
             catch (e) {
                 setState({ code, doc: null });
@@ -5324,19 +5330,23 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         useEffect(() => {
             if (!wanted)
                 return;
-            const batch = FB.db.batch();
-            let n = 0;
             rosterH.roster.forEach((r) => {
                 const w = wanted[r.id] || null;
                 const cur = r.st ? { m: r.st.m, left: r.st.left, total: r.st.total, pay: r.st.pay } : null;
                 if (stable(cur) === stable(w))
                     return;
-                batch.set(FB.db.doc("students/" + r.code), { st: w ? Object.assign(Object.assign({}, w), { at: todayISO() }) : null }, { mergeFields: ["st"] });
-                n++;
+                /* update, not set: if the student was just removed or got a new code, this fails quietly instead of bringing back an empty record */
+                FB.db.doc("students/" + r.code).update({ st: w ? Object.assign(Object.assign({}, w), { at: todayISO() }) : null }).catch(() => { });
             });
-            if (n)
-                batch.commit().catch(() => { });
         }, [wanted]);
+        /* clear away leftover records from before this fix */
+        useEffect(() => {
+            if (!isTeacher || !rosterH.leftovers.length)
+                return;
+            const batch = FB.db.batch();
+            rosterH.leftovers.forEach((code) => batch.delete(FB.db.doc("students/" + code)));
+            batch.commit().catch(() => { });
+        }, [isTeacher, rosterH.leftovers.join(",")]);
         const saveContent = (key) => (value) => {
             FB.db.doc("site/content").set({ [key]: value, updated: new Date().toISOString() }, { mergeFields: [key, "updated"] }).catch(saveFail);
         };
