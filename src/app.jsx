@@ -535,26 +535,37 @@ function useMoney(db, userId, month) {
   return { enabled, fees, pays, ready: feesOk && paysOk, slow, failed, saveFees, savePays };
 }
 
-/* Classes taken, one private document per month: { taken: [{ id, studentId, date, slot? }] } */
+/* Classes taken, one private document per month:
+   { taken: [{ id, studentId, date, slot?, place?, note? }], absent: [{ id, studentId, date, slot?, place? }] }
+   A note is the teacher's own record of that class. Absences don't count as classes taken. */
 function useAttendance(db, userId, month) {
   const path = db && userId ? "data/users/" + userId + "/money/attendance/" + month : "";
   const [taken, setTaken] = useState([]);
+  const [absent, setAbsent] = useState([]);
   const [ready, setReady] = useState(false);
+  const cur = useRef({ taken: [], absent: [] });
   useEffect(() => {
     if (!path) return undefined;
-    setTaken([]); setReady(false);
+    setTaken([]); setAbsent([]); setReady(false); cur.current = { taken: [], absent: [] };
     let un = () => {};
     try {
       un = db.doc(path).onSnapshot((s) => {
         const d = s.exists ? s.data() : null;
-        setTaken(d && Array.isArray(d.taken) ? d.taken : []);
-        setReady(true);
+        const t = d && Array.isArray(d.taken) ? d.taken : [];
+        const ab = d && Array.isArray(d.absent) ? d.absent : [];
+        cur.current = { taken: t, absent: ab };
+        setTaken(t); setAbsent(ab); setReady(true);
       }, () => {});
     } catch (e) { /* attendance unavailable */ }
     return () => un();
   }, [path]);
-  const save = (next) => { setTaken(next); return queuedSet(db.doc(path), { taken: next }); };
-  return { on: !!path, ready, taken, save };
+  const save = (next, nextAbsent) => {
+    const ab = nextAbsent === undefined ? cur.current.absent : nextAbsent;
+    cur.current = { taken: next, absent: ab };
+    setTaken(next); setAbsent(ab);
+    return queuedSet(db.doc(path), { taken: next, absent: ab });
+  };
+  return { on: !!path, ready, taken, absent, month, save };
 }
 
 /* Where a class happened, and how much of the fee goes to that place. */
@@ -670,6 +681,7 @@ const ICONS = {
   stop: <rect width="12" height="12" x="6" y="6" rx="2" />,
   play: <path d="M7 4.5v15l12-7.5z" />,
   award: <><circle cx="12" cy="8" r="6" /><path d="M15.5 12.9 17 22l-5-3-5 3 1.5-9.1" /></>,
+  sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></>,
   report: <><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M10 9H8M16 13H8M16 17H8" /></>,
 };
 function Icon({ name, size = 18, label }) {
@@ -1463,7 +1475,7 @@ function WordsTeacher({ decks, groups, saveDecks, openId, setOpenId, sample }) {
 }
 
 /* ---------- lessons & homework ---------- */
-function LessonEntry({ lesson: l, teacher = false, isDone = false, onToggle, onEdit, onDelete, onSaveToLibrary, voice }) {
+function LessonEntry({ lesson: l, teacher = false, isDone = false, onToggle, onEdit, onDelete, onSaveToLibrary, voice, hwCheck = null }) {
   const { t, lang } = useT();
   const [libLevel, setLibLevel] = useState(null);
   const d = l.date ? parseISO(l.date) : null;
@@ -1489,6 +1501,7 @@ function LessonEntry({ lesson: l, teacher = false, isDone = false, onToggle, onE
             )}
             {!teacher && !isDone && pastDue && <p className="late">{t("pastDue")}</p>}
             {!teacher && voice && <VoiceHomework lesson={l} me={voice.me} sent={voice.sent} reply={voice.reply} onSent={voice.onSent} />}
+            {teacher && hwCheck}
           </div>
         )}
         {teacher && (
@@ -1538,11 +1551,11 @@ function GroupPicker({ id, groups, value, onChange, roster = [] }) {
   );
 }
 
-function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks, roster = [], voiceNotes = {}, progressMap = {} }) {
-  const [mode, setMode] = useState("lessons");
+function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks, roster = [], voiceNotes = {}, progressMap = {}, plansH, hw, people = roster, start = null }) {
+  const [mode, setMode] = useState(() => (start && start.mode) || "lessons");
   const [form, setForm] = useState(null);
   const lib = useLibrary(db, userId);
-  const plansH = usePlans(db, userId);
+  const voiceList = Object.values(voiceNotes);
   const newVoice = Object.values(voiceNotes).filter((v) => !v.heard).length;
   const pending = useRef(null);
   const [libKey, setLibKey] = useState(0); // tapping Library again goes back to its first page
@@ -1588,7 +1601,7 @@ function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userI
         </div>
       )}
       {mode === "voice" ? <VoiceInbox notes={voiceNotes} progressMap={progressMap} flash={flash} /> : mode === "library" ? (
-        <CourseLibrary key={libKey} progressMap={progressMap} saved={lib.items} onUse={usePlan} decks={decks} saveDecks={saveDecks} groups={groups} flash={flash} roster={roster} plansH={plansH}
+        <CourseLibrary key={libKey} startNav={libKey === 0 && start ? start.nav : null} progressMap={progressMap} saved={lib.items} onUse={usePlan} decks={decks} saveDecks={saveDecks} groups={groups} flash={flash} roster={roster} plansH={plansH}
           onRemoveSaved={(id) => lib.remove(id).catch(() => flash("That didn't save. Check your connection and try again."))} />
       ) : (
         <>
@@ -1621,7 +1634,8 @@ function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userI
                 <LessonEntry key={l.id} lesson={l} teacher
                   onEdit={() => { setForm({ ...l, groups: lessonGroups(l) }); window.scrollTo(0, 0); }}
                   onDelete={() => saveLessons(lessons.filter((x) => x.id !== l.id))}
-                  onSaveToLibrary={lib.on ? (level) => saveToLib(l, level) : null} />
+                  onSaveToLibrary={lib.on ? (level) => saveToLib(l, level) : null}
+                  hwCheck={l.homework && hw && hw.on ? <HomeworkToggle lesson={l} people={people} hw={hw} voiceList={voiceList} flash={flash} /> : null} />
               ))}
             </ol>
           )}
@@ -1878,9 +1892,10 @@ function NoticesTeacher({ notices, groups, saveNotices, flash }) {
 }
 
 /* ---------- classes ---------- */
-function Classes({ schedule, changes = [], saveChanges, notices = [], saveNotices, isTeacher = false, me, groups = [EVERYONE], saveSchedule, flash, roster = [], att, st, updated }) {
+function Classes({ schedule, changes = [], saveChanges, notices = [], saveNotices, isTeacher = false, me, groups = [EVERYONE], saveSchedule, flash, roster = [], att, st, updated, lessons = [] }) {
   const { t, lang } = useT();
   const [form, setForm] = useState(null);
+  const [logFor, setLogFor] = useState(null);
   const [formErr, setFormErr] = useState("");
   const [changeFor, setChangeFor] = useState(null);
   const today = todayISO();
@@ -1928,18 +1943,20 @@ function Classes({ schedule, changes = [], saveChanges, notices = [], saveNotice
     const n = (form.id ? 1 : 0) + added.length;
     setForm(null); setFormErr(""); flash(n > 1 ? `${n} classes saved.` : "Class saved.");
   };
-  const isTaught = (key) => markable && att.taken.some((x) => x.slot === key && x.date === today);
-  const toggleTaught = (key, group, place) => {
-    if (isTaught(key)) { att.save(att.taken.filter((x) => !(x.slot === key && x.date === today))).then(() => flash("Class unmarked."), fail); return; }
-    const who = roster.filter((r) => forGroup(group, r.group));
-    att.save([...att.taken, ...who.map((r) => ({ id: uid(), studentId: r.id, date: today, slot: key, place }))])
-      .then(() => flash(`Logged a class for ${who.length} ${who.length === 1 ? "student" : "students"}.`), fail);
+  /* Mark taught opens a short form: who came, notes, and a message for absent students' families. */
+  const recOf = (key) => recordsOf(att, key, today);
+  const taughtButton = (key, s, start) => {
+    if (!markable || !roster.some((r) => forGroup(s.group, r.group))) return null;
+    const rec = recOf(key);
+    const logged = rec.taken.length + rec.absent.length > 0;
+    return (
+      <button className={"btn sm" + (logged ? " done" : " ghost")} aria-expanded={logFor === key} onClick={() => setLogFor(logFor === key ? null : key)}>
+        {logged ? <><Icon name="check" size={16} />{logSummary(rec)}</> : "Mark taught"}
+      </button>
+    );
   };
-  const taughtButton = (key, group, place) => (markable && roster.some((r) => forGroup(group, r.group)) ? (
-    <button className={"btn sm" + (isTaught(key) ? " done" : " ghost")} aria-pressed={isTaught(key)} onClick={() => toggleTaught(key, group, place)}>
-      {isTaught(key) ? <><Icon name="check" size={16} />Taught</> : "Mark taught"}
-    </button>
-  ) : null);
+  const logForm = (key, s, start) => (logFor === key && markable
+    ? <ClassLog occ={{ s, key, date: today, start }} people={roster} att={att} lessons={lessons} flash={flash} onClose={() => setLogFor(null)} /> : null);
   const saveChange = (s, existing, v) => {
     const c = existing ? { ...existing, makeup: v.makeup } : { id: uid(), slot: s.id, date: v.date, note: v.note, makeup: v.makeup, resolved: false };
     saveChanges(existing ? changes.map((x) => (x.id === c.id ? c : x)) : [...changes, c]);
@@ -2037,10 +2054,11 @@ function Classes({ schedule, changes = [], saveChanges, notices = [], saveNotice
                   </div>
                   {isTeacher && (
                     <span className="slot-actions">
-                      {c.makeup && c.makeup.date === today && taughtButton(c.id, s.group, placeName(s))}
+                      {c.makeup && c.makeup.date === today && taughtButton(c.id, s, c.makeup.start)}
                       <ConfirmButton iconOnly label="Undo this change" onConfirm={() => undoChange(c)} />
                     </span>
                   )}
+                  {isTeacher && c.makeup && c.makeup.date === today && logForm(c.id, s, c.makeup.start)}
                 </li>
               );
             })}
@@ -2067,7 +2085,7 @@ function Classes({ schedule, changes = [], saveChanges, notices = [], saveNotice
           </ul>
         </div>
       )}
-      {markable && slots.length > 0 && <p className="hint">Tap Mark taught after today's class to count it for everyone in that group. To log a class on another day, open the student in Students.</p>}
+      {markable && slots.length > 0 && <p className="hint">Tap Mark taught after today's class to note who came and what you did. To log a class on another day, use Today or open the student in Students.</p>}
       {dayOrder.map((d) => {
         const list = slots.filter((s) => Number(s.day) === d).sort((a, b) => a.start.localeCompare(b.start));
         if (!list.length) return null;
@@ -2078,7 +2096,8 @@ function Classes({ schedule, changes = [], saveChanges, notices = [], saveNotice
             {list.map((s) => {
               const cancelledToday = d === ti && changes.some((c) => c.slot === s.id && c.date === today);
               return (
-                <div key={s.id} className="slot">
+                <React.Fragment key={s.id}>
+                <div className="slot">
                   <span className="slot-time">{t("timeRange", s.start, addMin(s.start, s.minutes))}</span>
                   <span className="slot-main">
                     {isTeacher && <span className="row-title">{s.group}</span>}
@@ -2086,12 +2105,14 @@ function Classes({ schedule, changes = [], saveChanges, notices = [], saveNotice
                   </span>
                   <span className="slot-actions">
                     {s.link && <a className="btn ghost sm" href={s.link} target="_blank" rel="noopener noreferrer"><Icon name="video" size={16} />{t("join")}</a>}
-                    {d === ti && !cancelledToday && taughtButton(s.id, s.group, placeName(s))}
+                    {d === ti && !cancelledToday && taughtButton(s.id, s, s.start)}
                     {isTeacher && <button className="btn ghost sm" onClick={() => { setForm(null); setChangeFor({ slot: s.id, change: null }); window.scrollTo(0, 0); }}>Cancel or move</button>}
                     {isTeacher && <button className="icon-btn sm-icon" aria-label="Edit class" onClick={() => { setChangeFor(null); setFormErr(""); setForm({ id: s.id, group: s.group, days: [Number(s.day)], times: { [Number(s.day)]: s.start }, start: s.start, minutes: s.minutes, place: s.place || "", link: s.link || "" }); window.scrollTo(0, 0); }}><Icon name="pencil" size={15} /></button>}
                     {isTeacher && <ConfirmButton iconOnly label="Delete class" onConfirm={() => saveSchedule(schedule.filter((x) => x.id !== s.id))} />}
                   </span>
                 </div>
+                {d === ti && !cancelledToday && logForm(s.id, s, s.start)}
+                </React.Fragment>
               );
             })}
           </div>
@@ -2242,9 +2263,16 @@ const STATUS = { paid: "Paid", partial: "Part paid", unpaid: "Not paid", none: "
 function StudentReport({ r, month, lessons, decks }) {
   const [comment, setComment] = useState("");
   const text = reportText(r, month, lessons, decks, comment);
+  const myNotes = r.takenList.filter((x) => noteText(x));
   return (
     <div className="report">
       <p className="form-title">Report for {monthLabel(month)}{r.lang === "fr" ? ", in French" : ""}</p>
+      {myNotes.length > 0 && (
+        <div className="report-notes">
+          <p className="muted small">Your class notes this month (only you see these)</p>
+          <ul className="visit-list">{myNotes.map((x) => <li key={x.id}><span className="visit-date">{fmtShort(x.date)}</span><span className="visit-main">{noteText(x)}</span></li>)}</ul>
+        </div>
+      )}
       <Field label="Your comment (optional)"><textarea id={"report-note-" + r.id} className="inp" value={comment} placeholder={r.lang === "fr" ? "Très bons progrès ce mois-ci !" : "Great progress this month!"} onChange={(e) => setComment(e.target.value)} /></Field>
       <p className="msg sel pre">{text}</p>
       <div className="form-actions">
@@ -2256,7 +2284,7 @@ function StudentReport({ r, month, lessons, decks }) {
   );
 }
 
-function StudentDetail({ r, month, moneyOn, lessons, decks, placeOptions = [], defaultPlace = "", downloads, teacherName, onPay, onRemovePayment, onLogClass, onRemoveClass, onNewCode, onEdit, onRemove }) {
+function StudentDetail({ r, month, moneyOn, lessons, decks, placeOptions = [], defaultPlace = "", downloads, teacherName, onPay, onRemovePayment, onLogClass, onRemoveClass, onNewCode, onEdit, onRemove, onFile, absentList = [] }) {
   const [logPlace, setLogPlace] = useState(defaultPlace);
   const [showCert, setShowCert] = useState(false);
   const [min, max] = monthRange(month);
@@ -2272,6 +2300,7 @@ function StudentDetail({ r, month, moneyOn, lessons, decks, placeOptions = [], d
   const save = () => { if (!valid) return; onPay(Number(amount), date); setAmount(""); };
   return (
     <div className="expand">
+      {onFile && <button className="btn ghost sm file-open" onClick={onFile}><Icon name="users" size={15} />Open {r.name}'s page</button>}
       <div className="code-box">
         <div className="code-main"><span className="muted small">Code</span><span className="code-big sel">{r.code}</span></div>
         <div className="pay-actions">
@@ -2298,12 +2327,13 @@ function StudentDetail({ r, month, moneyOn, lessons, decks, placeOptions = [], d
               <ul className="pay-list taken-list" aria-label="Classes taken">
                 {r.takenList.map((x) => (
                   <li key={x.id}>
-                    <span>{fmtDate(x.date)}</span>
+                    <span>{fmtDate(x.date)}{noteText(x) && <span className="taken-note">{noteText(x)}</span>}</span>
                     <ConfirmButton iconOnly label={`Remove the class on ${fmtDate(x.date)}`} onConfirm={() => onRemoveClass(x.id)} />
                   </li>
                 ))}
               </ul>
             )}
+            {absentList.length > 0 && <p className="absent-line">Absent: {absentList.map((x) => fmtShort(x.date)).join(", ")}. Not counted.</p>}
           </div>
           {!r.classes && <p className="hint" style={{ marginTop: 0 }}>Classes per month is set to 0 for this student. Change it with Edit student to see how many are left.</p>}
           <p className="sub-h" style={{ marginTop: 14 }}>Payments in {monthLabel(month)}</p>
@@ -2343,10 +2373,10 @@ function StudentDetail({ r, month, moneyOn, lessons, decks, placeOptions = [], d
   );
 }
 
-function StudentsTeacher({ roster, saveRoster, pay, savePay, settings, saveSettings, lessons, decks, schedule = [], changes = [], places = [], downloads, teacherName, db, userId, flash }) {
+function StudentsTeacher({ roster, saveRoster, pay, savePay, settings, saveSettings, lessons, decks, schedule = [], changes = [], places = [], downloads, teacherName, db, userId, flash, startOpen = null, onFile }) {
   const [month, setMonth] = useState(monthKey(new Date()));
   const [form, setForm] = useState(null);
-  const [openId, setOpenId] = useState(null);
+  const [openId, setOpenId] = useState(startOpen);
   const money = useMoney(db, userId, month);
   const moneyOn = money.enabled && !money.failed;
   const att = useAttendance(moneyOn ? db : null, userId, month);
@@ -2506,7 +2536,9 @@ function StudentsTeacher({ roster, saveRoster, pay, savePay, settings, saveSetti
                     onRemoveClass={(tid) => att.save(att.taken.filter((x) => x.id !== tid)).catch(saveFailed)}
                     onNewCode={() => { const c = newCode(roster, r.id); saveRoster(roster.map((x) => (x.id === r.id ? { ...x, code: c } : x))); flash(`New code for ${r.name}: ${c}.`); }}
                     onEdit={() => editStudent(r)}
-                    onRemove={() => removeStudent(r.id)} />
+                    onRemove={() => removeStudent(r.id)}
+                    onFile={onFile ? () => onFile(r.id) : null}
+                    absentList={arr(att.absent).filter((x) => x.studentId === r.id)} />
                 )}
               </li>
             ))}
@@ -2826,8 +2858,9 @@ function WordListOffers({ lists, decks, saveDecks, groups, flash }) {
 }
 
 /* Each student's own list of lessons: data/users/{uid}/plans/{studentId} = { items: [{ id, course, item } | { id, custom: { title, notes, homework } }, used?] } */
+/* Each student's lesson list: data/users/{uid}/money/plans/{studentId} (a collection needs an odd number of path parts). */
 function usePlans(db, userId) {
-  const path = db && userId ? "data/users/" + userId + "/plans" : "";
+  const path = db && userId ? "data/users/" + userId + "/money/plans" : "";
   const [plans, setPlans] = useState({});
   const [ready, setReady] = useState(false);
   useEffect(() => {
@@ -2951,9 +2984,9 @@ function AddLessons({ student, courses, have, onAddItems, onAddCustom, onBack })
   );
 }
 
-function CourseLibrary({ saved, onUse, onRemoveSaved, decks, saveDecks, groups, flash, roster = [], plansH, progressMap = {} }) {
+function CourseLibrary({ saved, onUse, onRemoveSaved, decks, saveDecks, groups, flash, roster = [], plansH, progressMap = {}, startNav = null }) {
   const { status, data, retry } = useCourses();
-  const [nav, setNav] = useState({ view: "home" });
+  const [nav, setNav] = useState(() => startNav || { view: "home" });
   const [q, setQ] = useState("");
   const go = (n) => { setNav(n); window.scrollTo(0, 0); };
   const fail = () => flash("That didn't save. Check your connection and try again.");
@@ -4136,6 +4169,746 @@ function BusinessTeacher({ bizH, db, userId, flash, pay, downloads, roster, sche
 }
 
 /* ---------- live data from the database ---------- */
+/* ---------- the teacher's day: Today, class logs, homework checks, messages, student pages, to-do ---------- */
+const addDays = (iso, n) => { const d = parseISO(iso); d.setDate(d.getDate() + n); return isoOf(d); };
+const longDate = (iso, lang = "en") => parseISO(iso).toLocaleDateString(LOCALE[lang], { weekday: "long", day: "numeric", month: "long" });
+const studentsIn = (group, people) => people.filter((r) => forGroup(group, r.group));
+const noteText = (x) => [x.note, x.own].filter(Boolean).join(" — ");
+
+/* Every class on one date: weekly classes not cancelled that day, plus make-up classes moved to it. */
+function classesOn(iso, schedule, changes) {
+  const wd = (parseISO(iso).getDay() + 6) % 7;
+  const out = [];
+  schedule.forEach((s) => {
+    if (Number(s.day) === wd && !changes.some((c) => c.slot === s.id && c.date === iso)) out.push({ s, key: s.id, date: iso, start: s.start });
+  });
+  changes.forEach((c) => {
+    if (!c.makeup || c.makeup.date !== iso) return;
+    const s = schedule.find((x) => x.id === c.slot);
+    if (s) out.push({ s, key: c.id, date: iso, start: c.makeup.start, makeup: true });
+  });
+  return out.sort((a, b) => String(a.start).localeCompare(String(b.start)));
+}
+const recordsOf = (att, key, date) => ({
+  taken: att.taken.filter((x) => x.slot === key && x.date === date),
+  absent: arr(att.absent).filter((x) => x.slot === key && x.date === date),
+});
+const logSummary = (rec) => {
+  if (!rec.absent.length) return "Taught";
+  return `${rec.taken.length} came, ${rec.absent.length} absent`;
+};
+
+/* A student's lesson list from the Library, with titles and plan text. */
+function planEntries(items, courses) {
+  return arr(items).map((p) => {
+    if (p.custom) return { p, key: "own/" + p.id, title: p.custom.title, from: "Your own lesson", body: p.custom.notes || "" };
+    const c = courses.find((x) => x.id === p.course);
+    const it = c && arr(c.items).find((x) => x.id === p.item);
+    if (!it) return { p, missing: true, title: "" };
+    return { p, key: c.id + "/" + it.id, title: it.title, from: c.title, body: it.body || "" };
+  });
+}
+const nextPlanEntry = (items, courses) => planEntries(items, courses).find((e) => !e.p.used && !e.missing) || null;
+
+/* "Materials:" and "Print before class:" lines from a lesson plan. */
+const PREP_RE = /^\s*(?:[-*]\s+)?\*\*((?:Materials|Print before class|Not printable|Before the lesson|Bring|You need)[^*]*?):?\*\*:?\s*(.+)$/i;
+const prepLines = (body) => String(body || "").split("\n").map((l) => l.match(PREP_RE)).filter(Boolean).map((m) => ({ label: m[1].trim(), text: m[2].trim() }));
+
+/* Messages for families, in each family's language. */
+function absentText(r, date, lessonTitle) {
+  const fr = r.lang === "fr";
+  const when = date === todayISO() ? (fr ? "aujourd'hui" : "today") : fr ? "le " + longDate(date, "fr") : "on " + longDate(date, "en");
+  if (fr) return `Bonjour ! ${r.name} n'était pas au cours d'anglais ${when}.` + (lessonTitle ? ` Nous avons travaillé sur : ${lessonTitle}.` : "") + " Les notes et les devoirs sont dans l'application Bright Minds, onglet Devoirs. À bientôt !";
+  return `Hello! ${r.name} missed English class ${when}.` + (lessonTitle ? ` We worked on: ${lessonTitle}.` : "") + " The notes and homework are in the Bright Minds app, under Homework. See you soon!";
+}
+function hwReminderText(r, l) {
+  const fr = r.lang === "fr";
+  const due = l.due ? (fr ? ` pour ${longDate(l.due, "fr")}` : ` for ${longDate(l.due, "en")}`) : "";
+  return fr
+    ? `Bonjour ! Petit rappel pour ${r.name} : les devoirs d'anglais « ${l.title} »${due}.\n${l.homework}\nOn peut aussi envoyer un message vocal dans l'application Bright Minds, onglet Devoirs. Merci !`
+    : `Hello! A quick reminder for ${r.name}: the English homework "${l.title}"${due}.\n${l.homework}\nYou can also send a voice note in the Bright Minds app, under Homework. Thank you!`;
+}
+function classWhen(o, lang) {
+  const fr = lang === "fr";
+  const today = todayISO();
+  const start = o.start || (o.at ? `${pad(o.at.getHours())}:${pad(o.at.getMinutes())}` : "");
+  const day = o.date === today ? (fr ? "aujourd'hui" : "today") : o.date === addDays(today, 1) ? (fr ? "demain" : "tomorrow") : fr ? longDate(o.date, "fr") : "on " + longDate(o.date, "en");
+  return `${day} ${fr ? "à" : "at"} ${start}`;
+}
+
+/* ---------- logging a class: who came, notes, and a message for absent students' families ---------- */
+function ClassLog({ occ, people, att, lessons = [], flash, onClose }) {
+  const who = studentsIn(occ.s.group, people);
+  const rec = recordsOf(att, occ.key, occ.date);
+  const logged = rec.taken.length + rec.absent.length > 0;
+  const [here, setHere] = useState(() => new Set(logged ? rec.taken.map((x) => x.studentId) : who.map((r) => r.id)));
+  const [note, setNote] = useState(() => (rec.taken.find((x) => x.note) || {}).note || "");
+  const [own, setOwn] = useState(() => { const o = {}; rec.taken.forEach((x) => { if (x.own) o[x.studentId] = x.own; }); return o; });
+  const [missed, setMissed] = useState(null);
+  const fail = () => flash("That didn't save. Check your connection and try again.");
+  const toggle = (id) => setHere((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const others = (list) => list.filter((x) => !(x.slot === occ.key && x.date === occ.date));
+  const place = placeName(occ.s);
+  const save = () => {
+    const came = who.filter((r) => here.has(r.id));
+    const away = who.filter((r) => !here.has(r.id));
+    const t = came.map((r) => {
+      const x = { id: uid(), studentId: r.id, date: occ.date, slot: occ.key, place };
+      if (note.trim()) x.note = note.trim();
+      if ((own[r.id] || "").trim()) x.own = own[r.id].trim();
+      return x;
+    });
+    const ab = away.map((r) => ({ id: uid(), studentId: r.id, date: occ.date, slot: occ.key, place }));
+    att.save([...others(att.taken), ...t], [...others(arr(att.absent)), ...ab]).then(() => {
+      flash(came.length ? `Saved: ${came.length} came${away.length ? `, ${away.length} absent` : ""}.` : "Saved: nobody came.");
+      if (away.length) setMissed(away); else onClose();
+    }, fail);
+  };
+  const unmark = () => att.save(others(att.taken), others(arr(att.absent))).then(() => { flash("Class unmarked."); onClose(); }, fail);
+  if (missed) {
+    return (
+      <div className="form log-form">
+        <p className="form-title">Let the families know</p>
+        <p className="hint">A short message in their language, with what the class worked on.</p>
+        <ul className="msg-rows">
+          {missed.map((r) => {
+            const l = lessons.find((x) => x.date === occ.date && forGroup(lessonGroups(x), r.group));
+            const text = absentText(r, occ.date, l ? l.title : "");
+            return (
+              <li key={r.id}>
+                <div className="row-main"><span className="row-title">{r.name}</span><span className="row-sub">{text}</span></div>
+                {r.phone ? <WaButton phone={r.phone} text={text}>Send</WaButton> : <CopyButton text={text} label={`Copy the message for ${r.name}`} caption="Copy" />}
+              </li>
+            );
+          })}
+        </ul>
+        <div className="form-actions"><button className="btn" onClick={onClose}>Done</button></div>
+      </div>
+    );
+  }
+  const present = who.filter((r) => here.has(r.id));
+  return (
+    <div className="form log-form">
+      <p className="form-title">{occ.s.group}, {fmtDate(occ.date)} at {occ.start}</p>
+      <div className="field">
+        <span id={"came-" + occ.key}>Who came?</span>
+        <div className="chip-pick came-pick" role="group" aria-labelledby={"came-" + occ.key}>
+          {who.map((r) => (
+            <button key={r.id} type="button" aria-pressed={here.has(r.id)} onClick={() => toggle(r.id)}>
+              <Icon name={here.has(r.id) ? "check" : "x"} size={15} /><span>{r.name}</span>
+            </button>
+          ))}
+        </div>
+        <span className="hint">{who.length > 1 ? "Tap anyone who was absent. An absent student doesn't use up a class." : "Tap the name if they were absent. An absent class isn't counted."}</span>
+      </div>
+      <Field label={who.length > 1 ? "Class notes (only you see these)" : "Notes (only you see these)"}>
+        <textarea id={"log-note-" + occ.key} className="inp" value={note} placeholder="What you did, what to review next time..." onChange={(e) => setNote(e.target.value)} />
+      </Field>
+      {who.length > 1 && present.map((r) => (
+        <Field key={r.id} label={`Just for ${r.name} (optional)`}>
+          <input id={"log-own-" + r.id} className="inp" value={own[r.id] || ""} placeholder="Mixes up 12 and 20" onChange={(e) => setOwn({ ...own, [r.id]: e.target.value })} />
+        </Field>
+      ))}
+      <div className="form-actions">
+        <button className="btn" onClick={save}>{logged ? "Save changes" : "Save"}</button>
+        <button className="btn ghost" onClick={onClose}>Cancel</button>
+        {logged && <ConfirmButton label="Unmark this class" onConfirm={unmark} />}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- homework: who did it ---------- */
+function useHomeworkChecks(db, userId) {
+  const path = db && userId ? "data/users/" + userId + "/homework" : "";
+  const [checks, setChecks] = useState({});
+  const cur = useRef({});
+  useEffect(() => {
+    if (!path) return undefined;
+    let un = () => {};
+    try {
+      un = db.doc(path).onSnapshot((s) => {
+        const d = s.exists ? s.data() : null;
+        const c = d && d.checks && typeof d.checks === "object" ? d.checks : {};
+        cur.current = c; setChecks(c);
+      }, () => {});
+    } catch (e) { /* unavailable */ }
+    return () => un();
+  }, [path]);
+  /* value: "done", "missing", or null to clear */
+  const set = (lessonId, studentId, value) => {
+    const forLesson = { ...(cur.current[lessonId] || {}) };
+    if (value) forLesson[studentId] = value; else delete forLesson[studentId];
+    const next = { ...cur.current, [lessonId]: forLesson };
+    if (!Object.keys(forLesson).length) delete next[lessonId];
+    cur.current = next; setChecks(next);
+    return queuedSet(db.doc(path), { checks: next });
+  };
+  return { on: !!path, checks, set };
+}
+const HW_STATE = { done: "Done", missing: "Not done", voice: "Sent a voice note", "": "Not checked yet" };
+function hwStatus(l, r, checks, voiceList) {
+  const c = (checks[l.id] || {})[r.id];
+  if (c) return c;
+  return voiceList.some((v) => v.lessonId === l.id && v.sid === r.id) ? "voice" : "";
+}
+function hwTally(l, people, checks, voiceList) {
+  const who = studentsIn(lessonGroups(l), people);
+  const st = who.map((r) => hwStatus(l, r, checks, voiceList));
+  return { total: who.length, open: st.filter((x) => !x).length, done: st.filter((x) => x === "done" || x === "voice").length, missing: st.filter((x) => x === "missing").length };
+}
+function HomeworkCheck({ lesson, people, hw, voiceList, flash }) {
+  const who = studentsIn(lessonGroups(lesson), people);
+  if (!who.length) return <p className="hint">No students in {lessonGroups(lesson).join(", ")} yet.</p>;
+  const mine = hw.checks[lesson.id] || {};
+  const set = (sid, v) => hw.set(lesson.id, sid, v).catch(() => flash("That didn't save. Check your connection and try again."));
+  return (
+    <ul className="hw-check">
+      {who.map((r) => {
+        const st = hwStatus(lesson, r, hw.checks, voiceList);
+        const c = mine[r.id] || "";
+        return (
+          <li key={r.id}>
+            <div className="row-main">
+              <span className="row-title">{r.name}</span>
+              <span className={"row-sub hw-st " + (st || "open")}>{HW_STATE[st]}</span>
+            </div>
+            <div className="hw-btns">
+              <button type="button" className="btn sm ghost yes" aria-pressed={c === "done"} aria-label={`${r.name} did it`} onClick={() => set(r.id, c === "done" ? null : "done")}><Icon name="check" size={15} />Done</button>
+              <button type="button" className="btn sm ghost no" aria-pressed={c === "missing"} aria-label={`${r.name} didn't do it`} onClick={() => set(r.id, c === "missing" ? null : "missing")}>Not done</button>
+              {st !== "done" && st !== "voice" && r.phone && <WaButton phone={r.phone} text={hwReminderText(r, lesson)} ghost>Remind</WaButton>}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+function HomeworkToggle({ lesson, people, hw, voiceList, flash }) {
+  const [open, setOpen] = useState(false);
+  const t = hwTally(lesson, people, hw.checks, voiceList);
+  if (!t.total) return null;
+  const label = t.open === t.total ? `Check homework (${t.total})` : `Homework: ${t.done} of ${t.total} done${t.missing ? `, ${t.missing} not done` : ""}`;
+  return (
+    <div className="hw-toggle">
+      <button className="btn ghost sm" aria-expanded={open} onClick={() => setOpen(!open)}><Icon name="clipboard" size={15} />{open ? "Close" : label}</button>
+      {open && <HomeworkCheck lesson={lesson} people={people} hw={hw} voiceList={voiceList} flash={flash} />}
+    </div>
+  );
+}
+
+/* ---------- the teacher's own to-do list ---------- */
+function useTodo(db, userId) {
+  const path = db && userId ? "data/users/" + userId + "/todo" : "";
+  const [items, setItems] = useState([]);
+  const [ready, setReady] = useState(false);
+  const cur = useRef([]);
+  useEffect(() => {
+    if (!path) return undefined;
+    let un = () => {};
+    try {
+      un = db.doc(path).onSnapshot((s) => {
+        const d = s.exists ? s.data() : null;
+        cur.current = d && Array.isArray(d.items) ? d.items : [];
+        setItems(cur.current); setReady(true);
+      }, () => setReady(true));
+    } catch (e) { setReady(true); }
+    return () => un();
+  }, [path]);
+  const save = (next) => { cur.current = next; setItems(next); return queuedSet(db.doc(path), { items: next }); };
+  return { on: !!path, ready, items, save, cur };
+}
+function TodoList({ todo, flash }) {
+  const [text, setText] = useState("");
+  const [showDone, setShowDone] = useState(false);
+  const fail = () => flash("That didn't save. Check your connection and try again.");
+  const open = todo.items.filter((x) => !x.done);
+  const done = todo.items.filter((x) => x.done);
+  const add = () => {
+    const t = text.trim();
+    if (!t) return;
+    todo.save([...todo.cur.current, { id: uid(), text: t, at: todayISO() }]).catch(fail);
+    setText("");
+  };
+  const tick = (id) => todo.save(todo.cur.current.map((x) => (x.id === id ? { ...x, done: x.done ? null : todayISO() } : x))).catch(fail);
+  return (
+    <div className="today-block">
+      <h3 className="today-h">To do</h3>
+      <form className="inline-add" onSubmit={(e) => { e.preventDefault(); add(); }}>
+        <input id="todo-new" className="inp" value={text} placeholder="Buy crayons, call a parent..." aria-label="New to-do" onChange={(e) => setText(e.target.value)} />
+        <button className="btn sm" type="submit" disabled={!text.trim()}><Icon name="plus" size={16} />Add</button>
+      </form>
+      {open.length === 0 && <p className="hint">Nothing on your list.</p>}
+      <ul className="todo-list">
+        {open.map((x) => (
+          <li key={x.id}>
+            <label className="check"><input type="checkbox" checked={false} onChange={() => tick(x.id)} /><span>{x.text}</span></label>
+          </li>
+        ))}
+      </ul>
+      {done.length > 0 && (
+        <div className="todo-done">
+          <button className="link small" aria-expanded={showDone} onClick={() => setShowDone(!showDone)}>{showDone ? "Hide done" : `Done (${done.length})`}</button>
+          {showDone && (
+            <>
+              <ul className="todo-list">
+                {done.map((x) => (
+                  <li key={x.id} className="is-done">
+                    <label className="check"><input type="checkbox" checked onChange={() => tick(x.id)} /><span>{x.text}</span></label>
+                  </li>
+                ))}
+              </ul>
+              <button className="btn ghost sm" onClick={() => todo.save(todo.cur.current.filter((x) => !x.done)).catch(fail)}>Clear done</button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- getting ready: what to print and bring for the next classes ---------- */
+function GetReady({ occs, people, plans, courses }) {
+  const [ticks, setTicks] = useState(() => ls.get("bm:ready", {}) || {});
+  const groupsSeen = new Map();
+  occs.forEach((o) => {
+    studentsIn(o.s.group, people).forEach((r) => {
+      const e = nextPlanEntry(plans[r.id], courses);
+      if (!e) return;
+      const lines = prepLines(e.body);
+      if (!lines.length) return;
+      const g = groupsSeen.get(e.key) || { e, names: [], when: o, lines };
+      if (!g.names.includes(r.name)) g.names.push(r.name);
+      groupsSeen.set(e.key, g);
+    });
+  });
+  const list = [...groupsSeen.values()];
+  if (!list.length) return null;
+  const toggle = (k) => {
+    const next = { ...ticks, [k]: ticks[k] ? null : todayISO() };
+    Object.keys(next).forEach((x) => { if (!next[x] || next[x] < addDays(todayISO(), -14)) delete next[x]; });
+    setTicks(next); ls.set("bm:ready", next);
+  };
+  return (
+    <div className="today-block">
+      <h3 className="today-h">Get ready</h3>
+      <p className="hint">From the next lesson on each student's list. Tick things off as you pack.</p>
+      {list.map(({ e, names, when, lines }) => (
+        <div key={e.key} className="ready-card">
+          <p className="ready-title">{e.title}</p>
+          <p className="row-sub">{names.join(", ")}. {when.date === todayISO() ? "Today" : "Tomorrow"} at {when.start}</p>
+          <ul className="todo-list">
+            {lines.map((x, k) => {
+              const id = e.key + "#" + k;
+              return (
+                <li key={id} className={ticks[id] ? "is-done" : ""}>
+                  <label className="check"><input type="checkbox" checked={!!ticks[id]} onChange={() => toggle(id)} /><span><strong>{x.label}:</strong> {mdInline(x.text, id)}</span></label>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- one-tap messages to families ---------- */
+const MSG_KINDS = [["reminder", "Class reminder"], ["cancel", "Class cancelled"], ["homework", "Homework reminder"], ["own", "Your own message"]];
+function familyText(kind, fam, ctx) {
+  const fr = fam.lang === "fr";
+  const names = fam.people.map((r) => r.name).join(fr ? " et " : " and ");
+  const extra = ctx.extra.trim();
+  const end = extra ? "\n" + extra : "";
+  if (kind === "own") return extra;
+  if (kind === "reminder" || kind === "cancel") {
+    const o = ctx.nextOf(fam.group);
+    if (!o) return "";
+    const where = o.s.link ? (fr ? "en ligne" : "online") : placeName(o.s);
+    if (kind === "reminder") {
+      return fr ? `Bonjour ! Petit rappel pour ${names} : cours d'anglais ${classWhen(o, "fr")}${where ? ` (${where})` : ""}. À bientôt !${end}\nBright Minds`
+        : `Hello! A quick reminder for ${names}: English class ${classWhen(o, "en")}${where ? ` (${where})` : ""}. See you soon!${end}\nBright Minds`;
+    }
+    return fr ? `Bonjour ! Le cours d'anglais de ${names} ${classWhen(o, "fr")} est annulé. Je vous dirai bientôt quand nous le rattrapons. Désolé pour le changement.${end}\nBright Minds`
+      : `Hello! ${names}'s English class ${classWhen(o, "en")} is cancelled. I'll let you know soon when we'll make it up. Sorry for the change.${end}\nBright Minds`;
+  }
+  const l = ctx.homeworkOf(fam.group);
+  if (!l) return "";
+  const due = l.due ? (fr ? ` pour ${longDate(l.due, "fr")}` : ` for ${longDate(l.due, "en")}`) : "";
+  return fr ? `Bonjour ! Petit rappel pour ${names} : les devoirs d'anglais « ${l.title} »${due}.\n${l.homework}\nOn peut aussi envoyer un message vocal dans l'application Bright Minds, onglet Devoirs. Merci !${end}`
+    : `Hello! A quick reminder for ${names}: the English homework "${l.title}"${due}.\n${l.homework}\nYou can also send a voice note in the Bright Minds app, under Homework. Thank you!${end}`;
+}
+/* Students who share one WhatsApp number (brothers and sisters) get one message. */
+function familiesOf(list) {
+  const out = [];
+  list.forEach((r) => {
+    const d = r.phone ? waDigits(r.phone) : "";
+    const key = d ? "p" + d : "s" + r.id;
+    let f = out.find((x) => x.key === key);
+    if (!f) { f = { key, phone: r.phone, lang: r.lang, group: r.group, people: [] }; out.push(f); }
+    f.people.push(r);
+  });
+  return out;
+}
+function FamilyMessages({ people, groups, schedule, changes, lessons, hw, voiceList = [], onBack }) {
+  const [kind, setKind] = useState("reminder");
+  const [chosen, setChosen] = useState([EVERYONE]);
+  const [extra, setExtra] = useState("");
+  const [sent, setSent] = useState({});
+  const now = new Date();
+  const today = todayISO();
+  const ctx = {
+    extra,
+    nextOf: (g) => upcomingClasses(schedule.filter((s) => s.group === g || s.group === EVERYONE), changes, now, 14)[0] || null,
+    homeworkOf: (g) => [...lessons].filter((l) => l.homework && forGroup(lessonGroups(l), g) && ((l.due && l.due >= today) || String(l.date || "") >= addDays(today, -14)))
+      .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))[0] || null,
+  };
+  /* a homework reminder skips students who did it or sent a voice note */
+  const didIt = (r) => {
+    if (kind !== "homework" || !hw) return false;
+    const l = ctx.homeworkOf(r.group);
+    if (!l) return false;
+    const st = hwStatus(l, r, hw.checks, voiceList);
+    return st === "done" || st === "voice";
+  };
+  const who = people.filter((r) => forGroup(chosen, r.group));
+  const already = who.filter(didIt);
+  const fams = familiesOf(who.filter((r) => !didIt(r)));
+  const rows = fams.map((f) => ({ f, text: familyText(kind, f, ctx) }));
+  const skipped = rows.filter((x) => !x.text);
+  return (
+    <section>
+      <button className="back-link" onClick={onBack}><Icon name="left" />Today</button>
+      <h2 className="h">Message families</h2>
+      <div className="field">
+        <span id="msg-kind-label">Message</span>
+        <div className="chip-pick" role="group" aria-labelledby="msg-kind-label">
+          {MSG_KINDS.map(([k, label]) => <button key={k} type="button" aria-pressed={kind === k} onClick={() => { setKind(k); setSent({}); }}>{label}</button>)}
+        </div>
+      </div>
+      <GroupPicker id="msg-for" groups={groups} roster={people} value={chosen} onChange={(v) => { setChosen(v); setSent({}); }} />
+      <Field label={kind === "own" ? "Your message" : "Add a line (optional)"}>
+        <textarea id="msg-extra" className="inp" value={extra} placeholder={kind === "own" ? "Bonjour ! ..." : "Bring your colored pencils."} onChange={(e) => setExtra(e.target.value)} />
+      </Field>
+      {kind !== "own" && <p className="hint">Each family gets it in their own language, with their own class time. Brothers and sisters on one number get one message.</p>}
+      {kind === "own" && <p className="hint">Sent as you write it. Write it in the language the family reads.</p>}
+      {rows.filter((x) => x.text).length > 0 && (
+        <ul className="msg-rows">
+          {rows.filter((x) => x.text).map(({ f, text }) => (
+            <li key={f.key} className={sent[f.key] ? "is-sent" : ""}>
+              <div className="row-main">
+                <span className="row-title">{f.people.map((r) => r.name).join(", ")}{sent[f.key] && <span className="sent-chip"><Icon name="check" size={13} />Opened</span>}</span>
+                <span className="row-sub msg-preview">{text}</span>
+              </div>
+              {f.phone
+                ? <a className="btn sm" href={waLink(f.phone, text)} target="_blank" rel="noopener noreferrer" onClick={() => setSent({ ...sent, [f.key]: true })}><Icon name="chat" size={16} />Send</a>
+                : <CopyButton text={text} label={`Copy the message for ${f.people.map((r) => r.name).join(", ")}`} caption="Copy" />}
+            </li>
+          ))}
+        </ul>
+      )}
+      {!who.length && <Empty text="Pick who the message is for." />}
+      {already.length > 0 && <p className="hint">Already done, so no reminder: {already.map((r) => r.name).join(", ")}.</p>}
+      {fams.length > 0 && kind === "own" && !extra.trim() && <p className="hint">Write your message above, then send it to each family.</p>}
+      {skipped.length > 0 && kind !== "own" && (
+        <p className="hint">{skipped.map((x) => x.f.people.map((r) => r.name).join(", ")).join("; ")}: {kind === "homework" ? "no homework waiting" : "no class in the next two weeks"}, so nothing to send.</p>
+      )}
+      {fams.some((f) => !f.phone) && <p className="hint">Families without a WhatsApp number get a Copy button. Add numbers with Edit student in Students.</p>}
+    </section>
+  );
+}
+
+/* ---------- one page per student ---------- */
+function StudentFile({ r, schedule, changes, lessons, plans, progress, voiceList, hw, money, attNow, attPrev, flash, onBack, onGo }) {
+  const { data } = useCourses();
+  const courses = data ? data.courses : [];
+  const now = new Date();
+  const thisMonth = monthKey(now);
+  const next = upcomingClasses(schedule.filter((s) => forGroup(s.group, r.group)), changes, now, 21)[0];
+  const entries = planEntries(plans[r.id], courses);
+  const done = entries.filter((e) => e.p.used).length;
+  const nextE = entries.find((e) => !e.p.used && !e.missing);
+  const skills = Object.keys((progress && progress.skills) || {}).length;
+  const m = money && money.ready ? studentMonth(r, money.fees, money.pays, attNow.taken) : null;
+  const visits = [...attNow.taken, ...attPrev.taken].filter((x) => x.studentId === r.id).map((x) => ({ ...x, kind: "came" }))
+    .concat([...arr(attNow.absent), ...arr(attPrev.absent)].filter((x) => x.studentId === r.id).map((x) => ({ ...x, kind: "absent" })))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const hwLessons = lessons.filter((l) => l.homework && forGroup(lessonGroups(l), r.group))
+    .sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))).slice(0, 6);
+  const voices = voiceList.filter((v) => v.sid === r.id).sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
+  const replies = (progress && progress.replies) || {};
+  const setHw = (lid, v) => hw.set(lid, r.id, v).catch(() => flash("That didn't save. Check your connection and try again."));
+  return (
+    <section>
+      <button className="back-link" onClick={onBack}><Icon name="left" />Back</button>
+      <h2 className="h file-name">{r.name}</h2>
+      <p className="muted file-sub">{[r.group && r.group !== r.name ? r.group : null, "code " + r.code, r.level ? levelName(r.level) : null].filter(Boolean).join(", ")}</p>
+      <div className="file-grid">
+        <div className="file-card">
+          <span className="muted small">Next class</span>
+          <strong>{next ? `${next.date === todayISO() ? "Today" : next.date === addDays(todayISO(), 1) ? "Tomorrow" : DAYS.en[(next.at.getDay() + 6) % 7]} at ${pad(next.at.getHours())}:${pad(next.at.getMinutes())}` : "None planned"}</strong>
+          {next && <span className="row-sub">{fmtDate(next.date)}{placeName(next.s) ? `, ${placeName(next.s)}` : ""}</span>}
+        </div>
+        {m && (
+          <div className="file-card">
+            <span className="muted small">{monthLabel(thisMonth)}</span>
+            <strong>{m.classes ? `${Math.max(m.left, 0)} of ${m.classes} classes left` : `${m.used} classes`}</strong>
+            <span className={"row-sub pay-" + m.status}>{m.fee ? (m.status === "paid" ? "Paid" : `${fcfa(m.fee - m.paid)} to pay`) : "No fee set"}</span>
+          </div>
+        )}
+      </div>
+      <div className="file-sec">
+        <div className="h-row"><h3 className="today-h">Lessons</h3><button className="btn ghost sm" onClick={() => onGo("lessons", { lessons: { mode: "library", nav: { view: "student", studentId: r.id } } })}>Open list</button></div>
+        <p>{entries.length ? `${done} of ${entries.length} taught.` : "No lessons on the list yet."}{nextE ? ` Next: ${nextE.title}.` : ""}</p>
+      </div>
+      <div className="file-sec">
+        <div className="h-row"><h3 className="today-h">What {r.name} can do</h3><button className="btn ghost sm" onClick={() => onGo("lessons", { lessons: { mode: "library", nav: { view: "skills", studentId: r.id } } })}>Update</button></div>
+        <p>{skills ? `${skills} ${skills === 1 ? "thing" : "things"} ticked so far.` : "Nothing ticked yet."}</p>
+      </div>
+      <div className="file-sec">
+        <h3 className="today-h">Classes and notes</h3>
+        {visits.length === 0 ? <p className="hint">No classes logged in {monthLabel(shiftMonth(thisMonth, -1))} or {monthLabel(thisMonth)}.</p> : (
+          <ul className="visit-list">
+            {visits.map((x) => (
+              <li key={x.id} className={x.kind === "absent" ? "is-absent" : ""}>
+                <span className="visit-date">{fmtShort(x.date)}</span>
+                <span className="visit-main">
+                  {x.kind === "absent" ? <span className="absent-tag">Absent</span> : noteText(x) ? <span>{noteText(x)}</span> : <span className="muted">Came. No notes.</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="file-sec">
+        <h3 className="today-h">Homework</h3>
+        {hwLessons.length === 0 ? <p className="hint">No homework given yet.</p> : (
+          <ul className="hw-check">
+            {hwLessons.map((l) => {
+              const st = hwStatus(l, r, hw.checks, voiceList);
+              const c = (hw.checks[l.id] || {})[r.id] || "";
+              return (
+                <li key={l.id}>
+                  <div className="row-main">
+                    <span className="row-title">{l.title}</span>
+                    <span className={"row-sub hw-st " + (st || "open")}>{HW_STATE[st]}{l.due ? `. Due ${fmtShort(l.due)}` : ""}</span>
+                  </div>
+                  <div className="hw-btns">
+                    <button type="button" className="btn sm ghost yes" aria-pressed={c === "done"} aria-label={`Done: ${l.title}`} onClick={() => setHw(l.id, c === "done" ? null : "done")}><Icon name="check" size={15} />Done</button>
+                    <button type="button" className="btn sm ghost no" aria-pressed={c === "missing"} aria-label={`Not done: ${l.title}`} onClick={() => setHw(l.id, c === "missing" ? null : "missing")}>Not done</button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+      <div className="file-sec">
+        <div className="h-row"><h3 className="today-h">Voice notes</h3>{voices.length > 0 && <button className="btn ghost sm" onClick={() => onGo("lessons", { lessons: { mode: "voice" } })}>Listen</button>}</div>
+        {voices.length === 0 ? <p className="hint">No voice notes yet.</p> : (
+          <ul className="visit-list">
+            {voices.slice(0, 6).map((v) => {
+              const rep = replies[v.id];
+              return (
+                <li key={v.id}>
+                  <span className="visit-date">{v.at ? fmtShort(String(v.at).slice(0, 10)) : ""}</span>
+                  <span className="visit-main">{v.title || "Voice note"}. {mmss(v.secs || 0)}{!v.heard ? <span className="new-chip">New</span> : rep ? ` Replied ${"★".repeat(rep.stars || 0)}` : ""}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+      <div className="file-sec">
+        <button className="btn ghost sm" onClick={() => onGo("students", { openId: r.id })}><Icon name="wallet" size={15} />Payments, code and report</button>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- Today: the teacher's home screen ---------- */
+function TodayTeacher({ people, groups, view, att, attPrev, plansH, hw, voiceList, money, pay, db, userId, flash, onFile, onGo }) {
+  const [logFor, setLogFor] = useState(null);
+  const [mode, setMode] = useState("home");
+  const [hwOpen, setHwOpen] = useState(null);
+  const [skipped, setSkipped] = useState(() => ls.get("bm:skipLog", []) || []);
+  const { data } = useCourses();
+  const todo = useTodo(db, userId);
+  const courses = data ? data.courses : [];
+  const plans = plansH.on ? plansH.plans : {};
+  const today = todayISO();
+  const tomorrow = addDays(today, 1);
+  const { schedule, changes, lessons } = view;
+  const attFor = (date) => (date.slice(0, 7) === att.month ? att : attPrev);
+  const todays = classesOn(today, schedule, changes);
+  const tomorrows = classesOn(tomorrow, schedule, changes);
+  const allTaken = [...att.taken, ...attPrev.taken];
+  const lastNote = (sid, before) => allTaken.filter((x) => x.studentId === sid && x.date < before && noteText(x)).sort((a, b) => b.date.localeCompare(a.date))[0];
+  /* classes from the last 3 days that were never logged */
+  const unlogged = [1, 2, 3].flatMap((k) => classesOn(addDays(today, -k), schedule, changes))
+    .filter((o) => studentsIn(o.s.group, people).length && !skipped.includes(o.key + "|" + o.date))
+    .filter((o) => { const rec = recordsOf(attFor(o.date), o.key, o.date); return !rec.taken.length && !rec.absent.length && attFor(o.date).ready; });
+  const skip = (o) => { const next = [...skipped, o.key + "|" + o.date].slice(-40); setSkipped(next); ls.set("bm:skipLog", next); };
+  const newVoice = voiceList.filter((v) => !v.heard).length;
+  const hwWaiting = lessons.filter((l) => l.homework && l.date && l.date <= today && l.date >= addDays(today, -21))
+    .map((l) => ({ l, t: hwTally(l, people, hw.checks, voiceList) })).filter((x) => x.t.total && x.t.open)
+    .sort((a, b) => String(a.l.due || a.l.date).localeCompare(String(b.l.due || b.l.date)));
+  const rows = money.ready ? people.map((r) => ({ ...r, ...studentMonth(r, money.fees, money.pays, att.taken) })) : [];
+  const toPay = rows.filter((r) => r.fee > 0 && r.paid < r.fee).sort((a, b) => a.name.localeCompare(b.name));
+  const thisMonth = monthKey(new Date());
+
+  if (mode === "messages") return <FamilyMessages people={people} groups={groups} schedule={schedule} changes={changes} lessons={lessons} hw={hw} voiceList={voiceList} onBack={() => { setMode("home"); window.scrollTo(0, 0); }} />;
+
+  const classCard = (o) => {
+    const who = studentsIn(o.s.group, people);
+    const a = attFor(o.date);
+    const rec = recordsOf(a, o.key, o.date);
+    const logged = rec.taken.length + rec.absent.length > 0;
+    const nexts = new Map();
+    who.forEach((r) => {
+      const e = nextPlanEntry(plans[r.id], courses);
+      if (!e) return;
+      const g = nexts.get(e.key) || { e, names: [], r };
+      g.names.push(r.name); nexts.set(e.key, g);
+    });
+    const notes = who.map((r) => ({ r, x: lastNote(r.id, o.date) })).filter((n) => n.x);
+    const id = o.key + "|" + o.date;
+    return (
+      <div key={id} className={"class-card" + (logged ? " is-logged" : "")}>
+        <div className="class-top">
+          <span className="class-time">{o.start}</span>
+          <span className="class-main">
+            <span className="row-title">{o.s.group}{o.makeup ? " (make-up)" : ""}</span>
+            <span className="row-sub">{[placeName(o.s), `${o.s.minutes || 60} min`].filter(Boolean).join(", ")}</span>
+          </span>
+          {o.s.link && <a className="btn ghost sm" href={o.s.link} target="_blank" rel="noopener noreferrer"><Icon name="video" size={16} />Join</a>}
+        </div>
+        {who.length > 0 && (
+          <div className="class-who">
+            {who.map((r) => <button key={r.id} className="name-chip" onClick={() => onFile(r.id)}>{r.name}</button>)}
+          </div>
+        )}
+        {[...nexts.values()].map(({ e, names, r }) => (
+          <div key={e.key} className="class-line">
+            <span className="muted small">Next lesson{nexts.size > 1 || (who.length > 1 && names.length < who.length) ? ` for ${names.join(", ")}` : ""}</span>
+            <button className="link-row" onClick={() => onGo("lessons", { lessons: { mode: "library", nav: { view: "plan", studentId: r.id, planId: e.p.id } } })}>
+              <span>{e.title}</span><Icon name="right" size={16} />
+            </button>
+          </div>
+        ))}
+        {who.length > 0 && !nexts.size && plansH.on && (
+          <p className="hint class-hint">No lesson list yet. <button className="link" onClick={() => onGo("lessons", { lessons: { mode: "library", nav: who.length === 1 ? { view: "student", studentId: who[0].id } : { view: "home" } } })}>Add lessons in the Library</button></p>
+        )}
+        {notes.map(({ r, x }) => (
+          <p key={r.id} className="last-note"><span className="muted small">Last time{who.length > 1 ? `, ${r.name}` : ""} ({fmtShort(x.date)})</span>{noteText(x)}</p>
+        ))}
+        {who.length > 0 && a.on && o.date <= today && logFor !== id && (
+          <div className="class-actions">
+            {logged
+              ? <button className="btn done sm" onClick={() => setLogFor(id)}><Icon name="check" size={16} />{logSummary(rec)}</button>
+              : <button className="btn sm" onClick={() => setLogFor(id)}>Mark taught</button>}
+          </div>
+        )}
+        {logFor === id && <ClassLog occ={o} people={people} att={a} lessons={lessons} flash={flash} onClose={() => setLogFor(null)} />}
+      </div>
+    );
+  };
+
+  return (
+    <section>
+      <div className="h-row">
+        <div>
+          <h2 className="h today-title">Today</h2>
+          <p className="muted today-date">{longDate(today)}</p>
+        </div>
+        <button className="btn sm" onClick={() => { setMode("messages"); window.scrollTo(0, 0); }}><Icon name="chat" size={16} />Message families</button>
+      </div>
+
+      {unlogged.length > 0 && (
+        <div className="today-block">
+          <h3 className="today-h">Not logged yet</h3>
+          {unlogged.map((o) => {
+            const id = o.key + "|" + o.date;
+            return (
+              <div key={id} className="class-card">
+                <div className="class-top">
+                  <span className="class-time">{o.start}</span>
+                  <span className="class-main"><span className="row-title">{o.s.group}</span><span className="row-sub">{longDate(o.date)}</span></span>
+                </div>
+                {logFor !== id && (
+                  <div className="class-actions">
+                    <button className="btn sm" onClick={() => setLogFor(id)}>Mark taught</button>
+                    <button className="btn ghost sm" onClick={() => skip(o)}>There was no class</button>
+                  </div>
+                )}
+                {logFor === id && <ClassLog occ={o} people={people} att={attFor(o.date)} lessons={lessons} flash={flash} onClose={() => setLogFor(null)} />}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="today-block">
+        <h3 className="today-h">Classes today</h3>
+        {todays.length ? todays.map(classCard) : <p className="hint">No classes today.</p>}
+      </div>
+
+      {tomorrows.length > 0 && (
+        <div className="today-block">
+          <h3 className="today-h">Tomorrow</h3>
+          {tomorrows.map(classCard)}
+        </div>
+      )}
+      {!todays.length && !tomorrows.length && (() => {
+        const nx = upcomingClasses(schedule, changes, new Date(), 14)[0];
+        return nx ? <p className="hint">Next class: {nx.s.group}, {longDate(nx.date)} at {pad(nx.at.getHours())}:{pad(nx.at.getMinutes())}.</p> : null;
+      })()}
+
+      {(newVoice > 0 || hwWaiting.length > 0) && (
+        <div className="today-block">
+          <h3 className="today-h">Waiting for you</h3>
+          {newVoice > 0 && (
+            <div className="wait-row">
+              <span className="row-main"><span className="row-title">{newVoice} new voice {newVoice === 1 ? "note" : "notes"}</span><span className="row-sub">Homework recorded by your students</span></span>
+              <button className="btn sm" onClick={() => onGo("lessons", { lessons: { mode: "voice" } })}><Icon name="play" size={15} />Listen</button>
+            </div>
+          )}
+          {hwWaiting.map(({ l, t }) => (
+            <div key={l.id} className="wait-block">
+              <div className="wait-row">
+                <span className="row-main">
+                  <span className="row-title">{l.title}</span>
+                  <span className="row-sub">{t.open} of {t.total} to check{l.due ? `. Due ${fmtShort(l.due)}` : ""}. For {lessonGroups(l).join(", ")}</span>
+                </span>
+                <button className="btn ghost sm" aria-expanded={hwOpen === l.id} onClick={() => setHwOpen(hwOpen === l.id ? null : l.id)}>{hwOpen === l.id ? "Close" : "Check"}</button>
+              </div>
+              {hwOpen === l.id && <HomeworkCheck lesson={l} people={people} hw={hw} voiceList={voiceList} flash={flash} />}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <GetReady occs={[...todays.filter((o) => !recordsOf(attFor(o.date), o.key, o.date).taken.length), ...tomorrows]} people={people} plans={plans} courses={courses} />
+
+      {todo.on && <TodoList todo={todo} flash={flash} />}
+
+      {money.ready && toPay.length > 0 && (
+        <div className="today-block">
+          <h3 className="today-h">Still to pay in {monthLabel(thisMonth)}</h3>
+          <ul className="msg-rows">
+            {toPay.map((r) => (
+              <li key={r.id}>
+                <button className="row-main link-like" onClick={() => onFile(r.id)}><span className="row-title">{r.name}</span><span className="row-sub">{fcfa(r.fee - r.paid)} left to pay</span></button>
+                {r.phone ? <WaButton phone={r.phone} text={reminderText(r, thisMonth, pay)} ghost>Remind</WaButton> : <CopyButton text={reminderText(r, thisMonth, pay)} label={`Copy a reminder for ${r.name}`} caption="Copy" />}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function useContent(on) {
   const [state, setState] = useState({ content: null, error: false });
   useEffect(() => {
@@ -4202,6 +4975,8 @@ function App() {
   const [installView, setInstallView] = useState(() => (window.location.hash || "") === "#install");
   const [installHidden, setInstallHidden] = useState(() => !!ls.get("bm:installHidden"));
   const [tab, setTab] = useState(null);
+  const [jump, setJump] = useState(null); // where a link from Today or a student's page opens another tab
+  const [fileOf, setFileOf] = useState(null); // the student whose page is open
   const [openDeck, setOpenDeck] = useState(null);
   const [toast, setToast] = useState("");
   const toastTimer = useRef(null);
@@ -4214,6 +4989,9 @@ function App() {
   const rosterH = useRoster(isTeacher);
   const studentRec = useStudentDoc(!isTeacher && me && me.id !== "guest" ? me.code : null);
   const attToday = useAttendance(isTeacher ? db : null, userId, thisMonth);
+  const attPrev = useAttendance(isTeacher ? db : null, userId, shiftMonth(thisMonth, -1));
+  const plansH = usePlans(isTeacher ? db : null, userId);
+  const hwChecks = useHomeworkChecks(isTeacher ? db : null, userId);
   const moneyNow = useMoney(isTeacher ? db : null, userId, thisMonth);
   const bizH = useBiz(isTeacher ? db : null, userId);
   const progressAll = useCollectionMap("progress", isTeacher);
@@ -4270,6 +5048,13 @@ function App() {
     const s = [...new Set(roster.map((r) => r.group).filter((g) => g && g !== EVERYONE))].sort();
     return [EVERYONE, ...s];
   }, [roster]);
+  /* students with their private WhatsApp number and message language, for the teacher's messages */
+  const people = useMemo(() => roster.map((r) => {
+    const f = moneyNow.fees[r.id] || {};
+    return { ...r, phone: f.phone || "", lang: f.lang === "fr" ? "fr" : "en" };
+  }).sort((x, y) => String(x.name).localeCompare(String(y.name))), [roster, moneyNow.fees]);
+  const goTab = (id, extra = null) => { setFileOf(null); setJump(extra); setTab(id); window.scrollTo(0, 0); };
+  const openFile = (id) => { setFileOf(id); window.scrollTo(0, 0); };
 
   const meR = !me ? null : me.id === "guest" ? GUEST : studentRec || null;
   const progDoc = useProgressDoc(!isTeacher && meR && meR.id !== "guest" ? meR.id : null);
@@ -4288,7 +5073,7 @@ function App() {
     const m = s ? { id: s.id, name: s.name, group: s.group, code: s.code } : GUEST;
     setMe(m); ls.set("bm:me", m); setRole("student"); ls.set("bm:role", "student"); setTab("words");
   };
-  const toTeacher = () => { setRole("teacher"); ls.set("bm:role", "teacher"); setTab("classes"); window.scrollTo(0, 0); };
+  const toTeacher = () => { setRole("teacher"); ls.set("bm:role", "teacher"); setTab("today"); setFileOf(null); setJump(null); window.scrollTo(0, 0); };
   const toStudentView = () => { setRole("student"); ls.set("bm:role", "student"); setTab(null); };
   const switchStudent = () => { setMe(null); ls.del("bm:me"); setTab(null); };
   const signIn = async () => {
@@ -4302,7 +5087,7 @@ function App() {
   const uiLang = isTeacher ? "en" : lang;
   const T = (k) => STR[uiLang][k];
   const tabs = isTeacher
-    ? [{ id: "classes", label: "Classes", icon: "calendar" }, { id: "lessons", label: "Lessons", icon: "clipboard" }, { id: "words", label: "Words", icon: "book" }, { id: "students", label: "Students", icon: "users" }, { id: "business", label: "Business", icon: "briefcase" }]
+    ? [{ id: "today", label: "Today", icon: "sun" }, { id: "classes", label: "Classes", icon: "calendar" }, { id: "lessons", label: "Lessons", icon: "clipboard" }, { id: "words", label: "Words", icon: "book" }, { id: "students", label: "Students", icon: "users" }, { id: "business", label: "Business", icon: "briefcase" }]
     : [{ id: "words", label: T("tabWords"), icon: "book" }, { id: "homework", label: T("tabHomework"), icon: "clipboard" },
       ...(me && me.id !== "guest" ? [{ id: "progress", label: T("tabProgress"), icon: "award" }] : []),
       { id: "classes", label: T("tabClasses"), icon: "calendar" }, { id: "pay", label: T("tabPay"), icon: "wallet" }];
@@ -4335,15 +5120,26 @@ function App() {
   }
 
   let screen;
-  if (isTeacher) {
-    if (current === "classes") screen = (
+  const fileR = isTeacher && fileOf ? people.find((r) => r.id === fileOf) : null;
+  if (fileR) {
+    screen = (
+      <StudentFile r={fileR} schedule={view.schedule} changes={view.changes} lessons={view.lessons} plans={plansH.on ? plansH.plans : {}}
+        progress={progressAll.map[fileR.id]} voiceList={Object.values(voiceAll.map)} hw={hwChecks}
+        money={moneyNow} attNow={attToday} attPrev={attPrev} flash={flash} onBack={() => { setFileOf(null); window.scrollTo(0, 0); }} onGo={goTab} />
+    );
+  } else if (isTeacher) {
+    if (current === "today") screen = (
+      <TodayTeacher people={people} groups={groups} view={view} att={attToday} attPrev={attPrev} plansH={plansH} hw={hwChecks}
+        voiceList={Object.values(voiceAll.map)} money={moneyNow} pay={view.pay} db={db} userId={userId} flash={flash} onFile={openFile} onGo={goTab} />
+    );
+    else if (current === "classes") screen = (
       <>
         <NoticesTeacher notices={view.notices} groups={groups} saveNotices={saveContent("notices")} flash={flash} />
         <Classes schedule={view.schedule} changes={view.changes} saveChanges={saveContent("changes")} notices={view.notices} saveNotices={saveContent("notices")}
-          isTeacher groups={groups} saveSchedule={saveContent("schedule")} flash={flash} roster={roster} att={attToday} />
+          isTeacher groups={groups} saveSchedule={saveContent("schedule")} flash={flash} roster={people} att={attToday} lessons={view.lessons} />
       </>
     );
-    else if (current === "lessons") screen = <LessonsTeacher lessons={view.lessons} groups={groups} saveLessons={saveContent("lessons")} flash={flash} sample={null} db={db} userId={userId} decks={view.decks} saveDecks={saveContent("decks")} roster={roster} voiceNotes={voiceAll.map} progressMap={progressAll.map} />;
+    else if (current === "lessons") screen = <LessonsTeacher key={jump ? JSON.stringify(jump) : "lessons"} start={jump && jump.lessons} lessons={view.lessons} groups={groups} saveLessons={saveContent("lessons")} flash={flash} sample={null} db={db} userId={userId} decks={view.decks} saveDecks={saveContent("decks")} roster={roster} people={people} voiceNotes={voiceAll.map} progressMap={progressAll.map} plansH={plansH} hw={hwChecks} />;
     else if (current === "words") screen = <WordsTeacher decks={view.decks} groups={groups} saveDecks={saveContent("decks")} openId={openDeck} setOpenId={setOpenDeck} sample={null} />;
     else if (current === "business") screen = (
       <BusinessTeacher bizH={bizH} db={db} userId={userId} flash={flash} pay={view.pay} downloads={downloads}
@@ -4353,7 +5149,7 @@ function App() {
       <StudentsTeacher roster={roster} saveRoster={saveRoster} pay={view.pay} savePay={saveContent("pay")}
         settings={view.settings} saveSettings={saveContent("settings")} lessons={view.lessons} decks={view.decks}
         schedule={view.schedule} changes={view.changes} places={bizH.biz.places} downloads={downloads} teacherName={bizH.biz.teacher.name || view.pay.accountName}
-        db={db} userId={userId} flash={flash} />
+        db={db} userId={userId} flash={flash} startOpen={jump && jump.openId} onFile={openFile} key={jump && jump.openId ? "open-" + jump.openId : "students"} />
     );
   } else {
     const st = view.settings.showStatus ? meR.st : null;
@@ -4403,7 +5199,7 @@ function App() {
         <nav className="tabbar" aria-label="Sections">
           <div className="dock-in">
             {tabs.map((t) => (
-              <button key={t.id} className="tab" aria-current={current === t.id ? "page" : undefined} onClick={() => setTab(t.id)}>
+              <button key={t.id} className="tab" aria-current={current === t.id && !fileR ? "page" : undefined} onClick={() => goTab(t.id)}>
                 <Icon name={t.icon} size={22} />
                 <span className="tab-label">{t.label}</span>
                 {t.id === "homework" && hwCount > 0 && <span className="badge" aria-label={`${hwCount}`}>{hwCount}</span>}

@@ -627,29 +627,45 @@ var __rest = (this && this.__rest) || function (s, e) {
         const savePays = (next) => { setPays(next); return queuedSet(db.doc(monthPath), { payments: next }); };
         return { enabled, fees, pays, ready: feesOk && paysOk, slow, failed, saveFees, savePays };
     }
-    /* Classes taken, one private document per month: { taken: [{ id, studentId, date, slot? }] } */
+    /* Classes taken, one private document per month:
+       { taken: [{ id, studentId, date, slot?, place?, note? }], absent: [{ id, studentId, date, slot?, place? }] }
+       A note is the teacher's own record of that class. Absences don't count as classes taken. */
     function useAttendance(db, userId, month) {
         const path = db && userId ? "data/users/" + userId + "/money/attendance/" + month : "";
         const [taken, setTaken] = useState([]);
+        const [absent, setAbsent] = useState([]);
         const [ready, setReady] = useState(false);
+        const cur = useRef({ taken: [], absent: [] });
         useEffect(() => {
             if (!path)
                 return undefined;
             setTaken([]);
+            setAbsent([]);
             setReady(false);
+            cur.current = { taken: [], absent: [] };
             let un = () => { };
             try {
                 un = db.doc(path).onSnapshot((s) => {
                     const d = s.exists ? s.data() : null;
-                    setTaken(d && Array.isArray(d.taken) ? d.taken : []);
+                    const t = d && Array.isArray(d.taken) ? d.taken : [];
+                    const ab = d && Array.isArray(d.absent) ? d.absent : [];
+                    cur.current = { taken: t, absent: ab };
+                    setTaken(t);
+                    setAbsent(ab);
                     setReady(true);
                 }, () => { });
             }
             catch (e) { /* attendance unavailable */ }
             return () => un();
         }, [path]);
-        const save = (next) => { setTaken(next); return queuedSet(db.doc(path), { taken: next }); };
-        return { on: !!path, ready, taken, save };
+        const save = (next, nextAbsent) => {
+            const ab = nextAbsent === undefined ? cur.current.absent : nextAbsent;
+            cur.current = { taken: next, absent: ab };
+            setTaken(next);
+            setAbsent(ab);
+            return queuedSet(db.doc(path), { taken: next, absent: ab });
+        };
+        return { on: !!path, ready, taken, absent, month, save };
     }
     /* Where a class happened, and how much of the fee goes to that place. */
     function placeOfTaken(x, schedule, changes) {
@@ -833,6 +849,9 @@ var __rest = (this && this.__rest) || function (s, e) {
         award: React.createElement(React.Fragment, null,
             React.createElement("circle", { cx: "12", cy: "8", r: "6" }),
             React.createElement("path", { d: "M15.5 12.9 17 22l-5-3-5 3 1.5-9.1" })),
+        sun: React.createElement(React.Fragment, null,
+            React.createElement("circle", { cx: "12", cy: "12", r: "4" }),
+            React.createElement("path", { d: "M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" })),
         report: React.createElement(React.Fragment, null,
             React.createElement("path", { d: "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" }),
             React.createElement("path", { d: "M14 2v4a2 2 0 0 0 2 2h4" }),
@@ -1690,7 +1709,7 @@ var __rest = (this && this.__rest) || function (s, e) {
                     React.createElement(Icon, { name: "right" })))))))));
     }
     /* ---------- lessons & homework ---------- */
-    function LessonEntry({ lesson: l, teacher = false, isDone = false, onToggle, onEdit, onDelete, onSaveToLibrary, voice }) {
+    function LessonEntry({ lesson: l, teacher = false, isDone = false, onToggle, onEdit, onDelete, onSaveToLibrary, voice, hwCheck = null }) {
         const { t, lang } = useT();
         const [libLevel, setLibLevel] = useState(null);
         const d = l.date ? parseISO(l.date) : null;
@@ -1715,7 +1734,8 @@ var __rest = (this && this.__rest) || function (s, e) {
                         React.createElement(Icon, { name: "check", size: 16 }),
                         t("done")) : t("markDone"))),
                     !teacher && !isDone && pastDue && React.createElement("p", { className: "late" }, t("pastDue")),
-                    !teacher && voice && React.createElement(VoiceHomework, { lesson: l, me: voice.me, sent: voice.sent, reply: voice.reply, onSent: voice.onSent }))),
+                    !teacher && voice && React.createElement(VoiceHomework, { lesson: l, me: voice.me, sent: voice.sent, reply: voice.reply, onSent: voice.onSent }),
+                    teacher && hwCheck)),
                 teacher && (React.createElement("div", { className: "entry-actions" },
                     React.createElement("button", { className: "btn ghost sm", onClick: onEdit },
                         React.createElement(Icon, { name: "pencil", size: 15 }),
@@ -1751,11 +1771,11 @@ var __rest = (this && this.__rest) || function (s, e) {
             })),
             React.createElement("span", { className: "hint" }, value.length ? "Tap every student or group that gets this." : "Pick at least one student or group.")));
     }
-    function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks, roster = [], voiceNotes = {}, progressMap = {} }) {
-        const [mode, setMode] = useState("lessons");
+    function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks, roster = [], voiceNotes = {}, progressMap = {}, plansH, hw, people = roster, start = null }) {
+        const [mode, setMode] = useState(() => (start && start.mode) || "lessons");
         const [form, setForm] = useState(null);
         const lib = useLibrary(db, userId);
-        const plansH = usePlans(db, userId);
+        const voiceList = Object.values(voiceNotes);
         const newVoice = Object.values(voiceNotes).filter((v) => !v.heard).length;
         const pending = useRef(null);
         const [libKey, setLibKey] = useState(0); // tapping Library again goes back to its first page
@@ -1805,7 +1825,7 @@ var __rest = (this && this.__rest) || function (s, e) {
                 React.createElement("button", { "aria-pressed": mode === "voice", onClick: () => { pending.current = null; setMode("voice"); } },
                     "Voice notes",
                     newVoice ? ` (${newVoice})` : ""))),
-            mode === "voice" ? React.createElement(VoiceInbox, { notes: voiceNotes, progressMap: progressMap, flash: flash }) : mode === "library" ? (React.createElement(CourseLibrary, { key: libKey, progressMap: progressMap, saved: lib.items, onUse: usePlan, decks: decks, saveDecks: saveDecks, groups: groups, flash: flash, roster: roster, plansH: plansH, onRemoveSaved: (id) => lib.remove(id).catch(() => flash("That didn't save. Check your connection and try again.")) })) : (React.createElement(React.Fragment, null,
+            mode === "voice" ? React.createElement(VoiceInbox, { notes: voiceNotes, progressMap: progressMap, flash: flash }) : mode === "library" ? (React.createElement(CourseLibrary, { key: libKey, startNav: libKey === 0 && start ? start.nav : null, progressMap: progressMap, saved: lib.items, onUse: usePlan, decks: decks, saveDecks: saveDecks, groups: groups, flash: flash, roster: roster, plansH: plansH, onRemoveSaved: (id) => lib.remove(id).catch(() => flash("That didn't save. Check your connection and try again.")) })) : (React.createElement(React.Fragment, null,
                 form && (React.createElement("div", { className: "form" },
                     React.createElement(AskClaude, { sample: sample, title: "Draft with Claude", label: "What's the lesson about?", placeholder: "Present continuous for adult beginners", button: "Draft", makePrompt: lessonPrompt, onResult: (d) => {
                             if (!d || !d.title)
@@ -1828,7 +1848,7 @@ var __rest = (this && this.__rest) || function (s, e) {
                     React.createElement("div", { className: "form-actions" },
                         React.createElement("button", { className: "btn", onClick: submit, disabled: !form.title.trim() || !arr(form.groups).length }, "Save lesson"),
                         React.createElement("button", { className: "btn ghost", onClick: () => { pending.current = null; setForm(null); } }, "Cancel")))),
-                sorted.length === 0 ? (!form && React.createElement(Empty, { text: "Add your first lesson to give students their notes and homework, or open Library to use one of your lesson plans." })) : (React.createElement("ol", { className: "entries" }, sorted.map((l) => (React.createElement(LessonEntry, { key: l.id, lesson: l, teacher: true, onEdit: () => { setForm(Object.assign(Object.assign({}, l), { groups: lessonGroups(l) })); window.scrollTo(0, 0); }, onDelete: () => saveLessons(lessons.filter((x) => x.id !== l.id)), onSaveToLibrary: lib.on ? (level) => saveToLib(l, level) : null })))))))));
+                sorted.length === 0 ? (!form && React.createElement(Empty, { text: "Add your first lesson to give students their notes and homework, or open Library to use one of your lesson plans." })) : (React.createElement("ol", { className: "entries" }, sorted.map((l) => (React.createElement(LessonEntry, { key: l.id, lesson: l, teacher: true, onEdit: () => { setForm(Object.assign(Object.assign({}, l), { groups: lessonGroups(l) })); window.scrollTo(0, 0); }, onDelete: () => saveLessons(lessons.filter((x) => x.id !== l.id)), onSaveToLibrary: lib.on ? (level) => saveToLib(l, level) : null, hwCheck: l.homework && hw && hw.on ? React.createElement(HomeworkToggle, { lesson: l, people: people, hw: hw, voiceList: voiceList, flash: flash }) : null })))))))));
     }
     /* ---------- voice notes: a student's recorded homework, kept in Firestore in parts ---------- */
     const VOICE_PART = 700000;
@@ -2063,9 +2083,10 @@ var __rest = (this && this.__rest) || function (s, e) {
                 React.createElement(ConfirmButton, { iconOnly: true, label: "Delete announcement", onConfirm: () => saveNotices(notices.filter((x) => x.id !== n.id)) }))))))));
     }
     /* ---------- classes ---------- */
-    function Classes({ schedule, changes = [], saveChanges, notices = [], saveNotices, isTeacher = false, me, groups = [EVERYONE], saveSchedule, flash, roster = [], att, st, updated }) {
+    function Classes({ schedule, changes = [], saveChanges, notices = [], saveNotices, isTeacher = false, me, groups = [EVERYONE], saveSchedule, flash, roster = [], att, st, updated, lessons = [] }) {
         const { t, lang } = useT();
         const [form, setForm] = useState(null);
+        const [logFor, setLogFor] = useState(null);
         const [formErr, setFormErr] = useState("");
         const [changeFor, setChangeFor] = useState(null);
         const today = todayISO();
@@ -2131,19 +2152,19 @@ var __rest = (this && this.__rest) || function (s, e) {
             setFormErr("");
             flash(n > 1 ? `${n} classes saved.` : "Class saved.");
         };
-        const isTaught = (key) => markable && att.taken.some((x) => x.slot === key && x.date === today);
-        const toggleTaught = (key, group, place) => {
-            if (isTaught(key)) {
-                att.save(att.taken.filter((x) => !(x.slot === key && x.date === today))).then(() => flash("Class unmarked."), fail);
-                return;
-            }
-            const who = roster.filter((r) => forGroup(group, r.group));
-            att.save([...att.taken, ...who.map((r) => ({ id: uid(), studentId: r.id, date: today, slot: key, place }))])
-                .then(() => flash(`Logged a class for ${who.length} ${who.length === 1 ? "student" : "students"}.`), fail);
+        /* Mark taught opens a short form: who came, notes, and a message for absent students' families. */
+        const recOf = (key) => recordsOf(att, key, today);
+        const taughtButton = (key, s, start) => {
+            if (!markable || !roster.some((r) => forGroup(s.group, r.group)))
+                return null;
+            const rec = recOf(key);
+            const logged = rec.taken.length + rec.absent.length > 0;
+            return (React.createElement("button", { className: "btn sm" + (logged ? " done" : " ghost"), "aria-expanded": logFor === key, onClick: () => setLogFor(logFor === key ? null : key) }, logged ? React.createElement(React.Fragment, null,
+                React.createElement(Icon, { name: "check", size: 16 }),
+                logSummary(rec)) : "Mark taught"));
         };
-        const taughtButton = (key, group, place) => (markable && roster.some((r) => forGroup(group, r.group)) ? (React.createElement("button", { className: "btn sm" + (isTaught(key) ? " done" : " ghost"), "aria-pressed": isTaught(key), onClick: () => toggleTaught(key, group, place) }, isTaught(key) ? React.createElement(React.Fragment, null,
-            React.createElement(Icon, { name: "check", size: 16 }),
-            "Taught") : "Mark taught")) : null);
+        const logForm = (key, s, start) => (logFor === key && markable
+            ? React.createElement(ClassLog, { occ: { s, key, date: today, start }, people: roster, att: att, lessons: lessons, flash: flash, onClose: () => setLogFor(null) }) : null);
         const saveChange = (s, existing, v) => {
             const c = existing ? Object.assign(Object.assign({}, existing), { makeup: v.makeup }) : { id: uid(), slot: s.id, date: v.date, note: v.note, makeup: v.makeup, resolved: false };
             saveChanges(existing ? changes.map((x) => (x.id === c.id ? c : x)) : [...changes, c]);
@@ -2218,8 +2239,9 @@ var __rest = (this && this.__rest) || function (s, e) {
                             c.makeup && React.createElement("span", { className: isTeacher ? "row-sub" : "change-line" }, t("makeupOn", fmtDate(c.makeup.date, lang), c.makeup.start)),
                             !isTeacher && c.note && React.createElement("span", { className: "row-sub" }, c.note)),
                         isTeacher && (React.createElement("span", { className: "slot-actions" },
-                            c.makeup && c.makeup.date === today && taughtButton(c.id, s.group, placeName(s)),
-                            React.createElement(ConfirmButton, { iconOnly: true, label: "Undo this change", onConfirm: () => undoChange(c) })))));
+                            c.makeup && c.makeup.date === today && taughtButton(c.id, s, c.makeup.start),
+                            React.createElement(ConfirmButton, { iconOnly: true, label: "Undo this change", onConfirm: () => undoChange(c) }))),
+                        isTeacher && c.makeup && c.makeup.date === today && logForm(c.id, s, c.makeup.start)));
                 })))),
             owed.length > 0 && (React.createElement("div", { className: "changes" },
                 React.createElement("p", { className: "sub-h" }, "Make-up classes you owe"),
@@ -2239,7 +2261,7 @@ var __rest = (this && this.__rest) || function (s, e) {
                             React.createElement("button", { className: "btn ghost sm", onClick: () => { setForm(null); setChangeFor({ slot: s.id, change: c }); window.scrollTo(0, 0); } }, "Schedule make-up"),
                             React.createElement("button", { className: "btn ghost sm", onClick: () => saveChanges(changes.map((x) => (x.id === c.id ? Object.assign(Object.assign({}, x), { resolved: true }) : x))) }, "Done"))));
                 })))),
-            markable && slots.length > 0 && React.createElement("p", { className: "hint" }, "Tap Mark taught after today's class to count it for everyone in that group. To log a class on another day, open the student in Students."),
+            markable && slots.length > 0 && React.createElement("p", { className: "hint" }, "Tap Mark taught after today's class to note who came and what you did. To log a class on another day, use Today or open the student in Students."),
             dayOrder.map((d) => {
                 const list = slots.filter((s) => Number(s.day) === d).sort((a, b) => a.start.localeCompare(b.start));
                 if (!list.length)
@@ -2249,20 +2271,22 @@ var __rest = (this && this.__rest) || function (s, e) {
                     React.createElement("p", { className: "day-name" + (d === ti ? " today" : "") }, d === ti ? t("todayDay", isTeacher ? DAYS.en[d] : DAYS[lang][d]) : dayName),
                     list.map((s) => {
                         const cancelledToday = d === ti && changes.some((c) => c.slot === s.id && c.date === today);
-                        return (React.createElement("div", { key: s.id, className: "slot" },
-                            React.createElement("span", { className: "slot-time" }, t("timeRange", s.start, addMin(s.start, s.minutes))),
-                            React.createElement("span", { className: "slot-main" },
-                                isTeacher && React.createElement("span", { className: "row-title" }, s.group),
-                                React.createElement("span", { className: "row-sub" }, placeOf(s))),
-                            React.createElement("span", { className: "slot-actions" },
-                                s.link && React.createElement("a", { className: "btn ghost sm", href: s.link, target: "_blank", rel: "noopener noreferrer" },
-                                    React.createElement(Icon, { name: "video", size: 16 }),
-                                    t("join")),
-                                d === ti && !cancelledToday && taughtButton(s.id, s.group, placeName(s)),
-                                isTeacher && React.createElement("button", { className: "btn ghost sm", onClick: () => { setForm(null); setChangeFor({ slot: s.id, change: null }); window.scrollTo(0, 0); } }, "Cancel or move"),
-                                isTeacher && React.createElement("button", { className: "icon-btn sm-icon", "aria-label": "Edit class", onClick: () => { setChangeFor(null); setFormErr(""); setForm({ id: s.id, group: s.group, days: [Number(s.day)], times: { [Number(s.day)]: s.start }, start: s.start, minutes: s.minutes, place: s.place || "", link: s.link || "" }); window.scrollTo(0, 0); } },
-                                    React.createElement(Icon, { name: "pencil", size: 15 })),
-                                isTeacher && React.createElement(ConfirmButton, { iconOnly: true, label: "Delete class", onConfirm: () => saveSchedule(schedule.filter((x) => x.id !== s.id)) }))));
+                        return (React.createElement(React.Fragment, { key: s.id },
+                            React.createElement("div", { className: "slot" },
+                                React.createElement("span", { className: "slot-time" }, t("timeRange", s.start, addMin(s.start, s.minutes))),
+                                React.createElement("span", { className: "slot-main" },
+                                    isTeacher && React.createElement("span", { className: "row-title" }, s.group),
+                                    React.createElement("span", { className: "row-sub" }, placeOf(s))),
+                                React.createElement("span", { className: "slot-actions" },
+                                    s.link && React.createElement("a", { className: "btn ghost sm", href: s.link, target: "_blank", rel: "noopener noreferrer" },
+                                        React.createElement(Icon, { name: "video", size: 16 }),
+                                        t("join")),
+                                    d === ti && !cancelledToday && taughtButton(s.id, s, s.start),
+                                    isTeacher && React.createElement("button", { className: "btn ghost sm", onClick: () => { setForm(null); setChangeFor({ slot: s.id, change: null }); window.scrollTo(0, 0); } }, "Cancel or move"),
+                                    isTeacher && React.createElement("button", { className: "icon-btn sm-icon", "aria-label": "Edit class", onClick: () => { setChangeFor(null); setFormErr(""); setForm({ id: s.id, group: s.group, days: [Number(s.day)], times: { [Number(s.day)]: s.start }, start: s.start, minutes: s.minutes, place: s.place || "", link: s.link || "" }); window.scrollTo(0, 0); } },
+                                        React.createElement(Icon, { name: "pencil", size: 15 })),
+                                    isTeacher && React.createElement(ConfirmButton, { iconOnly: true, label: "Delete class", onConfirm: () => saveSchedule(schedule.filter((x) => x.id !== s.id)) }))),
+                            d === ti && !cancelledToday && logForm(s.id, s, s.start)));
                     })));
             })));
     }
@@ -2389,11 +2413,17 @@ var __rest = (this && this.__rest) || function (s, e) {
     function StudentReport({ r, month, lessons, decks }) {
         const [comment, setComment] = useState("");
         const text = reportText(r, month, lessons, decks, comment);
+        const myNotes = r.takenList.filter((x) => noteText(x));
         return (React.createElement("div", { className: "report" },
             React.createElement("p", { className: "form-title" },
                 "Report for ",
                 monthLabel(month),
                 r.lang === "fr" ? ", in French" : ""),
+            myNotes.length > 0 && (React.createElement("div", { className: "report-notes" },
+                React.createElement("p", { className: "muted small" }, "Your class notes this month (only you see these)"),
+                React.createElement("ul", { className: "visit-list" }, myNotes.map((x) => React.createElement("li", { key: x.id },
+                    React.createElement("span", { className: "visit-date" }, fmtShort(x.date)),
+                    React.createElement("span", { className: "visit-main" }, noteText(x))))))),
             React.createElement(Field, { label: "Your comment (optional)" },
                 React.createElement("textarea", { id: "report-note-" + r.id, className: "inp", value: comment, placeholder: r.lang === "fr" ? "Très bons progrès ce mois-ci !" : "Great progress this month!", onChange: (e) => setComment(e.target.value) })),
             React.createElement("p", { className: "msg sel pre" }, text),
@@ -2402,7 +2432,7 @@ var __rest = (this && this.__rest) || function (s, e) {
                 React.createElement(CopyButton, { text: text, label: "Copy the report", caption: "Copy report" })),
             !r.phone && React.createElement("p", { className: "hint", style: { margin: "10px 0 0" } }, "Add their WhatsApp number with Edit student to send it in one tap.")));
     }
-    function StudentDetail({ r, month, moneyOn, lessons, decks, placeOptions = [], defaultPlace = "", downloads, teacherName, onPay, onRemovePayment, onLogClass, onRemoveClass, onNewCode, onEdit, onRemove }) {
+    function StudentDetail({ r, month, moneyOn, lessons, decks, placeOptions = [], defaultPlace = "", downloads, teacherName, onPay, onRemovePayment, onLogClass, onRemoveClass, onNewCode, onEdit, onRemove, onFile, absentList = [] }) {
         const [logPlace, setLogPlace] = useState(defaultPlace);
         const [showCert, setShowCert] = useState(false);
         const [min, max] = monthRange(month);
@@ -2419,6 +2449,11 @@ var __rest = (this && this.__rest) || function (s, e) {
         const save = () => { if (!valid)
             return; onPay(Number(amount), date); setAmount(""); };
         return (React.createElement("div", { className: "expand" },
+            onFile && React.createElement("button", { className: "btn ghost sm file-open", onClick: onFile },
+                React.createElement(Icon, { name: "users", size: 15 }),
+                "Open ",
+                r.name,
+                "'s page"),
             React.createElement("div", { className: "code-box" },
                 React.createElement("div", { className: "code-main" },
                     React.createElement("span", { className: "muted small" }, "Code"),
@@ -2453,8 +2488,14 @@ var __rest = (this && this.__rest) || function (s, e) {
                             React.createElement(Icon, { name: "plus", size: 16 }),
                             "Log a class")),
                     r.takenList.length > 0 && (React.createElement("ul", { className: "pay-list taken-list", "aria-label": "Classes taken" }, r.takenList.map((x) => (React.createElement("li", { key: x.id },
-                        React.createElement("span", null, fmtDate(x.date)),
-                        React.createElement(ConfirmButton, { iconOnly: true, label: `Remove the class on ${fmtDate(x.date)}`, onConfirm: () => onRemoveClass(x.id) }))))))),
+                        React.createElement("span", null,
+                            fmtDate(x.date),
+                            noteText(x) && React.createElement("span", { className: "taken-note" }, noteText(x))),
+                        React.createElement(ConfirmButton, { iconOnly: true, label: `Remove the class on ${fmtDate(x.date)}`, onConfirm: () => onRemoveClass(x.id) })))))),
+                    absentList.length > 0 && React.createElement("p", { className: "absent-line" },
+                        "Absent: ",
+                        absentList.map((x) => fmtShort(x.date)).join(", "),
+                        ". Not counted.")),
                 !r.classes && React.createElement("p", { className: "hint", style: { marginTop: 0 } }, "Classes per month is set to 0 for this student. Change it with Edit student to see how many are left."),
                 React.createElement("p", { className: "sub-h", style: { marginTop: 14 } },
                     "Payments in ",
@@ -2489,10 +2530,10 @@ var __rest = (this && this.__rest) || function (s, e) {
             moneyOn && showReport && React.createElement(StudentReport, { r: r, month: month, lessons: lessons, decks: decks }),
             showCert && React.createElement(CertificatePanel, { r: r, teacherName: teacherName, downloads: downloads })));
     }
-    function StudentsTeacher({ roster, saveRoster, pay, savePay, settings, saveSettings, lessons, decks, schedule = [], changes = [], places = [], downloads, teacherName, db, userId, flash }) {
+    function StudentsTeacher({ roster, saveRoster, pay, savePay, settings, saveSettings, lessons, decks, schedule = [], changes = [], places = [], downloads, teacherName, db, userId, flash, startOpen = null, onFile }) {
         const [month, setMonth] = useState(monthKey(new Date()));
         const [form, setForm] = useState(null);
-        const [openId, setOpenId] = useState(null);
+        const [openId, setOpenId] = useState(startOpen);
         const money = useMoney(db, userId, month);
         const moneyOn = money.enabled && !money.failed;
         const att = useAttendance(moneyOn ? db : null, userId, month);
@@ -2662,7 +2703,7 @@ var __rest = (this && this.__rest) || function (s, e) {
                             React.createElement("span", { className: "row-sub" },
                                 num(r.paid),
                                 r.fee ? ` of ${num(r.fee)}` : "")))),
-                    openId === r.id && (React.createElement(StudentDetail, { key: r.id + month, r: r, month: month, moneyOn: moneyOn, lessons: lessons, decks: decks, placeOptions: placeOptions, defaultPlace: defaultPlaceOf(r), downloads: downloads, teacherName: teacherName, onPay: (amount, date) => addPayment(r.id, amount, date), onRemovePayment: (pid) => money.savePays(money.pays.filter((p) => p.id !== pid)).catch(saveFailed), onLogClass: (date, place) => att.save([...att.taken, { id: uid(), studentId: r.id, date, place }]).then(() => flash("Class logged."), saveFailed), onRemoveClass: (tid) => att.save(att.taken.filter((x) => x.id !== tid)).catch(saveFailed), onNewCode: () => { const c = newCode(roster, r.id); saveRoster(roster.map((x) => (x.id === r.id ? Object.assign(Object.assign({}, x), { code: c }) : x))); flash(`New code for ${r.name}: ${c}.`); }, onEdit: () => editStudent(r), onRemove: () => removeStudent(r.id) })))))))),
+                    openId === r.id && (React.createElement(StudentDetail, { key: r.id + month, r: r, month: month, moneyOn: moneyOn, lessons: lessons, decks: decks, placeOptions: placeOptions, defaultPlace: defaultPlaceOf(r), downloads: downloads, teacherName: teacherName, onPay: (amount, date) => addPayment(r.id, amount, date), onRemovePayment: (pid) => money.savePays(money.pays.filter((p) => p.id !== pid)).catch(saveFailed), onLogClass: (date, place) => att.save([...att.taken, { id: uid(), studentId: r.id, date, place }]).then(() => flash("Class logged."), saveFailed), onRemoveClass: (tid) => att.save(att.taken.filter((x) => x.id !== tid)).catch(saveFailed), onNewCode: () => { const c = newCode(roster, r.id); saveRoster(roster.map((x) => (x.id === r.id ? Object.assign(Object.assign({}, x), { code: c }) : x))); flash(`New code for ${r.name}: ${c}.`); }, onEdit: () => editStudent(r), onRemove: () => removeStudent(r.id), onFile: onFile ? () => onFile(r.id) : null, absentList: arr(att.absent).filter((x) => x.studentId === r.id) })))))))),
             React.createElement("section", { className: "pay-settings" },
                 React.createElement("h2", { className: "h" }, "What students see"),
                 React.createElement("label", { className: "check" },
@@ -2981,8 +3022,9 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                         React.createElement("button", { className: "btn ghost sm", onClick: () => setOpenId(null) }, "Cancel"))))))))))));
     }
     /* Each student's own list of lessons: data/users/{uid}/plans/{studentId} = { items: [{ id, course, item } | { id, custom: { title, notes, homework } }, used?] } */
+    /* Each student's lesson list: data/users/{uid}/money/plans/{studentId} (a collection needs an odd number of path parts). */
     function usePlans(db, userId) {
-        const path = db && userId ? "data/users/" + userId + "/plans" : "";
+        const path = db && userId ? "data/users/" + userId + "/money/plans" : "";
         const [plans, setPlans] = useState({});
         const [ready, setReady] = useState(false);
         useEffect(() => {
@@ -3119,9 +3161,9 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                             student.name,
                             "'s lessons"))))));
     }
-    function CourseLibrary({ saved, onUse, onRemoveSaved, decks, saveDecks, groups, flash, roster = [], plansH, progressMap = {} }) {
+    function CourseLibrary({ saved, onUse, onRemoveSaved, decks, saveDecks, groups, flash, roster = [], plansH, progressMap = {}, startNav = null }) {
         const { status, data, retry } = useCourses();
-        const [nav, setNav] = useState({ view: "home" });
+        const [nav, setNav] = useState(() => startNav || { view: "home" });
         const [q, setQ] = useState("");
         const go = (n) => { setNav(n); window.scrollTo(0, 0); };
         const fail = () => flash("That didn't save. Check your connection and try again.");
@@ -4325,6 +4367,724 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                                 : React.createElement(BizSettings, { biz: bizH.biz, saveBiz: bizH.save, schedule: schedule, pay: pay, flash: flash })));
     }
     /* ---------- live data from the database ---------- */
+    /* ---------- the teacher's day: Today, class logs, homework checks, messages, student pages, to-do ---------- */
+    const addDays = (iso, n) => { const d = parseISO(iso); d.setDate(d.getDate() + n); return isoOf(d); };
+    const longDate = (iso, lang = "en") => parseISO(iso).toLocaleDateString(LOCALE[lang], { weekday: "long", day: "numeric", month: "long" });
+    const studentsIn = (group, people) => people.filter((r) => forGroup(group, r.group));
+    const noteText = (x) => [x.note, x.own].filter(Boolean).join(" — ");
+    /* Every class on one date: weekly classes not cancelled that day, plus make-up classes moved to it. */
+    function classesOn(iso, schedule, changes) {
+        const wd = (parseISO(iso).getDay() + 6) % 7;
+        const out = [];
+        schedule.forEach((s) => {
+            if (Number(s.day) === wd && !changes.some((c) => c.slot === s.id && c.date === iso))
+                out.push({ s, key: s.id, date: iso, start: s.start });
+        });
+        changes.forEach((c) => {
+            if (!c.makeup || c.makeup.date !== iso)
+                return;
+            const s = schedule.find((x) => x.id === c.slot);
+            if (s)
+                out.push({ s, key: c.id, date: iso, start: c.makeup.start, makeup: true });
+        });
+        return out.sort((a, b) => String(a.start).localeCompare(String(b.start)));
+    }
+    const recordsOf = (att, key, date) => ({
+        taken: att.taken.filter((x) => x.slot === key && x.date === date),
+        absent: arr(att.absent).filter((x) => x.slot === key && x.date === date),
+    });
+    const logSummary = (rec) => {
+        if (!rec.absent.length)
+            return "Taught";
+        return `${rec.taken.length} came, ${rec.absent.length} absent`;
+    };
+    /* A student's lesson list from the Library, with titles and plan text. */
+    function planEntries(items, courses) {
+        return arr(items).map((p) => {
+            if (p.custom)
+                return { p, key: "own/" + p.id, title: p.custom.title, from: "Your own lesson", body: p.custom.notes || "" };
+            const c = courses.find((x) => x.id === p.course);
+            const it = c && arr(c.items).find((x) => x.id === p.item);
+            if (!it)
+                return { p, missing: true, title: "" };
+            return { p, key: c.id + "/" + it.id, title: it.title, from: c.title, body: it.body || "" };
+        });
+    }
+    const nextPlanEntry = (items, courses) => planEntries(items, courses).find((e) => !e.p.used && !e.missing) || null;
+    /* "Materials:" and "Print before class:" lines from a lesson plan. */
+    const PREP_RE = /^\s*(?:[-*]\s+)?\*\*((?:Materials|Print before class|Not printable|Before the lesson|Bring|You need)[^*]*?):?\*\*:?\s*(.+)$/i;
+    const prepLines = (body) => String(body || "").split("\n").map((l) => l.match(PREP_RE)).filter(Boolean).map((m) => ({ label: m[1].trim(), text: m[2].trim() }));
+    /* Messages for families, in each family's language. */
+    function absentText(r, date, lessonTitle) {
+        const fr = r.lang === "fr";
+        const when = date === todayISO() ? (fr ? "aujourd'hui" : "today") : fr ? "le " + longDate(date, "fr") : "on " + longDate(date, "en");
+        if (fr)
+            return `Bonjour ! ${r.name} n'était pas au cours d'anglais ${when}.` + (lessonTitle ? ` Nous avons travaillé sur : ${lessonTitle}.` : "") + " Les notes et les devoirs sont dans l'application Bright Minds, onglet Devoirs. À bientôt !";
+        return `Hello! ${r.name} missed English class ${when}.` + (lessonTitle ? ` We worked on: ${lessonTitle}.` : "") + " The notes and homework are in the Bright Minds app, under Homework. See you soon!";
+    }
+    function hwReminderText(r, l) {
+        const fr = r.lang === "fr";
+        const due = l.due ? (fr ? ` pour ${longDate(l.due, "fr")}` : ` for ${longDate(l.due, "en")}`) : "";
+        return fr
+            ? `Bonjour ! Petit rappel pour ${r.name} : les devoirs d'anglais « ${l.title} »${due}.\n${l.homework}\nOn peut aussi envoyer un message vocal dans l'application Bright Minds, onglet Devoirs. Merci !`
+            : `Hello! A quick reminder for ${r.name}: the English homework "${l.title}"${due}.\n${l.homework}\nYou can also send a voice note in the Bright Minds app, under Homework. Thank you!`;
+    }
+    function classWhen(o, lang) {
+        const fr = lang === "fr";
+        const today = todayISO();
+        const start = o.start || (o.at ? `${pad(o.at.getHours())}:${pad(o.at.getMinutes())}` : "");
+        const day = o.date === today ? (fr ? "aujourd'hui" : "today") : o.date === addDays(today, 1) ? (fr ? "demain" : "tomorrow") : fr ? longDate(o.date, "fr") : "on " + longDate(o.date, "en");
+        return `${day} ${fr ? "à" : "at"} ${start}`;
+    }
+    /* ---------- logging a class: who came, notes, and a message for absent students' families ---------- */
+    function ClassLog({ occ, people, att, lessons = [], flash, onClose }) {
+        const who = studentsIn(occ.s.group, people);
+        const rec = recordsOf(att, occ.key, occ.date);
+        const logged = rec.taken.length + rec.absent.length > 0;
+        const [here, setHere] = useState(() => new Set(logged ? rec.taken.map((x) => x.studentId) : who.map((r) => r.id)));
+        const [note, setNote] = useState(() => (rec.taken.find((x) => x.note) || {}).note || "");
+        const [own, setOwn] = useState(() => { const o = {}; rec.taken.forEach((x) => { if (x.own)
+            o[x.studentId] = x.own; }); return o; });
+        const [missed, setMissed] = useState(null);
+        const fail = () => flash("That didn't save. Check your connection and try again.");
+        const toggle = (id) => setHere((cur) => { const n = new Set(cur); if (n.has(id))
+            n.delete(id);
+        else
+            n.add(id); return n; });
+        const others = (list) => list.filter((x) => !(x.slot === occ.key && x.date === occ.date));
+        const place = placeName(occ.s);
+        const save = () => {
+            const came = who.filter((r) => here.has(r.id));
+            const away = who.filter((r) => !here.has(r.id));
+            const t = came.map((r) => {
+                const x = { id: uid(), studentId: r.id, date: occ.date, slot: occ.key, place };
+                if (note.trim())
+                    x.note = note.trim();
+                if ((own[r.id] || "").trim())
+                    x.own = own[r.id].trim();
+                return x;
+            });
+            const ab = away.map((r) => ({ id: uid(), studentId: r.id, date: occ.date, slot: occ.key, place }));
+            att.save([...others(att.taken), ...t], [...others(arr(att.absent)), ...ab]).then(() => {
+                flash(came.length ? `Saved: ${came.length} came${away.length ? `, ${away.length} absent` : ""}.` : "Saved: nobody came.");
+                if (away.length)
+                    setMissed(away);
+                else
+                    onClose();
+            }, fail);
+        };
+        const unmark = () => att.save(others(att.taken), others(arr(att.absent))).then(() => { flash("Class unmarked."); onClose(); }, fail);
+        if (missed) {
+            return (React.createElement("div", { className: "form log-form" },
+                React.createElement("p", { className: "form-title" }, "Let the families know"),
+                React.createElement("p", { className: "hint" }, "A short message in their language, with what the class worked on."),
+                React.createElement("ul", { className: "msg-rows" }, missed.map((r) => {
+                    const l = lessons.find((x) => x.date === occ.date && forGroup(lessonGroups(x), r.group));
+                    const text = absentText(r, occ.date, l ? l.title : "");
+                    return (React.createElement("li", { key: r.id },
+                        React.createElement("div", { className: "row-main" },
+                            React.createElement("span", { className: "row-title" }, r.name),
+                            React.createElement("span", { className: "row-sub" }, text)),
+                        r.phone ? React.createElement(WaButton, { phone: r.phone, text: text }, "Send") : React.createElement(CopyButton, { text: text, label: `Copy the message for ${r.name}`, caption: "Copy" })));
+                })),
+                React.createElement("div", { className: "form-actions" },
+                    React.createElement("button", { className: "btn", onClick: onClose }, "Done"))));
+        }
+        const present = who.filter((r) => here.has(r.id));
+        return (React.createElement("div", { className: "form log-form" },
+            React.createElement("p", { className: "form-title" },
+                occ.s.group,
+                ", ",
+                fmtDate(occ.date),
+                " at ",
+                occ.start),
+            React.createElement("div", { className: "field" },
+                React.createElement("span", { id: "came-" + occ.key }, "Who came?"),
+                React.createElement("div", { className: "chip-pick came-pick", role: "group", "aria-labelledby": "came-" + occ.key }, who.map((r) => (React.createElement("button", { key: r.id, type: "button", "aria-pressed": here.has(r.id), onClick: () => toggle(r.id) },
+                    React.createElement(Icon, { name: here.has(r.id) ? "check" : "x", size: 15 }),
+                    React.createElement("span", null, r.name))))),
+                React.createElement("span", { className: "hint" }, who.length > 1 ? "Tap anyone who was absent. An absent student doesn't use up a class." : "Tap the name if they were absent. An absent class isn't counted.")),
+            React.createElement(Field, { label: who.length > 1 ? "Class notes (only you see these)" : "Notes (only you see these)" },
+                React.createElement("textarea", { id: "log-note-" + occ.key, className: "inp", value: note, placeholder: "What you did, what to review next time...", onChange: (e) => setNote(e.target.value) })),
+            who.length > 1 && present.map((r) => (React.createElement(Field, { key: r.id, label: `Just for ${r.name} (optional)` },
+                React.createElement("input", { id: "log-own-" + r.id, className: "inp", value: own[r.id] || "", placeholder: "Mixes up 12 and 20", onChange: (e) => setOwn(Object.assign(Object.assign({}, own), { [r.id]: e.target.value })) })))),
+            React.createElement("div", { className: "form-actions" },
+                React.createElement("button", { className: "btn", onClick: save }, logged ? "Save changes" : "Save"),
+                React.createElement("button", { className: "btn ghost", onClick: onClose }, "Cancel"),
+                logged && React.createElement(ConfirmButton, { label: "Unmark this class", onConfirm: unmark }))));
+    }
+    /* ---------- homework: who did it ---------- */
+    function useHomeworkChecks(db, userId) {
+        const path = db && userId ? "data/users/" + userId + "/homework" : "";
+        const [checks, setChecks] = useState({});
+        const cur = useRef({});
+        useEffect(() => {
+            if (!path)
+                return undefined;
+            let un = () => { };
+            try {
+                un = db.doc(path).onSnapshot((s) => {
+                    const d = s.exists ? s.data() : null;
+                    const c = d && d.checks && typeof d.checks === "object" ? d.checks : {};
+                    cur.current = c;
+                    setChecks(c);
+                }, () => { });
+            }
+            catch (e) { /* unavailable */ }
+            return () => un();
+        }, [path]);
+        /* value: "done", "missing", or null to clear */
+        const set = (lessonId, studentId, value) => {
+            const forLesson = Object.assign({}, (cur.current[lessonId] || {}));
+            if (value)
+                forLesson[studentId] = value;
+            else
+                delete forLesson[studentId];
+            const next = Object.assign(Object.assign({}, cur.current), { [lessonId]: forLesson });
+            if (!Object.keys(forLesson).length)
+                delete next[lessonId];
+            cur.current = next;
+            setChecks(next);
+            return queuedSet(db.doc(path), { checks: next });
+        };
+        return { on: !!path, checks, set };
+    }
+    const HW_STATE = { done: "Done", missing: "Not done", voice: "Sent a voice note", "": "Not checked yet" };
+    function hwStatus(l, r, checks, voiceList) {
+        const c = (checks[l.id] || {})[r.id];
+        if (c)
+            return c;
+        return voiceList.some((v) => v.lessonId === l.id && v.sid === r.id) ? "voice" : "";
+    }
+    function hwTally(l, people, checks, voiceList) {
+        const who = studentsIn(lessonGroups(l), people);
+        const st = who.map((r) => hwStatus(l, r, checks, voiceList));
+        return { total: who.length, open: st.filter((x) => !x).length, done: st.filter((x) => x === "done" || x === "voice").length, missing: st.filter((x) => x === "missing").length };
+    }
+    function HomeworkCheck({ lesson, people, hw, voiceList, flash }) {
+        const who = studentsIn(lessonGroups(lesson), people);
+        if (!who.length)
+            return React.createElement("p", { className: "hint" },
+                "No students in ",
+                lessonGroups(lesson).join(", "),
+                " yet.");
+        const mine = hw.checks[lesson.id] || {};
+        const set = (sid, v) => hw.set(lesson.id, sid, v).catch(() => flash("That didn't save. Check your connection and try again."));
+        return (React.createElement("ul", { className: "hw-check" }, who.map((r) => {
+            const st = hwStatus(lesson, r, hw.checks, voiceList);
+            const c = mine[r.id] || "";
+            return (React.createElement("li", { key: r.id },
+                React.createElement("div", { className: "row-main" },
+                    React.createElement("span", { className: "row-title" }, r.name),
+                    React.createElement("span", { className: "row-sub hw-st " + (st || "open") }, HW_STATE[st])),
+                React.createElement("div", { className: "hw-btns" },
+                    React.createElement("button", { type: "button", className: "btn sm ghost yes", "aria-pressed": c === "done", "aria-label": `${r.name} did it`, onClick: () => set(r.id, c === "done" ? null : "done") },
+                        React.createElement(Icon, { name: "check", size: 15 }),
+                        "Done"),
+                    React.createElement("button", { type: "button", className: "btn sm ghost no", "aria-pressed": c === "missing", "aria-label": `${r.name} didn't do it`, onClick: () => set(r.id, c === "missing" ? null : "missing") }, "Not done"),
+                    st !== "done" && st !== "voice" && r.phone && React.createElement(WaButton, { phone: r.phone, text: hwReminderText(r, lesson), ghost: true }, "Remind"))));
+        })));
+    }
+    function HomeworkToggle({ lesson, people, hw, voiceList, flash }) {
+        const [open, setOpen] = useState(false);
+        const t = hwTally(lesson, people, hw.checks, voiceList);
+        if (!t.total)
+            return null;
+        const label = t.open === t.total ? `Check homework (${t.total})` : `Homework: ${t.done} of ${t.total} done${t.missing ? `, ${t.missing} not done` : ""}`;
+        return (React.createElement("div", { className: "hw-toggle" },
+            React.createElement("button", { className: "btn ghost sm", "aria-expanded": open, onClick: () => setOpen(!open) },
+                React.createElement(Icon, { name: "clipboard", size: 15 }),
+                open ? "Close" : label),
+            open && React.createElement(HomeworkCheck, { lesson: lesson, people: people, hw: hw, voiceList: voiceList, flash: flash })));
+    }
+    /* ---------- the teacher's own to-do list ---------- */
+    function useTodo(db, userId) {
+        const path = db && userId ? "data/users/" + userId + "/todo" : "";
+        const [items, setItems] = useState([]);
+        const [ready, setReady] = useState(false);
+        const cur = useRef([]);
+        useEffect(() => {
+            if (!path)
+                return undefined;
+            let un = () => { };
+            try {
+                un = db.doc(path).onSnapshot((s) => {
+                    const d = s.exists ? s.data() : null;
+                    cur.current = d && Array.isArray(d.items) ? d.items : [];
+                    setItems(cur.current);
+                    setReady(true);
+                }, () => setReady(true));
+            }
+            catch (e) {
+                setReady(true);
+            }
+            return () => un();
+        }, [path]);
+        const save = (next) => { cur.current = next; setItems(next); return queuedSet(db.doc(path), { items: next }); };
+        return { on: !!path, ready, items, save, cur };
+    }
+    function TodoList({ todo, flash }) {
+        const [text, setText] = useState("");
+        const [showDone, setShowDone] = useState(false);
+        const fail = () => flash("That didn't save. Check your connection and try again.");
+        const open = todo.items.filter((x) => !x.done);
+        const done = todo.items.filter((x) => x.done);
+        const add = () => {
+            const t = text.trim();
+            if (!t)
+                return;
+            todo.save([...todo.cur.current, { id: uid(), text: t, at: todayISO() }]).catch(fail);
+            setText("");
+        };
+        const tick = (id) => todo.save(todo.cur.current.map((x) => (x.id === id ? Object.assign(Object.assign({}, x), { done: x.done ? null : todayISO() }) : x))).catch(fail);
+        return (React.createElement("div", { className: "today-block" },
+            React.createElement("h3", { className: "today-h" }, "To do"),
+            React.createElement("form", { className: "inline-add", onSubmit: (e) => { e.preventDefault(); add(); } },
+                React.createElement("input", { id: "todo-new", className: "inp", value: text, placeholder: "Buy crayons, call a parent...", "aria-label": "New to-do", onChange: (e) => setText(e.target.value) }),
+                React.createElement("button", { className: "btn sm", type: "submit", disabled: !text.trim() },
+                    React.createElement(Icon, { name: "plus", size: 16 }),
+                    "Add")),
+            open.length === 0 && React.createElement("p", { className: "hint" }, "Nothing on your list."),
+            React.createElement("ul", { className: "todo-list" }, open.map((x) => (React.createElement("li", { key: x.id },
+                React.createElement("label", { className: "check" },
+                    React.createElement("input", { type: "checkbox", checked: false, onChange: () => tick(x.id) }),
+                    React.createElement("span", null, x.text)))))),
+            done.length > 0 && (React.createElement("div", { className: "todo-done" },
+                React.createElement("button", { className: "link small", "aria-expanded": showDone, onClick: () => setShowDone(!showDone) }, showDone ? "Hide done" : `Done (${done.length})`),
+                showDone && (React.createElement(React.Fragment, null,
+                    React.createElement("ul", { className: "todo-list" }, done.map((x) => (React.createElement("li", { key: x.id, className: "is-done" },
+                        React.createElement("label", { className: "check" },
+                            React.createElement("input", { type: "checkbox", checked: true, onChange: () => tick(x.id) }),
+                            React.createElement("span", null, x.text)))))),
+                    React.createElement("button", { className: "btn ghost sm", onClick: () => todo.save(todo.cur.current.filter((x) => !x.done)).catch(fail) }, "Clear done")))))));
+    }
+    /* ---------- getting ready: what to print and bring for the next classes ---------- */
+    function GetReady({ occs, people, plans, courses }) {
+        const [ticks, setTicks] = useState(() => ls.get("bm:ready", {}) || {});
+        const groupsSeen = new Map();
+        occs.forEach((o) => {
+            studentsIn(o.s.group, people).forEach((r) => {
+                const e = nextPlanEntry(plans[r.id], courses);
+                if (!e)
+                    return;
+                const lines = prepLines(e.body);
+                if (!lines.length)
+                    return;
+                const g = groupsSeen.get(e.key) || { e, names: [], when: o, lines };
+                if (!g.names.includes(r.name))
+                    g.names.push(r.name);
+                groupsSeen.set(e.key, g);
+            });
+        });
+        const list = [...groupsSeen.values()];
+        if (!list.length)
+            return null;
+        const toggle = (k) => {
+            const next = Object.assign(Object.assign({}, ticks), { [k]: ticks[k] ? null : todayISO() });
+            Object.keys(next).forEach((x) => { if (!next[x] || next[x] < addDays(todayISO(), -14))
+                delete next[x]; });
+            setTicks(next);
+            ls.set("bm:ready", next);
+        };
+        return (React.createElement("div", { className: "today-block" },
+            React.createElement("h3", { className: "today-h" }, "Get ready"),
+            React.createElement("p", { className: "hint" }, "From the next lesson on each student's list. Tick things off as you pack."),
+            list.map(({ e, names, when, lines }) => (React.createElement("div", { key: e.key, className: "ready-card" },
+                React.createElement("p", { className: "ready-title" }, e.title),
+                React.createElement("p", { className: "row-sub" },
+                    names.join(", "),
+                    ". ",
+                    when.date === todayISO() ? "Today" : "Tomorrow",
+                    " at ",
+                    when.start),
+                React.createElement("ul", { className: "todo-list" }, lines.map((x, k) => {
+                    const id = e.key + "#" + k;
+                    return (React.createElement("li", { key: id, className: ticks[id] ? "is-done" : "" },
+                        React.createElement("label", { className: "check" },
+                            React.createElement("input", { type: "checkbox", checked: !!ticks[id], onChange: () => toggle(id) }),
+                            React.createElement("span", null,
+                                React.createElement("strong", null,
+                                    x.label,
+                                    ":"),
+                                " ",
+                                mdInline(x.text, id)))));
+                })))))));
+    }
+    /* ---------- one-tap messages to families ---------- */
+    const MSG_KINDS = [["reminder", "Class reminder"], ["cancel", "Class cancelled"], ["homework", "Homework reminder"], ["own", "Your own message"]];
+    function familyText(kind, fam, ctx) {
+        const fr = fam.lang === "fr";
+        const names = fam.people.map((r) => r.name).join(fr ? " et " : " and ");
+        const extra = ctx.extra.trim();
+        const end = extra ? "\n" + extra : "";
+        if (kind === "own")
+            return extra;
+        if (kind === "reminder" || kind === "cancel") {
+            const o = ctx.nextOf(fam.group);
+            if (!o)
+                return "";
+            const where = o.s.link ? (fr ? "en ligne" : "online") : placeName(o.s);
+            if (kind === "reminder") {
+                return fr ? `Bonjour ! Petit rappel pour ${names} : cours d'anglais ${classWhen(o, "fr")}${where ? ` (${where})` : ""}. À bientôt !${end}\nBright Minds`
+                    : `Hello! A quick reminder for ${names}: English class ${classWhen(o, "en")}${where ? ` (${where})` : ""}. See you soon!${end}\nBright Minds`;
+            }
+            return fr ? `Bonjour ! Le cours d'anglais de ${names} ${classWhen(o, "fr")} est annulé. Je vous dirai bientôt quand nous le rattrapons. Désolé pour le changement.${end}\nBright Minds`
+                : `Hello! ${names}'s English class ${classWhen(o, "en")} is cancelled. I'll let you know soon when we'll make it up. Sorry for the change.${end}\nBright Minds`;
+        }
+        const l = ctx.homeworkOf(fam.group);
+        if (!l)
+            return "";
+        const due = l.due ? (fr ? ` pour ${longDate(l.due, "fr")}` : ` for ${longDate(l.due, "en")}`) : "";
+        return fr ? `Bonjour ! Petit rappel pour ${names} : les devoirs d'anglais « ${l.title} »${due}.\n${l.homework}\nOn peut aussi envoyer un message vocal dans l'application Bright Minds, onglet Devoirs. Merci !${end}`
+            : `Hello! A quick reminder for ${names}: the English homework "${l.title}"${due}.\n${l.homework}\nYou can also send a voice note in the Bright Minds app, under Homework. Thank you!${end}`;
+    }
+    /* Students who share one WhatsApp number (brothers and sisters) get one message. */
+    function familiesOf(list) {
+        const out = [];
+        list.forEach((r) => {
+            const d = r.phone ? waDigits(r.phone) : "";
+            const key = d ? "p" + d : "s" + r.id;
+            let f = out.find((x) => x.key === key);
+            if (!f) {
+                f = { key, phone: r.phone, lang: r.lang, group: r.group, people: [] };
+                out.push(f);
+            }
+            f.people.push(r);
+        });
+        return out;
+    }
+    function FamilyMessages({ people, groups, schedule, changes, lessons, hw, voiceList = [], onBack }) {
+        const [kind, setKind] = useState("reminder");
+        const [chosen, setChosen] = useState([EVERYONE]);
+        const [extra, setExtra] = useState("");
+        const [sent, setSent] = useState({});
+        const now = new Date();
+        const today = todayISO();
+        const ctx = {
+            extra,
+            nextOf: (g) => upcomingClasses(schedule.filter((s) => s.group === g || s.group === EVERYONE), changes, now, 14)[0] || null,
+            homeworkOf: (g) => [...lessons].filter((l) => l.homework && forGroup(lessonGroups(l), g) && ((l.due && l.due >= today) || String(l.date || "") >= addDays(today, -14)))
+                .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))[0] || null,
+        };
+        /* a homework reminder skips students who did it or sent a voice note */
+        const didIt = (r) => {
+            if (kind !== "homework" || !hw)
+                return false;
+            const l = ctx.homeworkOf(r.group);
+            if (!l)
+                return false;
+            const st = hwStatus(l, r, hw.checks, voiceList);
+            return st === "done" || st === "voice";
+        };
+        const who = people.filter((r) => forGroup(chosen, r.group));
+        const already = who.filter(didIt);
+        const fams = familiesOf(who.filter((r) => !didIt(r)));
+        const rows = fams.map((f) => ({ f, text: familyText(kind, f, ctx) }));
+        const skipped = rows.filter((x) => !x.text);
+        return (React.createElement("section", null,
+            React.createElement("button", { className: "back-link", onClick: onBack },
+                React.createElement(Icon, { name: "left" }),
+                "Today"),
+            React.createElement("h2", { className: "h" }, "Message families"),
+            React.createElement("div", { className: "field" },
+                React.createElement("span", { id: "msg-kind-label" }, "Message"),
+                React.createElement("div", { className: "chip-pick", role: "group", "aria-labelledby": "msg-kind-label" }, MSG_KINDS.map(([k, label]) => React.createElement("button", { key: k, type: "button", "aria-pressed": kind === k, onClick: () => { setKind(k); setSent({}); } }, label)))),
+            React.createElement(GroupPicker, { id: "msg-for", groups: groups, roster: people, value: chosen, onChange: (v) => { setChosen(v); setSent({}); } }),
+            React.createElement(Field, { label: kind === "own" ? "Your message" : "Add a line (optional)" },
+                React.createElement("textarea", { id: "msg-extra", className: "inp", value: extra, placeholder: kind === "own" ? "Bonjour ! ..." : "Bring your colored pencils.", onChange: (e) => setExtra(e.target.value) })),
+            kind !== "own" && React.createElement("p", { className: "hint" }, "Each family gets it in their own language, with their own class time. Brothers and sisters on one number get one message."),
+            kind === "own" && React.createElement("p", { className: "hint" }, "Sent as you write it. Write it in the language the family reads."),
+            rows.filter((x) => x.text).length > 0 && (React.createElement("ul", { className: "msg-rows" }, rows.filter((x) => x.text).map(({ f, text }) => (React.createElement("li", { key: f.key, className: sent[f.key] ? "is-sent" : "" },
+                React.createElement("div", { className: "row-main" },
+                    React.createElement("span", { className: "row-title" },
+                        f.people.map((r) => r.name).join(", "),
+                        sent[f.key] && React.createElement("span", { className: "sent-chip" },
+                            React.createElement(Icon, { name: "check", size: 13 }),
+                            "Opened")),
+                    React.createElement("span", { className: "row-sub msg-preview" }, text)),
+                f.phone
+                    ? React.createElement("a", { className: "btn sm", href: waLink(f.phone, text), target: "_blank", rel: "noopener noreferrer", onClick: () => setSent(Object.assign(Object.assign({}, sent), { [f.key]: true })) },
+                        React.createElement(Icon, { name: "chat", size: 16 }),
+                        "Send")
+                    : React.createElement(CopyButton, { text: text, label: `Copy the message for ${f.people.map((r) => r.name).join(", ")}`, caption: "Copy" })))))),
+            !who.length && React.createElement(Empty, { text: "Pick who the message is for." }),
+            already.length > 0 && React.createElement("p", { className: "hint" },
+                "Already done, so no reminder: ",
+                already.map((r) => r.name).join(", "),
+                "."),
+            fams.length > 0 && kind === "own" && !extra.trim() && React.createElement("p", { className: "hint" }, "Write your message above, then send it to each family."),
+            skipped.length > 0 && kind !== "own" && (React.createElement("p", { className: "hint" },
+                skipped.map((x) => x.f.people.map((r) => r.name).join(", ")).join("; "),
+                ": ",
+                kind === "homework" ? "no homework waiting" : "no class in the next two weeks",
+                ", so nothing to send.")),
+            fams.some((f) => !f.phone) && React.createElement("p", { className: "hint" }, "Families without a WhatsApp number get a Copy button. Add numbers with Edit student in Students.")));
+    }
+    /* ---------- one page per student ---------- */
+    function StudentFile({ r, schedule, changes, lessons, plans, progress, voiceList, hw, money, attNow, attPrev, flash, onBack, onGo }) {
+        const { data } = useCourses();
+        const courses = data ? data.courses : [];
+        const now = new Date();
+        const thisMonth = monthKey(now);
+        const next = upcomingClasses(schedule.filter((s) => forGroup(s.group, r.group)), changes, now, 21)[0];
+        const entries = planEntries(plans[r.id], courses);
+        const done = entries.filter((e) => e.p.used).length;
+        const nextE = entries.find((e) => !e.p.used && !e.missing);
+        const skills = Object.keys((progress && progress.skills) || {}).length;
+        const m = money && money.ready ? studentMonth(r, money.fees, money.pays, attNow.taken) : null;
+        const visits = [...attNow.taken, ...attPrev.taken].filter((x) => x.studentId === r.id).map((x) => (Object.assign(Object.assign({}, x), { kind: "came" })))
+            .concat([...arr(attNow.absent), ...arr(attPrev.absent)].filter((x) => x.studentId === r.id).map((x) => (Object.assign(Object.assign({}, x), { kind: "absent" }))))
+            .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+        const hwLessons = lessons.filter((l) => l.homework && forGroup(lessonGroups(l), r.group))
+            .sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))).slice(0, 6);
+        const voices = voiceList.filter((v) => v.sid === r.id).sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
+        const replies = (progress && progress.replies) || {};
+        const setHw = (lid, v) => hw.set(lid, r.id, v).catch(() => flash("That didn't save. Check your connection and try again."));
+        return (React.createElement("section", null,
+            React.createElement("button", { className: "back-link", onClick: onBack },
+                React.createElement(Icon, { name: "left" }),
+                "Back"),
+            React.createElement("h2", { className: "h file-name" }, r.name),
+            React.createElement("p", { className: "muted file-sub" }, [r.group && r.group !== r.name ? r.group : null, "code " + r.code, r.level ? levelName(r.level) : null].filter(Boolean).join(", ")),
+            React.createElement("div", { className: "file-grid" },
+                React.createElement("div", { className: "file-card" },
+                    React.createElement("span", { className: "muted small" }, "Next class"),
+                    React.createElement("strong", null, next ? `${next.date === todayISO() ? "Today" : next.date === addDays(todayISO(), 1) ? "Tomorrow" : DAYS.en[(next.at.getDay() + 6) % 7]} at ${pad(next.at.getHours())}:${pad(next.at.getMinutes())}` : "None planned"),
+                    next && React.createElement("span", { className: "row-sub" },
+                        fmtDate(next.date),
+                        placeName(next.s) ? `, ${placeName(next.s)}` : "")),
+                m && (React.createElement("div", { className: "file-card" },
+                    React.createElement("span", { className: "muted small" }, monthLabel(thisMonth)),
+                    React.createElement("strong", null, m.classes ? `${Math.max(m.left, 0)} of ${m.classes} classes left` : `${m.used} classes`),
+                    React.createElement("span", { className: "row-sub pay-" + m.status }, m.fee ? (m.status === "paid" ? "Paid" : `${fcfa(m.fee - m.paid)} to pay`) : "No fee set")))),
+            React.createElement("div", { className: "file-sec" },
+                React.createElement("div", { className: "h-row" },
+                    React.createElement("h3", { className: "today-h" }, "Lessons"),
+                    React.createElement("button", { className: "btn ghost sm", onClick: () => onGo("lessons", { lessons: { mode: "library", nav: { view: "student", studentId: r.id } } }) }, "Open list")),
+                React.createElement("p", null,
+                    entries.length ? `${done} of ${entries.length} taught.` : "No lessons on the list yet.",
+                    nextE ? ` Next: ${nextE.title}.` : "")),
+            React.createElement("div", { className: "file-sec" },
+                React.createElement("div", { className: "h-row" },
+                    React.createElement("h3", { className: "today-h" },
+                        "What ",
+                        r.name,
+                        " can do"),
+                    React.createElement("button", { className: "btn ghost sm", onClick: () => onGo("lessons", { lessons: { mode: "library", nav: { view: "skills", studentId: r.id } } }) }, "Update")),
+                React.createElement("p", null, skills ? `${skills} ${skills === 1 ? "thing" : "things"} ticked so far.` : "Nothing ticked yet.")),
+            React.createElement("div", { className: "file-sec" },
+                React.createElement("h3", { className: "today-h" }, "Classes and notes"),
+                visits.length === 0 ? React.createElement("p", { className: "hint" },
+                    "No classes logged in ",
+                    monthLabel(shiftMonth(thisMonth, -1)),
+                    " or ",
+                    monthLabel(thisMonth),
+                    ".") : (React.createElement("ul", { className: "visit-list" }, visits.map((x) => (React.createElement("li", { key: x.id, className: x.kind === "absent" ? "is-absent" : "" },
+                    React.createElement("span", { className: "visit-date" }, fmtShort(x.date)),
+                    React.createElement("span", { className: "visit-main" }, x.kind === "absent" ? React.createElement("span", { className: "absent-tag" }, "Absent") : noteText(x) ? React.createElement("span", null, noteText(x)) : React.createElement("span", { className: "muted" }, "Came. No notes.")))))))),
+            React.createElement("div", { className: "file-sec" },
+                React.createElement("h3", { className: "today-h" }, "Homework"),
+                hwLessons.length === 0 ? React.createElement("p", { className: "hint" }, "No homework given yet.") : (React.createElement("ul", { className: "hw-check" }, hwLessons.map((l) => {
+                    const st = hwStatus(l, r, hw.checks, voiceList);
+                    const c = (hw.checks[l.id] || {})[r.id] || "";
+                    return (React.createElement("li", { key: l.id },
+                        React.createElement("div", { className: "row-main" },
+                            React.createElement("span", { className: "row-title" }, l.title),
+                            React.createElement("span", { className: "row-sub hw-st " + (st || "open") },
+                                HW_STATE[st],
+                                l.due ? `. Due ${fmtShort(l.due)}` : "")),
+                        React.createElement("div", { className: "hw-btns" },
+                            React.createElement("button", { type: "button", className: "btn sm ghost yes", "aria-pressed": c === "done", "aria-label": `Done: ${l.title}`, onClick: () => setHw(l.id, c === "done" ? null : "done") },
+                                React.createElement(Icon, { name: "check", size: 15 }),
+                                "Done"),
+                            React.createElement("button", { type: "button", className: "btn sm ghost no", "aria-pressed": c === "missing", "aria-label": `Not done: ${l.title}`, onClick: () => setHw(l.id, c === "missing" ? null : "missing") }, "Not done"))));
+                })))),
+            React.createElement("div", { className: "file-sec" },
+                React.createElement("div", { className: "h-row" },
+                    React.createElement("h3", { className: "today-h" }, "Voice notes"),
+                    voices.length > 0 && React.createElement("button", { className: "btn ghost sm", onClick: () => onGo("lessons", { lessons: { mode: "voice" } }) }, "Listen")),
+                voices.length === 0 ? React.createElement("p", { className: "hint" }, "No voice notes yet.") : (React.createElement("ul", { className: "visit-list" }, voices.slice(0, 6).map((v) => {
+                    const rep = replies[v.id];
+                    return (React.createElement("li", { key: v.id },
+                        React.createElement("span", { className: "visit-date" }, v.at ? fmtShort(String(v.at).slice(0, 10)) : ""),
+                        React.createElement("span", { className: "visit-main" },
+                            v.title || "Voice note",
+                            ". ",
+                            mmss(v.secs || 0),
+                            !v.heard ? React.createElement("span", { className: "new-chip" }, "New") : rep ? ` Replied ${"★".repeat(rep.stars || 0)}` : "")));
+                })))),
+            React.createElement("div", { className: "file-sec" },
+                React.createElement("button", { className: "btn ghost sm", onClick: () => onGo("students", { openId: r.id }) },
+                    React.createElement(Icon, { name: "wallet", size: 15 }),
+                    "Payments, code and report"))));
+    }
+    /* ---------- Today: the teacher's home screen ---------- */
+    function TodayTeacher({ people, groups, view, att, attPrev, plansH, hw, voiceList, money, pay, db, userId, flash, onFile, onGo }) {
+        const [logFor, setLogFor] = useState(null);
+        const [mode, setMode] = useState("home");
+        const [hwOpen, setHwOpen] = useState(null);
+        const [skipped, setSkipped] = useState(() => ls.get("bm:skipLog", []) || []);
+        const { data } = useCourses();
+        const todo = useTodo(db, userId);
+        const courses = data ? data.courses : [];
+        const plans = plansH.on ? plansH.plans : {};
+        const today = todayISO();
+        const tomorrow = addDays(today, 1);
+        const { schedule, changes, lessons } = view;
+        const attFor = (date) => (date.slice(0, 7) === att.month ? att : attPrev);
+        const todays = classesOn(today, schedule, changes);
+        const tomorrows = classesOn(tomorrow, schedule, changes);
+        const allTaken = [...att.taken, ...attPrev.taken];
+        const lastNote = (sid, before) => allTaken.filter((x) => x.studentId === sid && x.date < before && noteText(x)).sort((a, b) => b.date.localeCompare(a.date))[0];
+        /* classes from the last 3 days that were never logged */
+        const unlogged = [1, 2, 3].flatMap((k) => classesOn(addDays(today, -k), schedule, changes))
+            .filter((o) => studentsIn(o.s.group, people).length && !skipped.includes(o.key + "|" + o.date))
+            .filter((o) => { const rec = recordsOf(attFor(o.date), o.key, o.date); return !rec.taken.length && !rec.absent.length && attFor(o.date).ready; });
+        const skip = (o) => { const next = [...skipped, o.key + "|" + o.date].slice(-40); setSkipped(next); ls.set("bm:skipLog", next); };
+        const newVoice = voiceList.filter((v) => !v.heard).length;
+        const hwWaiting = lessons.filter((l) => l.homework && l.date && l.date <= today && l.date >= addDays(today, -21))
+            .map((l) => ({ l, t: hwTally(l, people, hw.checks, voiceList) })).filter((x) => x.t.total && x.t.open)
+            .sort((a, b) => String(a.l.due || a.l.date).localeCompare(String(b.l.due || b.l.date)));
+        const rows = money.ready ? people.map((r) => (Object.assign(Object.assign({}, r), studentMonth(r, money.fees, money.pays, att.taken)))) : [];
+        const toPay = rows.filter((r) => r.fee > 0 && r.paid < r.fee).sort((a, b) => a.name.localeCompare(b.name));
+        const thisMonth = monthKey(new Date());
+        if (mode === "messages")
+            return React.createElement(FamilyMessages, { people: people, groups: groups, schedule: schedule, changes: changes, lessons: lessons, hw: hw, voiceList: voiceList, onBack: () => { setMode("home"); window.scrollTo(0, 0); } });
+        const classCard = (o) => {
+            const who = studentsIn(o.s.group, people);
+            const a = attFor(o.date);
+            const rec = recordsOf(a, o.key, o.date);
+            const logged = rec.taken.length + rec.absent.length > 0;
+            const nexts = new Map();
+            who.forEach((r) => {
+                const e = nextPlanEntry(plans[r.id], courses);
+                if (!e)
+                    return;
+                const g = nexts.get(e.key) || { e, names: [], r };
+                g.names.push(r.name);
+                nexts.set(e.key, g);
+            });
+            const notes = who.map((r) => ({ r, x: lastNote(r.id, o.date) })).filter((n) => n.x);
+            const id = o.key + "|" + o.date;
+            return (React.createElement("div", { key: id, className: "class-card" + (logged ? " is-logged" : "") },
+                React.createElement("div", { className: "class-top" },
+                    React.createElement("span", { className: "class-time" }, o.start),
+                    React.createElement("span", { className: "class-main" },
+                        React.createElement("span", { className: "row-title" },
+                            o.s.group,
+                            o.makeup ? " (make-up)" : ""),
+                        React.createElement("span", { className: "row-sub" }, [placeName(o.s), `${o.s.minutes || 60} min`].filter(Boolean).join(", "))),
+                    o.s.link && React.createElement("a", { className: "btn ghost sm", href: o.s.link, target: "_blank", rel: "noopener noreferrer" },
+                        React.createElement(Icon, { name: "video", size: 16 }),
+                        "Join")),
+                who.length > 0 && (React.createElement("div", { className: "class-who" }, who.map((r) => React.createElement("button", { key: r.id, className: "name-chip", onClick: () => onFile(r.id) }, r.name)))),
+                [...nexts.values()].map(({ e, names, r }) => (React.createElement("div", { key: e.key, className: "class-line" },
+                    React.createElement("span", { className: "muted small" },
+                        "Next lesson",
+                        nexts.size > 1 || (who.length > 1 && names.length < who.length) ? ` for ${names.join(", ")}` : ""),
+                    React.createElement("button", { className: "link-row", onClick: () => onGo("lessons", { lessons: { mode: "library", nav: { view: "plan", studentId: r.id, planId: e.p.id } } }) },
+                        React.createElement("span", null, e.title),
+                        React.createElement(Icon, { name: "right", size: 16 }))))),
+                who.length > 0 && !nexts.size && plansH.on && (React.createElement("p", { className: "hint class-hint" },
+                    "No lesson list yet. ",
+                    React.createElement("button", { className: "link", onClick: () => onGo("lessons", { lessons: { mode: "library", nav: who.length === 1 ? { view: "student", studentId: who[0].id } : { view: "home" } } }) }, "Add lessons in the Library"))),
+                notes.map(({ r, x }) => (React.createElement("p", { key: r.id, className: "last-note" },
+                    React.createElement("span", { className: "muted small" },
+                        "Last time",
+                        who.length > 1 ? `, ${r.name}` : "",
+                        " (",
+                        fmtShort(x.date),
+                        ")"),
+                    noteText(x)))),
+                who.length > 0 && a.on && o.date <= today && logFor !== id && (React.createElement("div", { className: "class-actions" }, logged
+                    ? React.createElement("button", { className: "btn done sm", onClick: () => setLogFor(id) },
+                        React.createElement(Icon, { name: "check", size: 16 }),
+                        logSummary(rec))
+                    : React.createElement("button", { className: "btn sm", onClick: () => setLogFor(id) }, "Mark taught"))),
+                logFor === id && React.createElement(ClassLog, { occ: o, people: people, att: a, lessons: lessons, flash: flash, onClose: () => setLogFor(null) })));
+        };
+        return (React.createElement("section", null,
+            React.createElement("div", { className: "h-row" },
+                React.createElement("div", null,
+                    React.createElement("h2", { className: "h today-title" }, "Today"),
+                    React.createElement("p", { className: "muted today-date" }, longDate(today))),
+                React.createElement("button", { className: "btn sm", onClick: () => { setMode("messages"); window.scrollTo(0, 0); } },
+                    React.createElement(Icon, { name: "chat", size: 16 }),
+                    "Message families")),
+            unlogged.length > 0 && (React.createElement("div", { className: "today-block" },
+                React.createElement("h3", { className: "today-h" }, "Not logged yet"),
+                unlogged.map((o) => {
+                    const id = o.key + "|" + o.date;
+                    return (React.createElement("div", { key: id, className: "class-card" },
+                        React.createElement("div", { className: "class-top" },
+                            React.createElement("span", { className: "class-time" }, o.start),
+                            React.createElement("span", { className: "class-main" },
+                                React.createElement("span", { className: "row-title" }, o.s.group),
+                                React.createElement("span", { className: "row-sub" }, longDate(o.date)))),
+                        logFor !== id && (React.createElement("div", { className: "class-actions" },
+                            React.createElement("button", { className: "btn sm", onClick: () => setLogFor(id) }, "Mark taught"),
+                            React.createElement("button", { className: "btn ghost sm", onClick: () => skip(o) }, "There was no class"))),
+                        logFor === id && React.createElement(ClassLog, { occ: o, people: people, att: attFor(o.date), lessons: lessons, flash: flash, onClose: () => setLogFor(null) })));
+                }))),
+            React.createElement("div", { className: "today-block" },
+                React.createElement("h3", { className: "today-h" }, "Classes today"),
+                todays.length ? todays.map(classCard) : React.createElement("p", { className: "hint" }, "No classes today.")),
+            tomorrows.length > 0 && (React.createElement("div", { className: "today-block" },
+                React.createElement("h3", { className: "today-h" }, "Tomorrow"),
+                tomorrows.map(classCard))),
+            !todays.length && !tomorrows.length && (() => {
+                const nx = upcomingClasses(schedule, changes, new Date(), 14)[0];
+                return nx ? React.createElement("p", { className: "hint" },
+                    "Next class: ",
+                    nx.s.group,
+                    ", ",
+                    longDate(nx.date),
+                    " at ",
+                    pad(nx.at.getHours()),
+                    ":",
+                    pad(nx.at.getMinutes()),
+                    ".") : null;
+            })(),
+            (newVoice > 0 || hwWaiting.length > 0) && (React.createElement("div", { className: "today-block" },
+                React.createElement("h3", { className: "today-h" }, "Waiting for you"),
+                newVoice > 0 && (React.createElement("div", { className: "wait-row" },
+                    React.createElement("span", { className: "row-main" },
+                        React.createElement("span", { className: "row-title" },
+                            newVoice,
+                            " new voice ",
+                            newVoice === 1 ? "note" : "notes"),
+                        React.createElement("span", { className: "row-sub" }, "Homework recorded by your students")),
+                    React.createElement("button", { className: "btn sm", onClick: () => onGo("lessons", { lessons: { mode: "voice" } }) },
+                        React.createElement(Icon, { name: "play", size: 15 }),
+                        "Listen"))),
+                hwWaiting.map(({ l, t }) => (React.createElement("div", { key: l.id, className: "wait-block" },
+                    React.createElement("div", { className: "wait-row" },
+                        React.createElement("span", { className: "row-main" },
+                            React.createElement("span", { className: "row-title" }, l.title),
+                            React.createElement("span", { className: "row-sub" },
+                                t.open,
+                                " of ",
+                                t.total,
+                                " to check",
+                                l.due ? `. Due ${fmtShort(l.due)}` : "",
+                                ". For ",
+                                lessonGroups(l).join(", "))),
+                        React.createElement("button", { className: "btn ghost sm", "aria-expanded": hwOpen === l.id, onClick: () => setHwOpen(hwOpen === l.id ? null : l.id) }, hwOpen === l.id ? "Close" : "Check")),
+                    hwOpen === l.id && React.createElement(HomeworkCheck, { lesson: l, people: people, hw: hw, voiceList: voiceList, flash: flash })))))),
+            React.createElement(GetReady, { occs: [...todays.filter((o) => !recordsOf(attFor(o.date), o.key, o.date).taken.length), ...tomorrows], people: people, plans: plans, courses: courses }),
+            todo.on && React.createElement(TodoList, { todo: todo, flash: flash }),
+            money.ready && toPay.length > 0 && (React.createElement("div", { className: "today-block" },
+                React.createElement("h3", { className: "today-h" },
+                    "Still to pay in ",
+                    monthLabel(thisMonth)),
+                React.createElement("ul", { className: "msg-rows" }, toPay.map((r) => (React.createElement("li", { key: r.id },
+                    React.createElement("button", { className: "row-main link-like", onClick: () => onFile(r.id) },
+                        React.createElement("span", { className: "row-title" }, r.name),
+                        React.createElement("span", { className: "row-sub" },
+                            fcfa(r.fee - r.paid),
+                            " left to pay")),
+                    r.phone ? React.createElement(WaButton, { phone: r.phone, text: reminderText(r, thisMonth, pay), ghost: true }, "Remind") : React.createElement(CopyButton, { text: reminderText(r, thisMonth, pay), label: `Copy a reminder for ${r.name}`, caption: "Copy" })))))))));
+    }
     function useContent(on) {
         const [state, setState] = useState({ content: null, error: false });
         useEffect(() => {
@@ -4395,6 +5155,8 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         const [installView, setInstallView] = useState(() => (window.location.hash || "") === "#install");
         const [installHidden, setInstallHidden] = useState(() => !!ls.get("bm:installHidden"));
         const [tab, setTab] = useState(null);
+        const [jump, setJump] = useState(null); // where a link from Today or a student's page opens another tab
+        const [fileOf, setFileOf] = useState(null); // the student whose page is open
         const [openDeck, setOpenDeck] = useState(null);
         const [toast, setToast] = useState("");
         const toastTimer = useRef(null);
@@ -4407,6 +5169,9 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         const rosterH = useRoster(isTeacher);
         const studentRec = useStudentDoc(!isTeacher && me && me.id !== "guest" ? me.code : null);
         const attToday = useAttendance(isTeacher ? db : null, userId, thisMonth);
+        const attPrev = useAttendance(isTeacher ? db : null, userId, shiftMonth(thisMonth, -1));
+        const plansH = usePlans(isTeacher ? db : null, userId);
+        const hwChecks = useHomeworkChecks(isTeacher ? db : null, userId);
         const moneyNow = useMoney(isTeacher ? db : null, userId, thisMonth);
         const bizH = useBiz(isTeacher ? db : null, userId);
         const progressAll = useCollectionMap("progress", isTeacher);
@@ -4468,6 +5233,13 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
             const s = [...new Set(roster.map((r) => r.group).filter((g) => g && g !== EVERYONE))].sort();
             return [EVERYONE, ...s];
         }, [roster]);
+        /* students with their private WhatsApp number and message language, for the teacher's messages */
+        const people = useMemo(() => roster.map((r) => {
+            const f = moneyNow.fees[r.id] || {};
+            return Object.assign(Object.assign({}, r), { phone: f.phone || "", lang: f.lang === "fr" ? "fr" : "en" });
+        }).sort((x, y) => String(x.name).localeCompare(String(y.name))), [roster, moneyNow.fees]);
+        const goTab = (id, extra = null) => { setFileOf(null); setJump(extra); setTab(id); window.scrollTo(0, 0); };
+        const openFile = (id) => { setFileOf(id); window.scrollTo(0, 0); };
         const meR = !me ? null : me.id === "guest" ? GUEST : studentRec || null;
         const progDoc = useProgressDoc(!isTeacher && meR && meR.id !== "guest" ? meR.id : null);
         const addVoiceSent = (lessonId, x) => {
@@ -4493,7 +5265,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
             ls.set("bm:role", "student");
             setTab("words");
         };
-        const toTeacher = () => { setRole("teacher"); ls.set("bm:role", "teacher"); setTab("classes"); window.scrollTo(0, 0); };
+        const toTeacher = () => { setRole("teacher"); ls.set("bm:role", "teacher"); setTab("today"); setFileOf(null); setJump(null); window.scrollTo(0, 0); };
         const toStudentView = () => { setRole("student"); ls.set("bm:role", "student"); setTab(null); };
         const switchStudent = () => { setMe(null); ls.del("bm:me"); setTab(null); };
         const signIn = async () => {
@@ -4510,7 +5282,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         const uiLang = isTeacher ? "en" : lang;
         const T = (k) => STR[uiLang][k];
         const tabs = isTeacher
-            ? [{ id: "classes", label: "Classes", icon: "calendar" }, { id: "lessons", label: "Lessons", icon: "clipboard" }, { id: "words", label: "Words", icon: "book" }, { id: "students", label: "Students", icon: "users" }, { id: "business", label: "Business", icon: "briefcase" }]
+            ? [{ id: "today", label: "Today", icon: "sun" }, { id: "classes", label: "Classes", icon: "calendar" }, { id: "lessons", label: "Lessons", icon: "clipboard" }, { id: "words", label: "Words", icon: "book" }, { id: "students", label: "Students", icon: "users" }, { id: "business", label: "Business", icon: "briefcase" }]
             : [{ id: "words", label: T("tabWords"), icon: "book" }, { id: "homework", label: T("tabHomework"), icon: "clipboard" },
                 ...(me && me.id !== "guest" ? [{ id: "progress", label: T("tabProgress"), icon: "award" }] : []),
                 { id: "classes", label: T("tabClasses"), icon: "calendar" }, { id: "pay", label: T("tabPay"), icon: "wallet" }];
@@ -4552,19 +5324,25 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                     React.createElement("div", { className: "toast", role: "status" }, toast))));
         }
         let screen;
-        if (isTeacher) {
-            if (current === "classes")
+        const fileR = isTeacher && fileOf ? people.find((r) => r.id === fileOf) : null;
+        if (fileR) {
+            screen = (React.createElement(StudentFile, { r: fileR, schedule: view.schedule, changes: view.changes, lessons: view.lessons, plans: plansH.on ? plansH.plans : {}, progress: progressAll.map[fileR.id], voiceList: Object.values(voiceAll.map), hw: hwChecks, money: moneyNow, attNow: attToday, attPrev: attPrev, flash: flash, onBack: () => { setFileOf(null); window.scrollTo(0, 0); }, onGo: goTab }));
+        }
+        else if (isTeacher) {
+            if (current === "today")
+                screen = (React.createElement(TodayTeacher, { people: people, groups: groups, view: view, att: attToday, attPrev: attPrev, plansH: plansH, hw: hwChecks, voiceList: Object.values(voiceAll.map), money: moneyNow, pay: view.pay, db: db, userId: userId, flash: flash, onFile: openFile, onGo: goTab }));
+            else if (current === "classes")
                 screen = (React.createElement(React.Fragment, null,
                     React.createElement(NoticesTeacher, { notices: view.notices, groups: groups, saveNotices: saveContent("notices"), flash: flash }),
-                    React.createElement(Classes, { schedule: view.schedule, changes: view.changes, saveChanges: saveContent("changes"), notices: view.notices, saveNotices: saveContent("notices"), isTeacher: true, groups: groups, saveSchedule: saveContent("schedule"), flash: flash, roster: roster, att: attToday })));
+                    React.createElement(Classes, { schedule: view.schedule, changes: view.changes, saveChanges: saveContent("changes"), notices: view.notices, saveNotices: saveContent("notices"), isTeacher: true, groups: groups, saveSchedule: saveContent("schedule"), flash: flash, roster: people, att: attToday, lessons: view.lessons })));
             else if (current === "lessons")
-                screen = React.createElement(LessonsTeacher, { lessons: view.lessons, groups: groups, saveLessons: saveContent("lessons"), flash: flash, sample: null, db: db, userId: userId, decks: view.decks, saveDecks: saveContent("decks"), roster: roster, voiceNotes: voiceAll.map, progressMap: progressAll.map });
+                screen = React.createElement(LessonsTeacher, { key: jump ? JSON.stringify(jump) : "lessons", start: jump && jump.lessons, lessons: view.lessons, groups: groups, saveLessons: saveContent("lessons"), flash: flash, sample: null, db: db, userId: userId, decks: view.decks, saveDecks: saveContent("decks"), roster: roster, people: people, voiceNotes: voiceAll.map, progressMap: progressAll.map, plansH: plansH, hw: hwChecks });
             else if (current === "words")
                 screen = React.createElement(WordsTeacher, { decks: view.decks, groups: groups, saveDecks: saveContent("decks"), openId: openDeck, setOpenId: setOpenDeck, sample: null });
             else if (current === "business")
                 screen = (React.createElement(BusinessTeacher, { bizH: bizH, db: db, userId: userId, flash: flash, pay: view.pay, downloads: downloads, roster: roster, schedule: view.schedule, changes: view.changes, join: view.join, saveJoin: saveContent("join"), groups: groups }));
             else
-                screen = (React.createElement(StudentsTeacher, { roster: roster, saveRoster: saveRoster, pay: view.pay, savePay: saveContent("pay"), settings: view.settings, saveSettings: saveContent("settings"), lessons: view.lessons, decks: view.decks, schedule: view.schedule, changes: view.changes, places: bizH.biz.places, downloads: downloads, teacherName: bizH.biz.teacher.name || view.pay.accountName, db: db, userId: userId, flash: flash }));
+                screen = (React.createElement(StudentsTeacher, { roster: roster, saveRoster: saveRoster, pay: view.pay, savePay: saveContent("pay"), settings: view.settings, saveSettings: saveContent("settings"), lessons: view.lessons, decks: view.decks, schedule: view.schedule, changes: view.changes, places: bizH.biz.places, downloads: downloads, teacherName: bizH.biz.teacher.name || view.pay.accountName, db: db, userId: userId, flash: flash, startOpen: jump && jump.openId, onFile: openFile, key: jump && jump.openId ? "open-" + jump.openId : "students" }));
         }
         else {
             const st = view.settings.showStatus ? meR.st : null;
@@ -4603,7 +5381,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
             React.createElement("div", { className: "dock" },
                 toast && React.createElement("div", { className: "toast", role: "status" }, toast),
                 React.createElement("nav", { className: "tabbar", "aria-label": "Sections" },
-                    React.createElement("div", { className: "dock-in" }, tabs.map((t) => (React.createElement("button", { key: t.id, className: "tab", "aria-current": current === t.id ? "page" : undefined, onClick: () => setTab(t.id) },
+                    React.createElement("div", { className: "dock-in" }, tabs.map((t) => (React.createElement("button", { key: t.id, className: "tab", "aria-current": current === t.id && !fileR ? "page" : undefined, onClick: () => goTab(t.id) },
                         React.createElement(Icon, { name: t.icon, size: 22 }),
                         React.createElement("span", { className: "tab-label" }, t.label),
                         t.id === "homework" && hwCount > 0 && React.createElement("span", { className: "badge", "aria-label": `${hwCount}` }, hwCount),
