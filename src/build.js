@@ -44,7 +44,8 @@ const html = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Bright Minds</title>
 <meta name="description" content="Bright Minds English classes for children and adults: word practice, homework, class times and payments.">
-<meta name="theme-color" content="#1C2A6B">
+<meta name="theme-color" content="#FBF3E6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1A130E" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -52,7 +53,7 @@ const html = `<!DOCTYPE html>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Playwrite+FR+Moderne&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,700;1,9..40,400&family=Poppins:wght@700&display=swap">
 <link rel="stylesheet" href="app.css?v=${hash(css)}">
 </head>
 <body>

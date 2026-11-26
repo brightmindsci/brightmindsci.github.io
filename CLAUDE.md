@@ -12,7 +12,7 @@ The teacher asked that their real name and personal Google address never appear 
 ## Layout
 
 - `src/app.jsx`: the whole app, one file. React 18 UMD globals (`React`, `ReactDOM`) and the Firebase compat SDK (`firebase`) are loaded by `index.html`; there are no imports. Student and parent screens come in English and French: their text lives in the `STR` table (`en` and `fr`) near the top of the file, so add both when adding text there. The teacher screens are in English.
-- `src/styles.css`: the stylesheet (light and dark tokens).
+- `src/styles.css`: the stylesheet (light and dark tokens). The look is "warm and Ivorian", chosen by the teacher: cream paper, dark brown ink, orange `--accent` for buttons and the open tab, green and gold, Poppins headings (`--font-head`) and DM Sans text. The woven strip (`--weave`) sits under the header and on top of each screen's main card (`.panel`); `.rings` adds wax-print circles in a corner. Keep the logo and app icon as they are.
 - `src/build.js`: transpiles `src/app.jsx` with TypeScript (global install, `npm root -g`) and writes `app.js`, `app.css` and `index.html` at the root, with cache-busting hashes.
 - `config.js`: `window.BM_CONFIG` with the Firebase web config (public by design) and `teacherKeys`. Not generated; edit by hand.
 - `firestore.rules`: reference copy only. GitHub does not deploy it. The live rules are in the Firebase console (Firestore → Rules) with the teacher's real address in place of the placeholder; when rules change, give the teacher the new text with their address filled in to paste and Publish there, and keep the placeholder in this file.

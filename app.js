@@ -1002,7 +1002,7 @@ var __rest = (this && this.__rest) || function (s, e) {
         return (React.createElement("div", { className: "welcome" },
             React.createElement("div", { className: "welcome-lang" },
                 React.createElement("button", { className: "link", onClick: onLang, "aria-label": t("otherLangName") }, t("otherLang"))),
-            React.createElement("div", { className: "seyes welcome-page" },
+            React.createElement("div", { className: "panel rings welcome-page" },
                 React.createElement("h1", { className: "welcome-title" }, "Bright Minds"),
                 React.createElement("p", { className: "welcome-sub" }, t("tagline"))),
             React.createElement("h2", { className: "h" }, t("enterCode")),
@@ -1334,7 +1334,7 @@ var __rest = (this && this.__rest) || function (s, e) {
                 setWrong((w) => [...w, c.id]);
         };
         if (!started) {
-            return (React.createElement("div", { className: "seyes game-start" },
+            return (React.createElement("div", { className: "panel game-start" },
                 React.createElement("p", { className: "game-title" }, t("listenTitle")),
                 React.createElement("p", { className: "muted" }, canSpeak ? t("listenHow") : t("listenHowRead")),
                 React.createElement("button", { className: "btn", onClick: begin },
@@ -1343,7 +1343,7 @@ var __rest = (this && this.__rest) || function (s, e) {
         }
         if (n >= rounds) {
             return (React.createElement("div", null,
-                React.createElement("div", { className: "seyes result" },
+                React.createElement("div", { className: "panel result" },
                     React.createElement("p", { className: "game-stars big", "aria-hidden": "true" }, Array.from({ length: Math.max(1, Math.round((stars / rounds) * 3)) }, (_, k) => React.createElement(Icon, { key: k, name: "star", size: 34 }))),
                     React.createElement("p", { className: "result-big" }, t("starsOf", stars, rounds))),
                 React.createElement("button", { className: "btn", onClick: begin },
@@ -1354,7 +1354,7 @@ var __rest = (this && this.__rest) || function (s, e) {
             React.createElement("div", { className: "game-bar" },
                 React.createElement("span", { className: "muted small" }, t("xOfY", n + 1, rounds)),
                 React.createElement("span", { className: "game-stars", "aria-label": t("starsN", stars) }, Array.from({ length: stars }, (_, k) => React.createElement(Icon, { key: k, name: "star", size: 16 })))),
-            React.createElement("div", { className: "seyes game-ask" },
+            React.createElement("div", { className: "panel game-ask" },
                 canSpeak
                     ? React.createElement("button", { className: "btn ghost", onClick: () => speak(round.target.en) },
                         React.createElement(Icon, { name: "volume", size: 18 }),
@@ -1408,7 +1408,7 @@ var __rest = (this && this.__rest) || function (s, e) {
             React.createElement("div", { className: "game-bar" },
                 React.createElement("span", { className: "muted small" }, t("pairsFound", found.length, pairs)),
                 React.createElement("span", { className: "muted small" }, t("movesN", moves))),
-            won && (React.createElement("div", { className: "seyes result" },
+            won && (React.createElement("div", { className: "panel result" },
                 React.createElement("p", { className: "game-stars big", "aria-hidden": "true" }, Array.from({ length: starsWon }, (_, k) => React.createElement(Icon, { key: k, name: "star", size: 34 }))),
                 React.createElement("p", { className: "result-big", role: "status" }, t("allPairs", moves)))),
             React.createElement("div", { className: "mem-grid" }, tiles.map((x, k) => {
@@ -1434,11 +1434,11 @@ var __rest = (this && this.__rest) || function (s, e) {
         return (React.createElement("div", null,
             React.createElement("div", { key: order[i], className: "flip" + (flipped ? " is-flipped" : "") },
                 React.createElement("button", { type: "button", className: "flip-inner", onClick: () => setFlipped((f) => !f), "aria-label": flipped ? t("ariaBack", card.fr) : t("ariaFront", card.en) },
-                    React.createElement("span", { className: "face seyes face-front" },
+                    React.createElement("span", { className: "face panel face-front" },
                         card.pic && React.createElement("span", { className: "face-pic", "aria-hidden": "true" }, card.pic),
                         React.createElement("span", { className: "face-word" }, card.en),
                         React.createElement("span", { className: "face-hint" }, t("tapMeaning"))),
-                    React.createElement("span", { className: "face seyes face-back" },
+                    React.createElement("span", { className: "face panel face-back" },
                         card.pic && React.createElement("span", { className: "face-pic small", "aria-hidden": "true" }, card.pic),
                         React.createElement("span", { className: "face-word" }, card.fr),
                         card.ex && React.createElement("span", { className: "face-ex" }, card.ex)))),
@@ -1475,7 +1475,7 @@ var __rest = (this && this.__rest) || function (s, e) {
             const total = qs.length;
             const msg = score === total ? t("perfect") : score / total >= 0.7 ? t("great") : t("practiceMore");
             return (React.createElement("div", null,
-                React.createElement("div", { className: "seyes result" },
+                React.createElement("div", { className: "panel result" },
                     React.createElement("p", { className: "muted" }, t("yourScore")),
                     React.createElement("p", { className: "result-big" }, t("xOfY", score, total)),
                     React.createElement("p", null, msg),
@@ -1501,7 +1501,7 @@ var __rest = (this && this.__rest) || function (s, e) {
         };
         return (React.createElement("div", null,
             React.createElement("p", { className: "muted small", style: { marginBottom: 8 } }, t("questionN", idx + 1, qs.length)),
-            React.createElement("div", { className: "seyes q-prompt" },
+            React.createElement("div", { className: "panel q-prompt" },
                 React.createElement("span", { className: "face-hint" }, q.dir === "en" ? t("whatMeans") : t("howSay")),
                 q.pic && React.createElement("span", { className: "face-pic small", "aria-hidden": "true" }, q.pic),
                 React.createElement("span", { className: "face-word" }, q.prompt)),
@@ -2196,7 +2196,7 @@ var __rest = (this && this.__rest) || function (s, e) {
             showSt && (React.createElement("div", { className: "status-card" },
                 React.createElement("strong", { className: st.left <= 0 ? "out" : "" }, st.left >= 0 ? t("classesLeft", st.left, st.total, monthLabel(st.m, lang)) : t("extraClasses", -st.left, monthLabel(st.m, lang))),
                 updated && React.createElement("span", { className: "muted small" }, t("updatedOn", fmtShort(updated.slice(0, 10), lang))))),
-            next ? (React.createElement("div", { className: "seyes next" },
+            next ? (React.createElement("div", { className: "panel rings next" },
                 React.createElement("p", { className: "muted small" },
                     isTeacher ? "Next class" : t("nextClass"),
                     next.makeup ? ` (${isTeacher ? "make-up" : t("makeupLabel").toLowerCase()})` : ""),
@@ -2284,7 +2284,7 @@ var __rest = (this && this.__rest) || function (s, e) {
         return (React.createElement("section", null,
             React.createElement("h2", { className: "h" }, t("payTitle")),
             showSt && React.createElement("p", { className: "pay-status " + st.pay }, t(st.pay, month)),
-            me.due > 0 && (React.createElement("div", { className: "seyes next" },
+            me.due > 0 && (React.createElement("div", { className: "panel rings next" },
                 React.createElement("p", { className: "muted small" }, t("yourFee")),
                 React.createElement("p", { className: "next-when" }, fcfa(me.due)),
                 React.createElement("p", { className: "muted" }, t("eachMonth")))),
@@ -3335,7 +3335,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         const courses = status === "ready" ? skillRows(data.courses, skills, arr(prog && prog.courses)) : [];
         return (React.createElement("section", null,
             React.createElement("h2", { className: "h" }, t("progressTitle")),
-            React.createElement("div", { className: "seyes progress-sum" },
+            React.createElement("div", { className: "panel rings progress-sum" },
                 React.createElement("p", { className: "progress-big" }, done),
                 React.createElement("p", null, t("skillsCount", done)),
                 stars > 0 && React.createElement("p", { className: "progress-stars" },
@@ -3729,62 +3729,79 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         c.width = W;
         c.height = H;
         const g = c.getContext("2d");
+        const HEAD = '"Poppins", "DM Sans", sans-serif', BODY = '"DM Sans", sans-serif';
         try {
-            await Promise.all([document.fonts.load('60px "Playwrite FR Moderne"'), document.fonts.load('bold 90px "Atkinson Hyperlegible"'), document.fonts.load('34px "Atkinson Hyperlegible"')]);
+            await Promise.all([document.fonts.load('bold 64px "Poppins"'), document.fonts.load('bold 30px "DM Sans"'), document.fonts.load('34px "DM Sans"')]);
         }
         catch (e) { /* fallback fonts */ }
         const fr = lang === "fr";
-        const ink = "#1C2A6B", soft = "#59628C";
-        g.fillStyle = "#FBFBFE";
+        const ink = "#2E1D12", soft = "#6B5242", accent = "#B9470B";
+        g.fillStyle = "#FBF3E6";
         g.fillRect(0, 0, W, H);
-        for (let y = 70; y < H - 60; y += 16) {
-            g.fillStyle = (y - 70) % 64 === 0 ? "#CDD0F0" : "#E7E9F8";
-            g.fillRect(70, y, W - 140, 1.5);
-        }
-        g.fillStyle = "#DB3B55";
-        g.fillRect(200, 62, 4, H - 124);
+        /* wax-print rings in two corners */
+        const rings = (x, y) => { [[150, "#FDEEE1"], [128, "#FBF3E6"], [112, "#FDEEE1"], [92, "#FBF3E6"], [80, "#FDEEE1"]].forEach(([r, col]) => { g.fillStyle = col; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }); };
+        rings(W - 62, H - 62);
+        rings(62, 62);
+        /* frame */
         g.strokeStyle = ink;
         g.lineWidth = 12;
         g.strokeRect(34, 34, W - 68, H - 68);
         g.lineWidth = 2;
         g.strokeRect(62, 62, W - 124, H - 124);
-        const cx = (W + 204) / 2;
+        /* woven strips (Baoulé weaving colours) along the top and bottom */
+        const weave = [["#E8731A", 36], ["#F2B630", 10], ["#0E8A55", 30], ["#F2B630", 10], ["#4A2C17", 14], ["#FFF6E8", 6], ["#4A2C17", 6], ["#F2B630", 10]];
+        const strip = (y) => {
+            let x = 64;
+            for (let k = 0; x < W - 64; k++) {
+                const [col, w] = weave[k % weave.length];
+                g.fillStyle = col;
+                g.fillRect(x, y, Math.min(w, W - 64 - x), 18);
+                x += w;
+            }
+            g.fillStyle = "rgba(0,0,0,.13)";
+            for (let yy = y; yy < y + 18; yy += 3)
+                g.fillRect(64, yy, W - 128, 1);
+        };
+        strip(64);
+        strip(H - 82);
+        const cx = W / 2;
         g.textAlign = "center";
         g.textBaseline = "alphabetic";
         g.fillStyle = ink;
-        g.font = '62px "Playwrite FR Moderne", "Segoe Script", cursive';
-        g.fillText(fr ? "Certificat de réussite" : "Certificate of Achievement", cx, 260);
+        g.font = "bold 64px " + HEAD;
+        g.fillText(fr ? "Certificat de réussite" : "Certificate of Achievement", cx, 250);
+        g.fillStyle = accent;
+        g.font = "bold 30px " + BODY;
+        g.fillText("Bright Minds", cx, 315);
         g.fillStyle = soft;
-        g.font = 'bold 30px "Atkinson Hyperlegible", sans-serif';
-        g.fillText("Bright Minds", cx, 330);
-        g.font = '34px "Atkinson Hyperlegible", sans-serif';
+        g.font = "34px " + BODY;
         g.fillText(fr ? "Nous certifions que" : "This certifies that", cx, 430);
-        let size = 100;
-        g.font = `bold ${size}px "Atkinson Hyperlegible", sans-serif`;
-        while (g.measureText(name).width > W - 520 && size > 48) {
+        let size = 96;
+        g.font = `bold ${size}px ${HEAD}`;
+        while (g.measureText(name).width > W - 420 && size > 48) {
             size -= 4;
-            g.font = `bold ${size}px "Atkinson Hyperlegible", sans-serif`;
+            g.font = `bold ${size}px ${HEAD}`;
         }
         const nw = g.measureText(name).width;
-        g.fillStyle = "#FFE45C";
-        g.fillRect(cx - nw / 2 - 16, 560 - size * 0.34, nw + 32, size * 0.4);
+        g.fillStyle = "#F6C343";
+        g.fillRect(cx - nw / 2 - 16, 560 - size * 0.3, nw + 32, size * 0.36);
         g.fillStyle = ink;
         g.fillText(name, cx, 560);
-        g.font = '38px "Atkinson Hyperlegible", sans-serif';
-        g.fillText(fr ? `a terminé avec succès le niveau ${level} en anglais.` : `has successfully completed the ${level} level in English.`, cx, 660);
+        g.font = "38px " + BODY;
+        g.fillText(fr ? `a terminé avec succès le niveau ${level} en anglais.` : `has successfully completed the ${level} level in English.`, cx, 670);
         g.textAlign = "left";
         g.fillStyle = soft;
-        g.font = '30px "Atkinson Hyperlegible", sans-serif';
+        g.font = "30px " + BODY;
         const dateText = new Date().toLocaleDateString(LOCALE[lang], { day: "numeric", month: "long", year: "numeric" });
-        g.fillText(fr ? `Fait le ${dateText}` : `Date: ${dateText}`, 260, 930);
+        g.fillText(fr ? `Fait le ${dateText}` : `Date: ${dateText}`, 160, 930);
         g.textAlign = "center";
         g.fillStyle = ink;
         g.fillRect(1020, 900, 420, 2);
-        g.font = 'bold 32px "Atkinson Hyperlegible", sans-serif';
+        g.font = "bold 32px " + BODY;
         if (teacher)
             g.fillText(teacher, 1230, 950);
         g.fillStyle = soft;
-        g.font = '28px "Atkinson Hyperlegible", sans-serif';
+        g.font = "28px " + BODY;
         g.fillText(fr ? "Professeur d'anglais" : "English teacher", 1230, teacher ? 990 : 950);
         return c;
     }
@@ -4268,7 +4285,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
             React.createElement("div", { className: "welcome-lang between" },
                 React.createElement("button", { className: "link", onClick: onBack }, t("haveCode")),
                 React.createElement("button", { className: "link", onClick: onLang, "aria-label": t("otherLangName") }, t("otherLang"))),
-            React.createElement("div", { className: "seyes welcome-page" },
+            React.createElement("div", { className: "panel rings welcome-page" },
                 React.createElement("h1", { className: "welcome-title" }, "Bright Minds"),
                 React.createElement("p", { className: "welcome-sub" }, join.intro || t("joinTagline"))),
             join.offers.length > 0 && (React.createElement(React.Fragment, null,
@@ -4363,7 +4380,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
     }
     function Notice({ text }) {
         return (React.createElement("div", { className: "welcome" },
-            React.createElement("div", { className: "seyes welcome-page" },
+            React.createElement("div", { className: "panel rings welcome-page" },
                 React.createElement("h1", { className: "welcome-title" }, "Bright Minds"),
                 React.createElement("p", { className: "welcome-sub" }, text))));
     }

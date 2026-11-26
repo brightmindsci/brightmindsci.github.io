@@ -828,7 +828,7 @@ function Welcome({ canTeach, signedIn, notTeacher, onStudent, onTeacher, onSignI
   return (
     <div className="welcome">
       <div className="welcome-lang"><button className="link" onClick={onLang} aria-label={t("otherLangName")}>{t("otherLang")}</button></div>
-      <div className="seyes welcome-page">
+      <div className="panel rings welcome-page">
         <h1 className="welcome-title">Bright Minds</h1>
         <p className="welcome-sub">{t("tagline")}</p>
       </div>
@@ -1050,7 +1050,7 @@ function ListenTap({ deck }) {
   };
   if (!started) {
     return (
-      <div className="seyes game-start">
+      <div className="panel game-start">
         <p className="game-title">{t("listenTitle")}</p>
         <p className="muted">{canSpeak ? t("listenHow") : t("listenHowRead")}</p>
         <button className="btn" onClick={begin}><Icon name="play" size={16} />{t("startGame")}</button>
@@ -1060,7 +1060,7 @@ function ListenTap({ deck }) {
   if (n >= rounds) {
     return (
       <div>
-        <div className="seyes result">
+        <div className="panel result">
           <p className="game-stars big" aria-hidden="true">{Array.from({ length: Math.max(1, Math.round((stars / rounds) * 3)) }, (_, k) => <Icon key={k} name="star" size={34} />)}</p>
           <p className="result-big">{t("starsOf", stars, rounds)}</p>
         </div>
@@ -1074,7 +1074,7 @@ function ListenTap({ deck }) {
         <span className="muted small">{t("xOfY", n + 1, rounds)}</span>
         <span className="game-stars" aria-label={t("starsN", stars)}>{Array.from({ length: stars }, (_, k) => <Icon key={k} name="star" size={16} />)}</span>
       </div>
-      <div className="seyes game-ask">
+      <div className="panel game-ask">
         {canSpeak
           ? <button className="btn ghost" onClick={() => speak(round.target.en)}><Icon name="volume" size={18} />{t("hearAgain")}</button>
           : <span className="face-word">{round.target.en}</span>}
@@ -1134,7 +1134,7 @@ function Memory({ deck }) {
         <span className="muted small">{t("movesN", moves)}</span>
       </div>
       {won && (
-        <div className="seyes result">
+        <div className="panel result">
           <p className="game-stars big" aria-hidden="true">{Array.from({ length: starsWon }, (_, k) => <Icon key={k} name="star" size={34} />)}</p>
           <p className="result-big" role="status">{t("allPairs", moves)}</p>
         </div>
@@ -1170,12 +1170,12 @@ function Flashcards({ cards }) {
     <div>
       <div key={order[i]} className={"flip" + (flipped ? " is-flipped" : "")}>
         <button type="button" className="flip-inner" onClick={() => setFlipped((f) => !f)} aria-label={flipped ? t("ariaBack", card.fr) : t("ariaFront", card.en)}>
-          <span className="face seyes face-front">
+          <span className="face panel face-front">
             {card.pic && <span className="face-pic" aria-hidden="true">{card.pic}</span>}
             <span className="face-word">{card.en}</span>
             <span className="face-hint">{t("tapMeaning")}</span>
           </span>
-          <span className="face seyes face-back">
+          <span className="face panel face-back">
             {card.pic && <span className="face-pic small" aria-hidden="true">{card.pic}</span>}
             <span className="face-word">{card.fr}</span>
             {card.ex && <span className="face-ex">{card.ex}</span>}
@@ -1218,7 +1218,7 @@ function Quiz({ deck }) {
     const msg = score === total ? t("perfect") : score / total >= 0.7 ? t("great") : t("practiceMore");
     return (
       <div>
-        <div className="seyes result">
+        <div className="panel result">
           <p className="muted">{t("yourScore")}</p>
           <p className="result-big">{t("xOfY", score, total)}</p>
           <p>{msg}</p>
@@ -1243,7 +1243,7 @@ function Quiz({ deck }) {
   return (
     <div>
       <p className="muted small" style={{ marginBottom: 8 }}>{t("questionN", idx + 1, qs.length)}</p>
-      <div className="seyes q-prompt">
+      <div className="panel q-prompt">
         <span className="face-hint">{q.dir === "en" ? t("whatMeans") : t("howSay")}</span>
         {q.pic && <span className="face-pic small" aria-hidden="true">{q.pic}</span>}
         <span className="face-word">{q.prompt}</span>
@@ -2013,7 +2013,7 @@ function Classes({ schedule, changes = [], saveChanges, notices = [], saveNotice
         </div>
       )}
       {next ? (
-        <div className="seyes next">
+        <div className="panel rings next">
           <p className="muted small">{isTeacher ? "Next class" : t("nextClass")}{next.makeup ? ` (${isTeacher ? "make-up" : t("makeupLabel").toLowerCase()})` : ""}</p>
           <p className="next-when">{whenLabel(next.at, t, lang)}</p>
           <p className="muted">{[isTeacher ? next.s.group : null, placeOf(next.s)].filter(Boolean).join(", ")}</p>
@@ -2122,7 +2122,7 @@ function PayStudent({ pay, me, st }) {
       <h2 className="h">{t("payTitle")}</h2>
       {showSt && <p className={"pay-status " + st.pay}>{t(st.pay, month)}</p>}
       {me.due > 0 && (
-        <div className="seyes next">
+        <div className="panel rings next">
           <p className="muted small">{t("yourFee")}</p>
           <p className="next-when">{fcfa(me.due)}</p>
           <p className="muted">{t("eachMonth")}</p>
@@ -3231,7 +3231,7 @@ function ProgressStudent({ me, prog }) {
   return (
     <section>
       <h2 className="h">{t("progressTitle")}</h2>
-      <div className="seyes progress-sum">
+      <div className="panel rings progress-sum">
         <p className="progress-big">{done}</p>
         <p>{t("skillsCount", done)}</p>
         {stars > 0 && <p className="progress-stars"><Icon name="star" size={18} />{t("starsFromTeacher", stars)}</p>}
@@ -3585,38 +3585,49 @@ async function drawCertificate({ name, level, lang, teacher }) {
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   const g = c.getContext("2d");
-  try { await Promise.all([document.fonts.load('60px "Playwrite FR Moderne"'), document.fonts.load('bold 90px "Atkinson Hyperlegible"'), document.fonts.load('34px "Atkinson Hyperlegible"')]); } catch (e) { /* fallback fonts */ }
+  const HEAD = '"Poppins", "DM Sans", sans-serif', BODY = '"DM Sans", sans-serif';
+  try { await Promise.all([document.fonts.load('bold 64px "Poppins"'), document.fonts.load('bold 30px "DM Sans"'), document.fonts.load('34px "DM Sans"')]); } catch (e) { /* fallback fonts */ }
   const fr = lang === "fr";
-  const ink = "#1C2A6B", soft = "#59628C";
-  g.fillStyle = "#FBFBFE"; g.fillRect(0, 0, W, H);
-  for (let y = 70; y < H - 60; y += 16) { g.fillStyle = (y - 70) % 64 === 0 ? "#CDD0F0" : "#E7E9F8"; g.fillRect(70, y, W - 140, 1.5); }
-  g.fillStyle = "#DB3B55"; g.fillRect(200, 62, 4, H - 124);
+  const ink = "#2E1D12", soft = "#6B5242", accent = "#B9470B";
+  g.fillStyle = "#FBF3E6"; g.fillRect(0, 0, W, H);
+  /* wax-print rings in two corners */
+  const rings = (x, y) => { [[150, "#FDEEE1"], [128, "#FBF3E6"], [112, "#FDEEE1"], [92, "#FBF3E6"], [80, "#FDEEE1"]].forEach(([r, col]) => { g.fillStyle = col; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }); };
+  rings(W - 62, H - 62); rings(62, 62);
+  /* frame */
   g.strokeStyle = ink; g.lineWidth = 12; g.strokeRect(34, 34, W - 68, H - 68);
   g.lineWidth = 2; g.strokeRect(62, 62, W - 124, H - 124);
-  const cx = (W + 204) / 2;
+  /* woven strips (Baoulé weaving colours) along the top and bottom */
+  const weave = [["#E8731A", 36], ["#F2B630", 10], ["#0E8A55", 30], ["#F2B630", 10], ["#4A2C17", 14], ["#FFF6E8", 6], ["#4A2C17", 6], ["#F2B630", 10]];
+  const strip = (y) => {
+    let x = 64;
+    for (let k = 0; x < W - 64; k++) { const [col, w] = weave[k % weave.length]; g.fillStyle = col; g.fillRect(x, y, Math.min(w, W - 64 - x), 18); x += w; }
+    g.fillStyle = "rgba(0,0,0,.13)"; for (let yy = y; yy < y + 18; yy += 3) g.fillRect(64, yy, W - 128, 1);
+  };
+  strip(64); strip(H - 82);
+  const cx = W / 2;
   g.textAlign = "center"; g.textBaseline = "alphabetic";
-  g.fillStyle = ink; g.font = '62px "Playwrite FR Moderne", "Segoe Script", cursive';
-  g.fillText(fr ? "Certificat de réussite" : "Certificate of Achievement", cx, 260);
-  g.fillStyle = soft; g.font = 'bold 30px "Atkinson Hyperlegible", sans-serif';
-  g.fillText("Bright Minds", cx, 330);
-  g.font = '34px "Atkinson Hyperlegible", sans-serif';
+  g.fillStyle = ink; g.font = "bold 64px " + HEAD;
+  g.fillText(fr ? "Certificat de réussite" : "Certificate of Achievement", cx, 250);
+  g.fillStyle = accent; g.font = "bold 30px " + BODY;
+  g.fillText("Bright Minds", cx, 315);
+  g.fillStyle = soft; g.font = "34px " + BODY;
   g.fillText(fr ? "Nous certifions que" : "This certifies that", cx, 430);
-  let size = 100;
-  g.font = `bold ${size}px "Atkinson Hyperlegible", sans-serif`;
-  while (g.measureText(name).width > W - 520 && size > 48) { size -= 4; g.font = `bold ${size}px "Atkinson Hyperlegible", sans-serif`; }
+  let size = 96;
+  g.font = `bold ${size}px ${HEAD}`;
+  while (g.measureText(name).width > W - 420 && size > 48) { size -= 4; g.font = `bold ${size}px ${HEAD}`; }
   const nw = g.measureText(name).width;
-  g.fillStyle = "#FFE45C"; g.fillRect(cx - nw / 2 - 16, 560 - size * 0.34, nw + 32, size * 0.4);
+  g.fillStyle = "#F6C343"; g.fillRect(cx - nw / 2 - 16, 560 - size * 0.3, nw + 32, size * 0.36);
   g.fillStyle = ink; g.fillText(name, cx, 560);
-  g.font = '38px "Atkinson Hyperlegible", sans-serif';
-  g.fillText(fr ? `a terminé avec succès le niveau ${level} en anglais.` : `has successfully completed the ${level} level in English.`, cx, 660);
-  g.textAlign = "left"; g.fillStyle = soft; g.font = '30px "Atkinson Hyperlegible", sans-serif';
+  g.font = "38px " + BODY;
+  g.fillText(fr ? `a terminé avec succès le niveau ${level} en anglais.` : `has successfully completed the ${level} level in English.`, cx, 670);
+  g.textAlign = "left"; g.fillStyle = soft; g.font = "30px " + BODY;
   const dateText = new Date().toLocaleDateString(LOCALE[lang], { day: "numeric", month: "long", year: "numeric" });
-  g.fillText(fr ? `Fait le ${dateText}` : `Date: ${dateText}`, 260, 930);
+  g.fillText(fr ? `Fait le ${dateText}` : `Date: ${dateText}`, 160, 930);
   g.textAlign = "center";
   g.fillStyle = ink; g.fillRect(1020, 900, 420, 2);
-  g.font = 'bold 32px "Atkinson Hyperlegible", sans-serif';
+  g.font = "bold 32px " + BODY;
   if (teacher) g.fillText(teacher, 1230, 950);
-  g.fillStyle = soft; g.font = '28px "Atkinson Hyperlegible", sans-serif';
+  g.fillStyle = soft; g.font = "28px " + BODY;
   g.fillText(fr ? "Professeur d'anglais" : "English teacher", 1230, teacher ? 990 : 950);
   return c;
 }
@@ -4064,7 +4075,7 @@ function JoinPage({ join, pay, schedule, counts = {}, onBack, onLang }) {
         <button className="link" onClick={onBack}>{t("haveCode")}</button>
         <button className="link" onClick={onLang} aria-label={t("otherLangName")}>{t("otherLang")}</button>
       </div>
-      <div className="seyes welcome-page">
+      <div className="panel rings welcome-page">
         <h1 className="welcome-title">Bright Minds</h1>
         <p className="welcome-sub">{join.intro || t("joinTagline")}</p>
       </div>
@@ -4172,7 +4183,7 @@ function useStudentDoc(code) {
 function Notice({ text }) {
   return (
     <div className="welcome">
-      <div className="seyes welcome-page">
+      <div className="panel rings welcome-page">
         <h1 className="welcome-title">Bright Minds</h1>
         <p className="welcome-sub">{text}</p>
       </div>
