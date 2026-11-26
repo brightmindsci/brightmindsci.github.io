@@ -115,8 +115,8 @@ const STR = {
     enterCode: "Enter your code", codeHint: "Your teacher sent you a code with 4 numbers.", yourCode: "Your code", open: "Open",
     codeShort: "Your code has 4 numbers.", codeWrong: "That code doesn't match. Check it with your teacher.", noCode: "Practice words without a code",
     switchUser: "Switch", otherLang: "Français", otherLangName: "Lire en français",
-    tabWords: "Words", tabHomework: "Homework", tabClasses: "Classes", tabPay: "Pay",
-    words: "Words", noLists: "Your teacher hasn't added any word lists yet.", nWords: (n) => `${n} ${n === 1 ? "word" : "words"}`,
+    tabWords: "Vocab", tabHomework: "Homework", tabClasses: "Classes", tabPay: "Pay",
+    words: "Vocabulary", noLists: "Your teacher hasn't added any word lists yet.", nWords: (n) => `${n} ${n === 1 ? "word" : "words"}`,
     allLists: "All lists", flashcards: "Flashcards", quiz: "Quiz", emptyList: "This list has no words yet.",
     tapMeaning: "Tap to see the meaning", ariaFront: (w) => `${w}. Tap to see the meaning.`, ariaBack: (w) => `${w}. Tap to see the English word.`,
     xOfY: (a, b) => `${a} of ${b}`, hearSentence: "Hear the sentence", hearWord: "Hear the word", back: "Back", mix: "Mix", next: "Next",
@@ -188,7 +188,7 @@ const STR = {
     enterCode: "Entrez votre code", codeHint: "Votre professeur vous a envoyé un code à 4 chiffres.", yourCode: "Votre code", open: "Ouvrir",
     codeShort: "Le code a 4 chiffres.", codeWrong: "Ce code ne correspond pas. Vérifiez-le avec votre professeur.", noCode: "Réviser le vocabulaire sans code",
     switchUser: "Changer", otherLang: "English", otherLangName: "Read in English",
-    tabWords: "Vocabulaire", tabHomework: "Devoirs", tabClasses: "Cours", tabPay: "Payer",
+    tabWords: "Vocab", tabHomework: "Devoirs", tabClasses: "Cours", tabPay: "Payer",
     words: "Vocabulaire", noLists: "Votre professeur n'a pas encore ajouté de liste de mots.", nWords: (n) => `${n} mot${n > 1 ? "s" : ""}`,
     allLists: "Toutes les listes", flashcards: "Cartes", quiz: "Quiz", emptyList: "Cette liste n'a pas encore de mots.",
     tapMeaning: "Touchez pour voir la traduction", ariaFront: (w) => `${w}. Touchez pour voir la traduction.`, ariaBack: (w) => `${w}. Touchez pour voir le mot anglais.`,
@@ -1596,7 +1596,7 @@ function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userI
       {lib.on && (
         <div className="seg seg-lessons">
           <button aria-pressed={mode === "lessons"} onClick={() => setMode("lessons")}>Lessons</button>
-          <button aria-pressed={mode === "words"} onClick={() => { pending.current = null; setMode("words"); }}>Words</button>
+          <button aria-pressed={mode === "words"} onClick={() => { pending.current = null; setMode("words"); }}>Vocab</button>
           <button aria-pressed={mode === "library"} onClick={() => { pending.current = null; setMode("library"); setLibKey((k) => k + 1); }}>Library</button>
           <button aria-pressed={mode === "voice"} onClick={() => { pending.current = null; setMode("voice"); }}>Voice{newVoice ? <span className="seg-count" aria-label={`${newVoice} new`}>{newVoice}</span> : ""}</button>
         </div>
@@ -2822,7 +2822,7 @@ function WordListOffers({ lists, decks, saveDecks, groups, flash }) {
     const cards = arr(w.cards).map((c) => { const x = { id: uid(), en: String(c.en || ""), fr: String(c.fr || ""), ex: String(c.ex || "") }; if (c.pic) x.pic = String(c.pic); return x; }).filter((c) => c.en && c.fr);
     saveDecks([{ id: uid(), title: w.title, group, cards }, ...decks]);
     setOpenId(null);
-    flash(`${w.title} is in Lessons, Words now, for ${group}.`);
+    flash(`${w.title} is in Lessons, Vocab now, for ${group}.`);
   };
   const parts = [["Picture lists for kids", lists.filter((w) => w.kids)], ["More word lists", lists.filter((w) => !w.kids)]].filter(([, l]) => l.length);
   return (
@@ -2841,7 +2841,7 @@ function WordListOffers({ lists, decks, saveDecks, groups, flash }) {
                 </div>
                 <div className="pay-actions">
                   {added(w) ? <span className="muted small"><Icon name="check" size={15} /> In Words</span>
-                    : openId !== w.id && <button className="btn sm" onClick={() => { setGroup(groups[1] || EVERYONE); setOpenId(w.id); }}>Add to Words</button>}
+                    : openId !== w.id && <button className="btn sm" onClick={() => { setGroup(groups[1] || EVERYONE); setOpenId(w.id); }}>Add to Vocab</button>}
                 </div>
                 {openId === w.id && (
                   <div className="inline-add lib-add">
