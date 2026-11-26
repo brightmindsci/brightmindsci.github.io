@@ -36,7 +36,7 @@ The teacher's lesson plans, shown to the teacher only in Lessons → Library. Th
 
 ## Data (Firestore)
 
-- `site/content`: lessons, word lists, class times, announcements, prices, group counts. Everyone reads; the teacher writes.
+- `site/content`: lessons, word lists, class times, announcements, prices, group counts. Everyone reads; the teacher writes. A lesson is for `group` (one group, or "Everyone"); when the teacher picks several, `groups` holds them all and `group` the first. Filter lessons with `forGroup(lessonGroups(l), studentGroup)`.
 - `students/{code}`: one doc per student, keyed by their code, with their name, group and status (`st`: classes left, paid). Anyone can `get` a single code; only the teacher can list or write.
 - `data/users/{uid}/...`: the teacher's private records (fees, payments, attendance, schools, lesson library). Teacher only.
 - `progress/{studentId}`: what a student can do and the teacher's replies to their voice notes, `{ skills: { "<courseId>/<skillId>": "YYYY-MM-DD" }, courses: [courseIds], replies: { <voiceId>: { stars, note, title, lessonId, at } }, updated }`. Anyone can `get` one (the id is the student's private id, not their code); only the teacher can list or write. Students see it in the Progress tab, and replies under the matching homework.

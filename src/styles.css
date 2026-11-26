@@ -375,3 +375,9 @@ a.btn{text-decoration:none}
 .skill-unit{margin-bottom:10px}
 .skill-check{align-items:flex-start;font-weight:400;padding:6px 0}
 .skill-check input{flex:none;margin-top:3px}
+
+/* picking who a lesson is for */
+.chip-pick{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 8px}
+.chip-pick button{display:inline-flex;flex-wrap:wrap;align-items:center;gap:2px 6px;min-height:44px;max-width:100%;padding:8px 14px;border:1px solid var(--line);border-radius:22px;background:var(--surface);color:var(--ink);font:inherit;font-weight:700;cursor:pointer;text-align:left}
+.chip-pick button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
+.chip-sub{font-weight:400;font-size:13px;opacity:.85}

@@ -29,7 +29,9 @@ const fmtShort = (iso, lang = "en") => (iso ? parseISO(iso).toLocaleDateString(L
 const num = (n) => Math.round(Number(n) || 0).toLocaleString("fr-FR");
 const fcfa = (n) => `${num(n)} FCFA`;
 const addMin = (hhmm, mins) => { const [h, m] = (hhmm || "00:00").split(":").map(Number); const t = h * 60 + m + (Number(mins) || 0); return `${pad(Math.floor(t / 60) % 24)}:${pad(t % 60)}`; };
-const forGroup = (g, mine) => !g || g === EVERYONE || g === mine;
+const forGroup = (g, mine) => (Array.isArray(g) ? !g.length || g.includes(EVERYONE) || g.includes(mine) : !g || g === EVERYONE || g === mine);
+/* A lesson is for one group (group) or several (groups); group always holds the first, for older copies of the app. */
+const lessonGroups = (l) => (Array.isArray(l.groups) && l.groups.length ? l.groups : [l.group || EVERYONE]);
 const shuffle = (list) => { const a = [...list]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const arr = (x) => (Array.isArray(x) ? x : []);
 const classWord = (n) => (n === 1 ? "class" : "classes");
@@ -627,7 +629,7 @@ function reportText(r, month, lessons, decks, comment) {
   const fr = r.lang === "fr";
   const m = monthLabel(month, r.lang);
   const dates = r.takenList.map((x) => fmtShort(x.date, r.lang));
-  const mine = lessons.filter((l) => (l.date || "").startsWith(month) && forGroup(l.group, r.group)).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const mine = lessons.filter((l) => (l.date || "").startsWith(month) && forGroup(lessonGroups(l), r.group)).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   const hw = mine.filter((l) => l.homework).length;
   const lists = decks.filter((d) => forGroup(d.group, r.group) && d.cards.length);
   const lines = [fr ? `Bright Minds : bilan de ${m} pour ${r.name}` : `Bright Minds: ${m} report for ${r.name}`, ""];
@@ -1473,7 +1475,7 @@ function LessonEntry({ lesson: l, teacher = false, isDone = false, onToggle, onE
       </div>
       <div className="entry-body">
         <h3>{l.title}</h3>
-        {teacher && <p className="muted small">For {l.group || EVERYONE}</p>}
+        {teacher && <p className="muted small">For {lessonGroups(l).join(", ")}</p>}
         {l.notes && <p className="notes">{l.notes}</p>}
         {!teacher && <PracticeSay items={practiceItems(l.notes)} />}
         {l.homework && (
@@ -1508,6 +1510,34 @@ function LessonEntry({ lesson: l, teacher = false, isDone = false, onToggle, onE
   );
 }
 
+function GroupPicker({ id, groups, value, onChange, roster = [] }) {
+  const all = [...new Set([...groups, ...value])];
+  const who = (g) => roster.filter((r) => r.group === g).map((r) => r.name);
+  const toggle = (g) => {
+    if (g === EVERYONE) { onChange(value.includes(EVERYONE) ? [] : [EVERYONE]); return; }
+    const cur = value.filter((x) => x !== EVERYONE);
+    onChange(cur.includes(g) ? cur.filter((x) => x !== g) : [...cur, g]);
+  };
+  return (
+    <div className="field">
+      <span id={id + "-label"}>For</span>
+      <div className="chip-pick" role="group" aria-labelledby={id + "-label"} id={id}>
+        {all.map((g) => {
+          const names = who(g);
+          const sub = g === EVERYONE ? "all students" : names.length && !(names.length === 1 && names[0] === g) ? names.join(", ") : "";
+          const on = value.includes(g);
+          return (
+            <button key={g} type="button" aria-pressed={on} onClick={() => toggle(g)}>
+              {on && <Icon name="check" size={15} />}<span>{g}</span>{sub && <span className="chip-sub">{sub}</span>}
+            </button>
+          );
+        })}
+      </div>
+      <span className="hint">{value.length ? "Tap every student or group that gets this." : "Pick at least one student or group."}</span>
+    </div>
+  );
+}
+
 function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks, roster = [], voiceNotes = {}, progressMap = {} }) {
   const [mode, setMode] = useState("lessons");
   const [form, setForm] = useState(null);
@@ -1516,11 +1546,14 @@ function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userI
   const newVoice = Object.values(voiceNotes).filter((v) => !v.heard).length;
   const pending = useRef(null);
   const [libKey, setLibKey] = useState(0); // tapping Library again goes back to its first page
-  const blank = () => ({ id: null, date: todayISO(), group: groups[1] || EVERYONE, title: "", notes: "", homework: "", due: "" });
+  const blank = () => ({ id: null, date: todayISO(), groups: [groups[1] || EVERYONE], title: "", notes: "", homework: "", due: "" });
   const upd = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const submit = () => {
-    if (!form.title.trim()) return;
-    const item = { ...form, title: form.title.trim(), notes: form.notes.trim(), homework: form.homework.trim() };
+    const chosen = arr(form.groups).includes(EVERYONE) ? [EVERYONE] : arr(form.groups);
+    if (!form.title.trim() || !chosen.length) return;
+    const { groups: _old, ...rest } = form;
+    const item = { ...rest, group: chosen[0], title: form.title.trim(), notes: form.notes.trim(), homework: form.homework.trim() };
+    if (chosen.length > 1) item.groups = chosen;
     if (form.id) saveLessons(lessons.map((l) => (l.id === form.id ? item : l)));
     else saveLessons([{ ...item, id: uid() }, ...lessons]);
     const pend = pending.current;
@@ -1537,10 +1570,9 @@ function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userI
     const b = blank();
     pending.current = opt.studentId && opt.planId ? { studentId: opt.studentId, planId: opt.planId } : null;
     setMode("lessons");
-    setForm({ ...b, group: opt.group || b.group, title: p.title || "", notes: p.notes || "", homework: p.homework || "" });
+    setForm({ ...b, groups: opt.group ? [opt.group] : b.groups, title: p.title || "", notes: p.notes || "", homework: p.homework || "" });
     window.scrollTo(0, 0);
   };
-  const opts = form && !groups.includes(form.group) ? [...groups, form.group] : groups;
   const sorted = [...lessons].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   return (
     <section>
@@ -1570,17 +1602,15 @@ function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userI
                   return true;
                 }} />
               <Field label="Title"><input id="lesson-title" className="inp" value={form.title} placeholder="Telling the time" onChange={upd("title")} /></Field>
-              <div className="grid2">
-                <Field label="Date"><input id="lesson-date" className="inp" type="date" value={form.date} onChange={upd("date")} /></Field>
-                <Field label="For">
-                  <select id="lesson-group" className="inp" value={form.group} onChange={upd("group")}>{opts.map((g) => <option key={g} value={g}>{g}</option>)}</select>
-                </Field>
-              </div>
+              <GroupPicker id="lesson-for" groups={groups} roster={roster} value={arr(form.groups)} onChange={(gs) => setForm({ ...form, groups: gs })} />
               <Field label="What we did"><textarea id="lesson-notes" className="inp" value={form.notes} placeholder="New words, a song, a short dialogue..." onChange={upd("notes")} /></Field>
               <Field label="Homework (optional)"><textarea id="lesson-hw" className="inp" value={form.homework} placeholder="Write 5 sentences with the new words." onChange={upd("homework")} /></Field>
-              <Field label="Homework due (optional)"><input id="lesson-due" className="inp" type="date" value={form.due} onChange={upd("due")} /></Field>
+              <div className="grid2">
+                <Field label="Date"><input id="lesson-date" className="inp" type="date" value={form.date} onChange={upd("date")} /></Field>
+                <Field label="Due date"><input id="lesson-due" className="inp" type="date" value={form.due} onChange={upd("due")} /></Field>
+              </div>
               <div className="form-actions">
-                <button className="btn" onClick={submit} disabled={!form.title.trim()}>Save lesson</button>
+                <button className="btn" onClick={submit} disabled={!form.title.trim() || !arr(form.groups).length}>Save lesson</button>
                 <button className="btn ghost" onClick={() => { pending.current = null; setForm(null); }}>Cancel</button>
               </div>
             </div>
@@ -1589,7 +1619,7 @@ function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userI
             <ol className="entries">
               {sorted.map((l) => (
                 <LessonEntry key={l.id} lesson={l} teacher
-                  onEdit={() => { setForm({ ...l }); window.scrollTo(0, 0); }}
+                  onEdit={() => { setForm({ ...l, groups: lessonGroups(l) }); window.scrollTo(0, 0); }}
                   onDelete={() => saveLessons(lessons.filter((x) => x.id !== l.id))}
                   onSaveToLibrary={lib.on ? (level) => saveToLib(l, level) : null} />
               ))}
@@ -1769,7 +1799,7 @@ function HomeworkStudent({ lessons, me, done, onToggle, prog, voiceSent = {}, on
   const { t } = useT();
   const replies = Object.values((prog && prog.replies) || {});
   const replyFor = (id) => replies.filter((r) => r.lessonId === id).sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")))[0];
-  const list = lessons.filter((l) => forGroup(l.group, me.group)).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const list = lessons.filter((l) => forGroup(lessonGroups(l), me.group)).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   return (
     <section>
       <h2 className="h">{t("homework")}</h2>
@@ -4325,7 +4355,7 @@ function App() {
 
   const today = todayISO();
   const voiceNew = isTeacher ? Object.values(voiceAll.map).filter((v) => !v.heard).length : 0;
-  const hwCount = isTeacher ? 0 : view.lessons.filter((l) => l.homework && forGroup(l.group, meR.group) && !done[l.id] && (!l.due || l.due >= today)).length;
+  const hwCount = isTeacher ? 0 : view.lessons.filter((l) => l.homework && forGroup(lessonGroups(l), meR.group) && !done[l.id] && (!l.due || l.due >= today)).length;
   const fresh = isTeacher && rosterH.ready && roster.length === 0 && !view.lessons.length && !view.schedule.length;
 
   return (

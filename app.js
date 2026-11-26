@@ -1,4 +1,15 @@
 "use strict";
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
 (function () {
     if (!window.React || !window.ReactDOM) {
         var rootEl = document.getElementById("root");
@@ -29,7 +40,9 @@
     const num = (n) => Math.round(Number(n) || 0).toLocaleString("fr-FR");
     const fcfa = (n) => `${num(n)} FCFA`;
     const addMin = (hhmm, mins) => { const [h, m] = (hhmm || "00:00").split(":").map(Number); const t = h * 60 + m + (Number(mins) || 0); return `${pad(Math.floor(t / 60) % 24)}:${pad(t % 60)}`; };
-    const forGroup = (g, mine) => !g || g === EVERYONE || g === mine;
+    const forGroup = (g, mine) => (Array.isArray(g) ? !g.length || g.includes(EVERYONE) || g.includes(mine) : !g || g === EVERYONE || g === mine);
+    /* A lesson is for one group (group) or several (groups); group always holds the first, for older copies of the app. */
+    const lessonGroups = (l) => (Array.isArray(l.groups) && l.groups.length ? l.groups : [l.group || EVERYONE]);
     const shuffle = (list) => { const a = [...list]; for (let i = a.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [a[i], a[j]] = [a[j], a[i]];
@@ -729,7 +742,7 @@
         const fr = r.lang === "fr";
         const m = monthLabel(month, r.lang);
         const dates = r.takenList.map((x) => fmtShort(x.date, r.lang));
-        const mine = lessons.filter((l) => (l.date || "").startsWith(month) && forGroup(l.group, r.group)).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+        const mine = lessons.filter((l) => (l.date || "").startsWith(month) && forGroup(lessonGroups(l), r.group)).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
         const hw = mine.filter((l) => l.homework).length;
         const lists = decks.filter((d) => forGroup(d.group, r.group) && d.cards.length);
         const lines = [fr ? `Bright Minds : bilan de ${m} pour ${r.name}` : `Bright Minds: ${m} report for ${r.name}`, ""];
@@ -1690,7 +1703,7 @@
                 React.createElement("h3", null, l.title),
                 teacher && React.createElement("p", { className: "muted small" },
                     "For ",
-                    l.group || EVERYONE),
+                    lessonGroups(l).join(", ")),
                 l.notes && React.createElement("p", { className: "notes" }, l.notes),
                 !teacher && React.createElement(PracticeSay, { items: practiceItems(l.notes) }),
                 l.homework && (React.createElement("div", { className: "hw" },
@@ -1714,6 +1727,30 @@
                     React.createElement("button", { className: "btn sm", onClick: () => { onSaveToLibrary(libLevel); setLibLevel(null); } }, "Save"),
                     React.createElement("button", { className: "btn ghost sm", onClick: () => setLibLevel(null) }, "Cancel"))))));
     }
+    function GroupPicker({ id, groups, value, onChange, roster = [] }) {
+        const all = [...new Set([...groups, ...value])];
+        const who = (g) => roster.filter((r) => r.group === g).map((r) => r.name);
+        const toggle = (g) => {
+            if (g === EVERYONE) {
+                onChange(value.includes(EVERYONE) ? [] : [EVERYONE]);
+                return;
+            }
+            const cur = value.filter((x) => x !== EVERYONE);
+            onChange(cur.includes(g) ? cur.filter((x) => x !== g) : [...cur, g]);
+        };
+        return (React.createElement("div", { className: "field" },
+            React.createElement("span", { id: id + "-label" }, "For"),
+            React.createElement("div", { className: "chip-pick", role: "group", "aria-labelledby": id + "-label", id: id }, all.map((g) => {
+                const names = who(g);
+                const sub = g === EVERYONE ? "all students" : names.length && !(names.length === 1 && names[0] === g) ? names.join(", ") : "";
+                const on = value.includes(g);
+                return (React.createElement("button", { key: g, type: "button", "aria-pressed": on, onClick: () => toggle(g) },
+                    on && React.createElement(Icon, { name: "check", size: 15 }),
+                    React.createElement("span", null, g),
+                    sub && React.createElement("span", { className: "chip-sub" }, sub)));
+            })),
+            React.createElement("span", { className: "hint" }, value.length ? "Tap every student or group that gets this." : "Pick at least one student or group.")));
+    }
     function LessonsTeacher({ lessons, groups, saveLessons, flash, sample, db, userId, decks = [], saveDecks, roster = [], voiceNotes = {}, progressMap = {} }) {
         const [mode, setMode] = useState("lessons");
         const [form, setForm] = useState(null);
@@ -1722,12 +1759,16 @@
         const newVoice = Object.values(voiceNotes).filter((v) => !v.heard).length;
         const pending = useRef(null);
         const [libKey, setLibKey] = useState(0); // tapping Library again goes back to its first page
-        const blank = () => ({ id: null, date: todayISO(), group: groups[1] || EVERYONE, title: "", notes: "", homework: "", due: "" });
+        const blank = () => ({ id: null, date: todayISO(), groups: [groups[1] || EVERYONE], title: "", notes: "", homework: "", due: "" });
         const upd = (k) => (e) => setForm(Object.assign(Object.assign({}, form), { [k]: e.target.value }));
         const submit = () => {
-            if (!form.title.trim())
+            const chosen = arr(form.groups).includes(EVERYONE) ? [EVERYONE] : arr(form.groups);
+            if (!form.title.trim() || !chosen.length)
                 return;
-            const item = Object.assign(Object.assign({}, form), { title: form.title.trim(), notes: form.notes.trim(), homework: form.homework.trim() });
+            const { groups: _old } = form, rest = __rest(form, ["groups"]);
+            const item = Object.assign(Object.assign({}, rest), { group: chosen[0], title: form.title.trim(), notes: form.notes.trim(), homework: form.homework.trim() });
+            if (chosen.length > 1)
+                item.groups = chosen;
             if (form.id)
                 saveLessons(lessons.map((l) => (l.id === form.id ? item : l)));
             else
@@ -1748,10 +1789,9 @@
             const b = blank();
             pending.current = opt.studentId && opt.planId ? { studentId: opt.studentId, planId: opt.planId } : null;
             setMode("lessons");
-            setForm(Object.assign(Object.assign({}, b), { group: opt.group || b.group, title: p.title || "", notes: p.notes || "", homework: p.homework || "" }));
+            setForm(Object.assign(Object.assign({}, b), { groups: opt.group ? [opt.group] : b.groups, title: p.title || "", notes: p.notes || "", homework: p.homework || "" }));
             window.scrollTo(0, 0);
         };
-        const opts = form && !groups.includes(form.group) ? [...groups, form.group] : groups;
         const sorted = [...lessons].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
         return (React.createElement("section", null,
             React.createElement("div", { className: "h-row" },
@@ -1775,21 +1815,20 @@
                         } }),
                     React.createElement(Field, { label: "Title" },
                         React.createElement("input", { id: "lesson-title", className: "inp", value: form.title, placeholder: "Telling the time", onChange: upd("title") })),
-                    React.createElement("div", { className: "grid2" },
-                        React.createElement(Field, { label: "Date" },
-                            React.createElement("input", { id: "lesson-date", className: "inp", type: "date", value: form.date, onChange: upd("date") })),
-                        React.createElement(Field, { label: "For" },
-                            React.createElement("select", { id: "lesson-group", className: "inp", value: form.group, onChange: upd("group") }, opts.map((g) => React.createElement("option", { key: g, value: g }, g))))),
+                    React.createElement(GroupPicker, { id: "lesson-for", groups: groups, roster: roster, value: arr(form.groups), onChange: (gs) => setForm(Object.assign(Object.assign({}, form), { groups: gs })) }),
                     React.createElement(Field, { label: "What we did" },
                         React.createElement("textarea", { id: "lesson-notes", className: "inp", value: form.notes, placeholder: "New words, a song, a short dialogue...", onChange: upd("notes") })),
                     React.createElement(Field, { label: "Homework (optional)" },
                         React.createElement("textarea", { id: "lesson-hw", className: "inp", value: form.homework, placeholder: "Write 5 sentences with the new words.", onChange: upd("homework") })),
-                    React.createElement(Field, { label: "Homework due (optional)" },
-                        React.createElement("input", { id: "lesson-due", className: "inp", type: "date", value: form.due, onChange: upd("due") })),
+                    React.createElement("div", { className: "grid2" },
+                        React.createElement(Field, { label: "Date" },
+                            React.createElement("input", { id: "lesson-date", className: "inp", type: "date", value: form.date, onChange: upd("date") })),
+                        React.createElement(Field, { label: "Due date" },
+                            React.createElement("input", { id: "lesson-due", className: "inp", type: "date", value: form.due, onChange: upd("due") }))),
                     React.createElement("div", { className: "form-actions" },
-                        React.createElement("button", { className: "btn", onClick: submit, disabled: !form.title.trim() }, "Save lesson"),
+                        React.createElement("button", { className: "btn", onClick: submit, disabled: !form.title.trim() || !arr(form.groups).length }, "Save lesson"),
                         React.createElement("button", { className: "btn ghost", onClick: () => { pending.current = null; setForm(null); } }, "Cancel")))),
-                sorted.length === 0 ? (!form && React.createElement(Empty, { text: "Add your first lesson to give students their notes and homework, or open Library to use one of your lesson plans." })) : (React.createElement("ol", { className: "entries" }, sorted.map((l) => (React.createElement(LessonEntry, { key: l.id, lesson: l, teacher: true, onEdit: () => { setForm(Object.assign({}, l)); window.scrollTo(0, 0); }, onDelete: () => saveLessons(lessons.filter((x) => x.id !== l.id)), onSaveToLibrary: lib.on ? (level) => saveToLib(l, level) : null })))))))));
+                sorted.length === 0 ? (!form && React.createElement(Empty, { text: "Add your first lesson to give students their notes and homework, or open Library to use one of your lesson plans." })) : (React.createElement("ol", { className: "entries" }, sorted.map((l) => (React.createElement(LessonEntry, { key: l.id, lesson: l, teacher: true, onEdit: () => { setForm(Object.assign(Object.assign({}, l), { groups: lessonGroups(l) })); window.scrollTo(0, 0); }, onDelete: () => saveLessons(lessons.filter((x) => x.id !== l.id)), onSaveToLibrary: lib.on ? (level) => saveToLib(l, level) : null })))))))));
     }
     /* ---------- voice notes: a student's recorded homework, kept in Firestore in parts ---------- */
     const VOICE_PART = 700000;
@@ -1966,7 +2005,7 @@
         const { t } = useT();
         const replies = Object.values((prog && prog.replies) || {});
         const replyFor = (id) => replies.filter((r) => r.lessonId === id).sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")))[0];
-        const list = lessons.filter((l) => forGroup(l.group, me.group)).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+        const list = lessons.filter((l) => forGroup(lessonGroups(l), me.group)).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
         return (React.createElement("section", null,
             React.createElement("h2", { className: "h" }, t("homework")),
             list.length === 0 ? React.createElement(Empty, { text: t("noLessons") }) : (React.createElement("ol", { className: "entries" }, list.map((l) => (React.createElement(LessonEntry, { key: l.id, lesson: l, isDone: !!done[l.id], onToggle: () => onToggle(l.id), voice: me && me.id !== "guest" ? { me, sent: arr(voiceSent[l.id]), reply: replyFor(l.id), onSent: (x) => onVoiceSent(l.id, x) } : null })))))));
@@ -4525,7 +4564,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         }
         const today = todayISO();
         const voiceNew = isTeacher ? Object.values(voiceAll.map).filter((v) => !v.heard).length : 0;
-        const hwCount = isTeacher ? 0 : view.lessons.filter((l) => l.homework && forGroup(l.group, meR.group) && !done[l.id] && (!l.due || l.due >= today)).length;
+        const hwCount = isTeacher ? 0 : view.lessons.filter((l) => l.homework && forGroup(lessonGroups(l), meR.group) && !done[l.id] && (!l.due || l.due >= today)).length;
         const fresh = isTeacher && rosterH.ready && roster.length === 0 && !view.lessons.length && !view.schedule.length;
         return (React.createElement(LangCtx.Provider, { value: uiLang },
             React.createElement("div", { className: "shell" },
