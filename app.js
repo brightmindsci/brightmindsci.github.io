@@ -199,7 +199,9 @@
             recordAnswer: "Record my answer", recordAnother: "Record another answer", recordHint: "Say your homework out loud. You can listen before you send it. Up to 2 minutes.",
             startRec: "Start recording", stopRec: "Stop", sendTeacher: "Send to my teacher", sending: "Sending...", cancel: "Cancel",
             voiceSent: (d) => `Sent to your teacher, ${d}`, voiceFail: "It didn't send. Check your internet and try again.",
-            voiceTooLong: "That recording is too long. Try one under 2 minutes.", teacherReplied: "Your teacher listened to your recording",
+            voiceTooLong: "That recording is too long. Try one under 2 minutes.",
+            voiceNotReady: "Voice notes aren't switched on yet. Let your teacher know, then try again later. Your recording is still here.",
+            voiceSlow: "It's taking a long time. Check your internet, then tap Send again.", teacherReplied: "Your teacher listened to your recording",
             progressTitle: "What I can do", skillsCount: (n) => (n === 1 ? "thing I can do in English" : "things I can do in English"),
             starsFromTeacher: (n) => `${n} ${n === 1 ? "star" : "stars"} from my teacher`, loadingProgress: "Opening your progress...",
             noSkillsYet: "After your classes, your teacher ticks off what you can do. It will show up here.", comingNext: "Coming next", canDoSince: (d) => `Since ${d}`,
@@ -270,7 +272,9 @@
             recordAnswer: "Enregistrer ma réponse", recordAnother: "Enregistrer une autre réponse", recordHint: "Dites vos devoirs à voix haute. Vous pourrez écouter avant d'envoyer. 2 minutes au maximum.",
             startRec: "Commencer l'enregistrement", stopRec: "Arrêter", sendTeacher: "Envoyer au professeur", sending: "Envoi...", cancel: "Annuler",
             voiceSent: (d) => `Envoyé au professeur, ${d}`, voiceFail: "L'envoi n'a pas marché. Vérifiez votre connexion et réessayez.",
-            voiceTooLong: "Cet enregistrement est trop long. Essayez en moins de 2 minutes.", teacherReplied: "Votre professeur a écouté votre enregistrement",
+            voiceTooLong: "Cet enregistrement est trop long. Essayez en moins de 2 minutes.",
+            voiceNotReady: "Les messages vocaux ne sont pas encore activés. Prévenez votre professeur, puis réessayez plus tard. Votre enregistrement est toujours là.",
+            voiceSlow: "Ça prend du temps. Vérifiez votre connexion, puis touchez Envoyer à nouveau.", teacherReplied: "Votre professeur a écouté votre enregistrement",
             progressTitle: "Ce que je sais faire", skillsCount: (n) => (n > 1 ? "choses que je sais faire en anglais" : "chose que je sais faire en anglais"),
             starsFromTeacher: (n) => `${n} étoile${n > 1 ? "s" : ""} de mon professeur`, loadingProgress: "Ouverture de vos progrès...",
             noSkillsYet: "Après les cours, votre professeur coche ce que vous savez faire. Ça s'affichera ici.", comingNext: "Bientôt", canDoSince: (d) => `Depuis le ${d}`,
@@ -1889,7 +1893,8 @@
                 setOpen(false);
             }
             catch (e) {
-                setErr(e && e.message === "too-long" ? t("voiceTooLong") : t("voiceFail"));
+                const why = (e && (e.code || e.message)) || "";
+                setErr(why === "too-long" ? t("voiceTooLong") : /permission/i.test(why) ? t("voiceNotReady") : why === "slow" ? t("voiceSlow") : t("voiceFail"));
             }
             setBusy(false);
         };
