@@ -4223,6 +4223,8 @@ function TeacherHeaderActions({ bizOpen, onBusiness, onStudentView, onSignOut })
 
 /* ---------- free trial: what visitors without a code see. Sample content only, kept on the phone: nothing is saved to the database. ---------- */
 const TRIAL_LISTS = [["wl-pic-colors", "Colors", "Les couleurs"], ["wl-pic-animals", "Animals", "Les animaux"], ["wl-pic-numbers", "Numbers 1–10", "Les nombres 1–10"], ["wl-pic-food", "Food and drinks", "À manger et à boire"]];
+/* A built-in sample list stays hidden when the teacher already shares a list on the same topic with everyone, so it doesn't show twice. */
+const TRIAL_TOPIC = { "wl-pic-colors": /colou?rs?|couleurs?/i, "wl-pic-animals": /animals?|animaux/i, "wl-pic-numbers": /numbers?|nombres?|chiffres?/i, "wl-pic-food": /food|drinks?|manger|boire|nourriture/i };
 const TRIAL_PHRASES = [["Hello! How are you?", "Bonjour ! Comment ça va ?"], ["I'm fine, thank you.", "Je vais bien, merci."], ["My name is Awa.", "Je m'appelle Awa."],
   ["Nice to meet you.", "Enchanté."], ["Where are you from?", "Tu viens d'où ?"], ["How much is it?", "C'est combien ?"], ["Thank you very much.", "Merci beaucoup."], ["See you tomorrow!", "À demain !"]];
 function trialDecks(wordLists, lang) {
@@ -4247,7 +4249,12 @@ const trialProgress = () => {
 function TrialWords({ decks, me }) {
   const { lang } = useT();
   const { data } = useCourses();
-  const all = [...decks.filter((d) => forGroup(d.group, EVERYONE)), ...trialDecks(data ? data.wordLists : [], lang)];
+  const shared = decks.filter((d) => forGroup(d.group, EVERYONE));
+  const builtIn = trialDecks(data ? data.wordLists : [], lang).filter((d) => {
+    const re = TRIAL_TOPIC[d.id.replace(/^trial-/, "")];
+    return !re || !shared.some((x) => re.test(String(x.title || "")));
+  });
+  const all = [...shared, ...builtIn];
   return <WordsStudent decks={all} me={me} />;
 }
 /* Recording works, but stays on the phone. A sample reply shows what the teacher sends back. */
