@@ -701,6 +701,7 @@ const ICONS = {
   stop: <rect width="12" height="12" x="6" y="6" rx="2" />,
   play: <path d="M7 4.5v15l12-7.5z" />,
   award: <><circle cx="12" cy="8" r="6" /><path d="M15.5 12.9 17 22l-5-3-5 3 1.5-9.1" /></>,
+  more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
   sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></>,
   report: <><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M10 9H8M16 13H8M16 17H8" /></>,
 };
@@ -4171,14 +4172,15 @@ function JoinPage({ join, pay, schedule, counts = {}, onBack, onLang, backLabel 
   );
 }
 
-function BusinessTeacher({ bizH, db, userId, flash, pay, downloads, roster, schedule, changes, join, saveJoin, groups }) {
+function BusinessTeacher({ bizH, db, userId, flash, pay, downloads, roster, schedule, changes, join, saveJoin, groups, onBack }) {
   const [mode, setMode] = useState("schools");
   const modes = [["schools", "Schools"], ["income", "Income"], ["join", "Join page"], ["settings", "Settings"]];
   const placesNeedDb = mode !== "join" && !bizH.on;
   return (
     <section>
+      {onBack && <button className="back-link" onClick={onBack}><Icon name="left" />Back</button>}
       <h2 className="h">Business</h2>
-      <div className="seg seg-wrap">
+      <div className="seg seg-lessons">
         {modes.map(([id, label]) => <button key={id} aria-pressed={mode === id} onClick={() => setMode(id)}>{label}</button>)}
       </div>
       {placesNeedDb ? <p className="note">Sign in as the teacher to use this.</p>
@@ -4188,6 +4190,32 @@ function BusinessTeacher({ bizH, db, userId, flash, pay, downloads, roster, sche
         : mode === "join" ? <JoinSettings join={join} saveJoin={saveJoin} groups={groups} roster={roster} pay={pay} flash={flash} />
         : <BizSettings biz={bizH.biz} saveBiz={bizH.save} schedule={schedule} pay={pay} flash={flash} />}
     </section>
+  );
+}
+
+/* The teacher's header: Business opens as its own section; Student view and Sign out sit in a small menu. */
+function TeacherHeaderActions({ bizOpen, onBusiness, onStudentView, onSignOut }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const esc = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", esc); };
+  }, [open]);
+  return (
+    <div className="head-actions" ref={ref}>
+      <button className="btn ghost sm biz-btn" aria-pressed={bizOpen} onClick={() => { setOpen(false); onBusiness(); }}><Icon name="briefcase" size={16} />Business</button>
+      <button className="icon-btn sm-icon" aria-label="More" aria-expanded={open} aria-haspopup="true" onClick={() => setOpen(!open)}><Icon name="more" size={20} /></button>
+      {open && (
+        <div className="head-menu" role="menu">
+          <button role="menuitem" onClick={() => { setOpen(false); onStudentView(); }}><Icon name="users" size={16} />Student view</button>
+          <button role="menuitem" onClick={() => { setOpen(false); onSignOut(); }}><Icon name="left" size={16} />Sign out</button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -5091,6 +5119,7 @@ function App() {
   const [tab, setTab] = useState(null);
   const [jump, setJump] = useState(null); // where a link from Today or a student's page opens another tab
   const [fileOf, setFileOf] = useState(null); // the student whose page is open
+  const [bizOpen, setBizOpen] = useState(false); // Business is its own section, opened from the header
   const [openDeck, setOpenDeck] = useState(null);
   const [toast, setToast] = useState("");
   const toastTimer = useRef(null);
@@ -5179,8 +5208,9 @@ function App() {
     const f = moneyNow.fees[r.id] || {};
     return { ...r, phone: f.phone || "", lang: f.lang === "fr" ? "fr" : "en" };
   }).sort((x, y) => String(x.name).localeCompare(String(y.name))), [roster, moneyNow.fees]);
-  const goTab = (id, extra = null) => { setFileOf(null); setJump(extra); setTab(id); window.scrollTo(0, 0); };
-  const openFile = (id) => { setFileOf(id); window.scrollTo(0, 0); };
+  const goTab = (id, extra = null) => { setFileOf(null); setBizOpen(false); setJump(extra); setTab(id); window.scrollTo(0, 0); };
+  const openFile = (id) => { setBizOpen(false); setFileOf(id); window.scrollTo(0, 0); };
+  const openBusiness = () => { setFileOf(null); setBizOpen(true); window.scrollTo(0, 0); };
 
   const meR = !me ? null : me.id === "guest" ? GUEST : studentRec || null;
   const progDoc = useProgressDoc(!isTeacher && meR && meR.id !== "guest" ? meR.id : null);
@@ -5213,7 +5243,7 @@ function App() {
   const uiLang = isTeacher ? "en" : lang;
   const T = (k) => STR[uiLang][k];
   const tabs = isTeacher
-    ? [{ id: "today", label: "Today", icon: "sun" }, { id: "classes", label: "Classes", icon: "calendar" }, { id: "lessons", label: "Lessons", icon: "clipboard" }, { id: "students", label: "Students", icon: "users" }, { id: "business", label: "Business", icon: "briefcase" }]
+    ? [{ id: "today", label: "Today", icon: "sun" }, { id: "classes", label: "Classes", icon: "calendar" }, { id: "lessons", label: "Lessons", icon: "clipboard" }, { id: "students", label: "Students", icon: "users" }]
     : [{ id: "words", label: T("tabWords"), icon: "book" }, { id: "homework", label: T("tabHomework"), icon: "clipboard" },
       { id: "progress", label: T("tabProgress"), icon: "award" },
       { id: "classes", label: T("tabClasses"), icon: "calendar" },
@@ -5250,7 +5280,13 @@ function App() {
 
   let screen;
   const fileR = isTeacher && fileOf ? people.find((r) => r.id === fileOf) : null;
-  if (fileR) {
+  const bizOn = isTeacher && bizOpen && !fileR;
+  if (bizOn) {
+    screen = (
+      <BusinessTeacher bizH={bizH} db={db} userId={userId} flash={flash} pay={view.pay} downloads={downloads} onBack={() => { setBizOpen(false); window.scrollTo(0, 0); }}
+        roster={roster} schedule={view.schedule} changes={view.changes} join={view.join} saveJoin={saveContent("join")} groups={groups} />
+    );
+  } else if (fileR) {
     screen = (
       <StudentFile r={fileR} schedule={view.schedule} changes={view.changes} lessons={view.lessons} plans={plansH.on ? plansH.plans : {}}
         progress={progressAll.map[fileR.id]} voiceList={Object.values(voiceAll.map)} hw={hwChecks}
@@ -5269,10 +5305,6 @@ function App() {
       </>
     );
     else if (current === "lessons") screen = <LessonsTeacher key={jump ? JSON.stringify(jump) : "lessons"} start={jump && jump.lessons} lessons={view.lessons} groups={groups} saveLessons={saveContent("lessons")} flash={flash} sample={null} db={db} userId={userId} decks={view.decks} saveDecks={saveContent("decks")} roster={roster} people={people} voiceNotes={voiceAll.map} progressMap={progressAll.map} plansH={plansH} hw={hwChecks} openDeck={openDeck} setOpenDeck={setOpenDeck} />;
-    else if (current === "business") screen = (
-      <BusinessTeacher bizH={bizH} db={db} userId={userId} flash={flash} pay={view.pay} downloads={downloads}
-        roster={roster} schedule={view.schedule} changes={view.changes} join={view.join} saveJoin={saveContent("join")} groups={groups} />
-    );
     else screen = (
       <StudentsTeacher roster={roster} saveRoster={saveRoster} pay={view.pay} savePay={saveContent("pay")}
         settings={view.settings} saveSettings={saveContent("settings")} lessons={view.lessons} decks={view.decks}
@@ -5306,10 +5338,7 @@ function App() {
           <span className="brand">Bright Minds</span>
           <div className="who">
             {isTeacher ? (
-              <>
-                <button className="link" onClick={toStudentView}>Student view</button>
-                <button className="link" onClick={signOut}>Sign out</button>
-              </>
+              <TeacherHeaderActions bizOpen={bizOn} onBusiness={openBusiness} onStudentView={() => { setBizOpen(false); setFileOf(null); toStudentView(); }} onSignOut={() => { setBizOpen(false); setFileOf(null); signOut(); }} />
             ) : (
               <>
                 {meR.id === "guest" ? <span className="trial-chip">{STR[lang].trialBadge}</span> : <span>{meR.name}</span>}
@@ -5321,7 +5350,7 @@ function App() {
           </div>
         </header>
         <main>
-          {fresh && <p className="note">Welcome to your own Bright Minds. To bring in everything from the Claude version, go to Business, then Settings, and use Move in.</p>}
+          {fresh && <p className="note">Welcome to your own Bright Minds. To bring in everything from the Claude version, tap Business at the top, then Settings, and use Move in.</p>}
           {trialOn && <TrialBanner contact={view.join.contact || view.pay.whatsapp} onJoin={openJoin} />}
           {!isTeacher && !trialOn && !installHidden && current === tabs[0].id && <InstallCard onHide={() => { setInstallHidden(true); ls.set("bm:installHidden", true); }} />}
           {!isTeacher && <StudentNotices notices={view.notices} me={meR} />}
@@ -5333,7 +5362,7 @@ function App() {
         <nav className="tabbar" aria-label="Sections">
           <div className="dock-in">
             {tabs.map((t) => (
-              <button key={t.id} className="tab" aria-current={current === t.id && !fileR ? "page" : undefined} onClick={() => goTab(t.id)}>
+              <button key={t.id} className="tab" aria-current={current === t.id && !fileR && !bizOn ? "page" : undefined} onClick={() => goTab(t.id)}>
                 <Icon name={t.icon} size={22} />
                 <span className="tab-label">{t.label}</span>
                 {t.id === "homework" && hwCount > 0 && <span className="badge" aria-label={`${hwCount}`}>{hwCount}</span>}

@@ -505,3 +505,10 @@ a.btn{text-decoration:none}
 .who>span.trial-chip{max-width:none}
 .sample-tag{display:inline-block;margin-left:8px;font-family:var(--font-body);font-size:12px;font-weight:700;padding:1px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent);vertical-align:3px;letter-spacing:.02em}
 .trial-reply{border-style:dashed}
+
+/* teacher header: Business button and a small menu */
+.head-actions{position:relative;display:flex;align-items:center;gap:8px}
+.biz-btn[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.head-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:190px;padding:6px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow)}
+.head-menu button{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px 12px;border:0;border-radius:10px;background:none;color:var(--ink);font:inherit;font-size:15px;font-weight:700;text-align:left;cursor:pointer}
+.head-menu button:hover,.head-menu button:focus-visible{background:var(--accent-soft)}

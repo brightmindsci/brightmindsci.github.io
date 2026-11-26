@@ -869,6 +869,10 @@ var __rest = (this && this.__rest) || function (s, e) {
         award: React.createElement(React.Fragment, null,
             React.createElement("circle", { cx: "12", cy: "8", r: "6" }),
             React.createElement("path", { d: "M15.5 12.9 17 22l-5-3-5 3 1.5-9.1" })),
+        more: React.createElement(React.Fragment, null,
+            React.createElement("circle", { cx: "5", cy: "12", r: "1" }),
+            React.createElement("circle", { cx: "12", cy: "12", r: "1" }),
+            React.createElement("circle", { cx: "19", cy: "12", r: "1" })),
         sun: React.createElement(React.Fragment, null,
             React.createElement("circle", { cx: "12", cy: "12", r: "4" }),
             React.createElement("path", { d: "M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" })),
@@ -4379,19 +4383,51 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                     t("bookTrial")),
                 React.createElement("p", { className: "hint", style: { margin: "8px 0 0" } }, t("trialHint"))))));
     }
-    function BusinessTeacher({ bizH, db, userId, flash, pay, downloads, roster, schedule, changes, join, saveJoin, groups }) {
+    function BusinessTeacher({ bizH, db, userId, flash, pay, downloads, roster, schedule, changes, join, saveJoin, groups, onBack }) {
         const [mode, setMode] = useState("schools");
         const modes = [["schools", "Schools"], ["income", "Income"], ["join", "Join page"], ["settings", "Settings"]];
         const placesNeedDb = mode !== "join" && !bizH.on;
         return (React.createElement("section", null,
+            onBack && React.createElement("button", { className: "back-link", onClick: onBack },
+                React.createElement(Icon, { name: "left" }),
+                "Back"),
             React.createElement("h2", { className: "h" }, "Business"),
-            React.createElement("div", { className: "seg seg-wrap" }, modes.map(([id, label]) => React.createElement("button", { key: id, "aria-pressed": mode === id, onClick: () => setMode(id) }, label))),
+            React.createElement("div", { className: "seg seg-lessons" }, modes.map(([id, label]) => React.createElement("button", { key: id, "aria-pressed": mode === id, onClick: () => setMode(id) }, label))),
             placesNeedDb ? React.createElement("p", { className: "note" }, "Sign in as the teacher to use this.")
                 : !bizH.ready && mode !== "join" ? React.createElement("p", { className: "empty", role: "status" }, "Loading...")
                     : mode === "schools" ? React.createElement(SchoolsSection, { biz: bizH.biz, saveBiz: bizH.save, db: db, userId: userId, flash: flash, pay: pay, downloads: downloads })
                         : mode === "income" ? React.createElement(IncomeSection, { db: db, userId: userId, roster: roster, schedule: schedule, changes: changes, places: bizH.biz.places })
                             : mode === "join" ? React.createElement(JoinSettings, { join: join, saveJoin: saveJoin, groups: groups, roster: roster, pay: pay, flash: flash })
                                 : React.createElement(BizSettings, { biz: bizH.biz, saveBiz: bizH.save, schedule: schedule, pay: pay, flash: flash })));
+    }
+    /* The teacher's header: Business opens as its own section; Student view and Sign out sit in a small menu. */
+    function TeacherHeaderActions({ bizOpen, onBusiness, onStudentView, onSignOut }) {
+        const [open, setOpen] = useState(false);
+        const ref = useRef(null);
+        useEffect(() => {
+            if (!open)
+                return undefined;
+            const close = (e) => { if (ref.current && !ref.current.contains(e.target))
+                setOpen(false); };
+            const esc = (e) => { if (e.key === "Escape")
+                setOpen(false); };
+            document.addEventListener("pointerdown", close);
+            document.addEventListener("keydown", esc);
+            return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", esc); };
+        }, [open]);
+        return (React.createElement("div", { className: "head-actions", ref: ref },
+            React.createElement("button", { className: "btn ghost sm biz-btn", "aria-pressed": bizOpen, onClick: () => { setOpen(false); onBusiness(); } },
+                React.createElement(Icon, { name: "briefcase", size: 16 }),
+                "Business"),
+            React.createElement("button", { className: "icon-btn sm-icon", "aria-label": "More", "aria-expanded": open, "aria-haspopup": "true", onClick: () => setOpen(!open) },
+                React.createElement(Icon, { name: "more", size: 20 })),
+            open && (React.createElement("div", { className: "head-menu", role: "menu" },
+                React.createElement("button", { role: "menuitem", onClick: () => { setOpen(false); onStudentView(); } },
+                    React.createElement(Icon, { name: "users", size: 16 }),
+                    "Student view"),
+                React.createElement("button", { role: "menuitem", onClick: () => { setOpen(false); onSignOut(); } },
+                    React.createElement(Icon, { name: "left", size: 16 }),
+                    "Sign out")))));
     }
     /* ---------- live data from the database ---------- */
     /* ---------- free trial: what visitors without a code see. Sample content only, kept on the phone: nothing is saved to the database. ---------- */
@@ -5267,6 +5303,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         const [tab, setTab] = useState(null);
         const [jump, setJump] = useState(null); // where a link from Today or a student's page opens another tab
         const [fileOf, setFileOf] = useState(null); // the student whose page is open
+        const [bizOpen, setBizOpen] = useState(false); // Business is its own section, opened from the header
         const [openDeck, setOpenDeck] = useState(null);
         const [toast, setToast] = useState("");
         const toastTimer = useRef(null);
@@ -5370,8 +5407,9 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
             const f = moneyNow.fees[r.id] || {};
             return Object.assign(Object.assign({}, r), { phone: f.phone || "", lang: f.lang === "fr" ? "fr" : "en" });
         }).sort((x, y) => String(x.name).localeCompare(String(y.name))), [roster, moneyNow.fees]);
-        const goTab = (id, extra = null) => { setFileOf(null); setJump(extra); setTab(id); window.scrollTo(0, 0); };
-        const openFile = (id) => { setFileOf(id); window.scrollTo(0, 0); };
+        const goTab = (id, extra = null) => { setFileOf(null); setBizOpen(false); setJump(extra); setTab(id); window.scrollTo(0, 0); };
+        const openFile = (id) => { setBizOpen(false); setFileOf(id); window.scrollTo(0, 0); };
+        const openBusiness = () => { setFileOf(null); setBizOpen(true); window.scrollTo(0, 0); };
         const meR = !me ? null : me.id === "guest" ? GUEST : studentRec || null;
         const progDoc = useProgressDoc(!isTeacher && meR && meR.id !== "guest" ? meR.id : null);
         const addVoiceSent = (lessonId, x) => {
@@ -5414,7 +5452,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         const uiLang = isTeacher ? "en" : lang;
         const T = (k) => STR[uiLang][k];
         const tabs = isTeacher
-            ? [{ id: "today", label: "Today", icon: "sun" }, { id: "classes", label: "Classes", icon: "calendar" }, { id: "lessons", label: "Lessons", icon: "clipboard" }, { id: "students", label: "Students", icon: "users" }, { id: "business", label: "Business", icon: "briefcase" }]
+            ? [{ id: "today", label: "Today", icon: "sun" }, { id: "classes", label: "Classes", icon: "calendar" }, { id: "lessons", label: "Lessons", icon: "clipboard" }, { id: "students", label: "Students", icon: "users" }]
             : [{ id: "words", label: T("tabWords"), icon: "book" }, { id: "homework", label: T("tabHomework"), icon: "clipboard" },
                 { id: "progress", label: T("tabProgress"), icon: "award" },
                 { id: "classes", label: T("tabClasses"), icon: "calendar" },
@@ -5460,7 +5498,11 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         }
         let screen;
         const fileR = isTeacher && fileOf ? people.find((r) => r.id === fileOf) : null;
-        if (fileR) {
+        const bizOn = isTeacher && bizOpen && !fileR;
+        if (bizOn) {
+            screen = (React.createElement(BusinessTeacher, { bizH: bizH, db: db, userId: userId, flash: flash, pay: view.pay, downloads: downloads, onBack: () => { setBizOpen(false); window.scrollTo(0, 0); }, roster: roster, schedule: view.schedule, changes: view.changes, join: view.join, saveJoin: saveContent("join"), groups: groups }));
+        }
+        else if (fileR) {
             screen = (React.createElement(StudentFile, { r: fileR, schedule: view.schedule, changes: view.changes, lessons: view.lessons, plans: plansH.on ? plansH.plans : {}, progress: progressAll.map[fileR.id], voiceList: Object.values(voiceAll.map), hw: hwChecks, money: moneyNow, attNow: attToday, attPrev: attPrev, flash: flash, onBack: () => { setFileOf(null); window.scrollTo(0, 0); }, onGo: goTab }));
         }
         else if (isTeacher) {
@@ -5472,8 +5514,6 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                     React.createElement(Classes, { schedule: view.schedule, changes: view.changes, saveChanges: saveContent("changes"), notices: view.notices, saveNotices: saveContent("notices"), isTeacher: true, groups: groups, saveSchedule: saveContent("schedule"), flash: flash, roster: people, att: attToday, lessons: view.lessons })));
             else if (current === "lessons")
                 screen = React.createElement(LessonsTeacher, { key: jump ? JSON.stringify(jump) : "lessons", start: jump && jump.lessons, lessons: view.lessons, groups: groups, saveLessons: saveContent("lessons"), flash: flash, sample: null, db: db, userId: userId, decks: view.decks, saveDecks: saveContent("decks"), roster: roster, people: people, voiceNotes: voiceAll.map, progressMap: progressAll.map, plansH: plansH, hw: hwChecks, openDeck: openDeck, setOpenDeck: setOpenDeck });
-            else if (current === "business")
-                screen = (React.createElement(BusinessTeacher, { bizH: bizH, db: db, userId: userId, flash: flash, pay: view.pay, downloads: downloads, roster: roster, schedule: view.schedule, changes: view.changes, join: view.join, saveJoin: saveContent("join"), groups: groups }));
             else
                 screen = (React.createElement(StudentsTeacher, { roster: roster, saveRoster: saveRoster, pay: view.pay, savePay: saveContent("pay"), settings: view.settings, saveSettings: saveContent("settings"), lessons: view.lessons, decks: view.decks, schedule: view.schedule, changes: view.changes, places: bizH.biz.places, downloads: downloads, teacherName: bizH.biz.teacher.name || view.pay.accountName, db: db, userId: userId, flash: flash, startOpen: jump && jump.openId, onFile: openFile, key: jump && jump.openId ? "open-" + jump.openId : "students" }));
         }
@@ -5508,15 +5548,13 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
             React.createElement("div", { className: "shell" },
                 React.createElement("header", { className: "top" },
                     React.createElement("span", { className: "brand" }, "Bright Minds"),
-                    React.createElement("div", { className: "who" }, isTeacher ? (React.createElement(React.Fragment, null,
-                        React.createElement("button", { className: "link", onClick: toStudentView }, "Student view"),
-                        React.createElement("button", { className: "link", onClick: signOut }, "Sign out"))) : (React.createElement(React.Fragment, null,
+                    React.createElement("div", { className: "who" }, isTeacher ? (React.createElement(TeacherHeaderActions, { bizOpen: bizOn, onBusiness: openBusiness, onStudentView: () => { setBizOpen(false); setFileOf(null); toStudentView(); }, onSignOut: () => { setBizOpen(false); setFileOf(null); signOut(); } })) : (React.createElement(React.Fragment, null,
                         meR.id === "guest" ? React.createElement("span", { className: "trial-chip" }, STR[lang].trialBadge) : React.createElement("span", null, meR.name),
                         React.createElement("button", { className: "link", onClick: toggleLang, "aria-label": STR[lang].otherLangName }, STR[lang].otherLang),
                         React.createElement("button", { className: "link", onClick: switchStudent }, STR[lang].switchUser),
                         canTeach && React.createElement("button", { className: "link", onClick: toTeacher }, "Teacher view"))))),
                 React.createElement("main", null,
-                    fresh && React.createElement("p", { className: "note" }, "Welcome to your own Bright Minds. To bring in everything from the Claude version, go to Business, then Settings, and use Move in."),
+                    fresh && React.createElement("p", { className: "note" }, "Welcome to your own Bright Minds. To bring in everything from the Claude version, tap Business at the top, then Settings, and use Move in."),
                     trialOn && React.createElement(TrialBanner, { contact: view.join.contact || view.pay.whatsapp, onJoin: openJoin }),
                     !isTeacher && !trialOn && !installHidden && current === tabs[0].id && React.createElement(InstallCard, { onHide: () => { setInstallHidden(true); ls.set("bm:installHidden", true); } }),
                     !isTeacher && React.createElement(StudentNotices, { notices: view.notices, me: meR }),
@@ -5524,7 +5562,7 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
             React.createElement("div", { className: "dock" },
                 toast && React.createElement("div", { className: "toast", role: "status" }, toast),
                 React.createElement("nav", { className: "tabbar", "aria-label": "Sections" },
-                    React.createElement("div", { className: "dock-in" }, tabs.map((t) => (React.createElement("button", { key: t.id, className: "tab", "aria-current": current === t.id && !fileR ? "page" : undefined, onClick: () => goTab(t.id) },
+                    React.createElement("div", { className: "dock-in" }, tabs.map((t) => (React.createElement("button", { key: t.id, className: "tab", "aria-current": current === t.id && !fileR && !bizOn ? "page" : undefined, onClick: () => goTab(t.id) },
                         React.createElement(Icon, { name: t.icon, size: 22 }),
                         React.createElement("span", { className: "tab-label" }, t.label),
                         t.id === "homework" && hwCount > 0 && React.createElement("span", { className: "badge", "aria-label": `${hwCount}` }, hwCount),
