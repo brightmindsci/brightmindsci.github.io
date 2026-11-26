@@ -4546,76 +4546,6 @@ function HomeworkToggle({ lesson, people, hw, voiceList, flash }) {
   );
 }
 
-/* ---------- the teacher's own to-do list ---------- */
-function useTodo(db, userId) {
-  const path = db && userId ? "data/users/" + userId + "/todo" : "";
-  const [items, setItems] = useState([]);
-  const [ready, setReady] = useState(false);
-  const cur = useRef([]);
-  useEffect(() => {
-    if (!path) return undefined;
-    let un = () => {};
-    try {
-      un = db.doc(path).onSnapshot((s) => {
-        const d = s.exists ? s.data() : null;
-        cur.current = d && Array.isArray(d.items) ? d.items : [];
-        setItems(cur.current); setReady(true);
-      }, () => setReady(true));
-    } catch (e) { setReady(true); }
-    return () => un();
-  }, [path]);
-  const save = (next) => { cur.current = next; setItems(next); return queuedSet(db.doc(path), { items: next }); };
-  return { on: !!path, ready, items, save, cur };
-}
-function TodoList({ todo, flash }) {
-  const [text, setText] = useState("");
-  const [showDone, setShowDone] = useState(false);
-  const fail = () => flash("That didn't save. Check your connection and try again.");
-  const open = todo.items.filter((x) => !x.done);
-  const done = todo.items.filter((x) => x.done);
-  const add = () => {
-    const t = text.trim();
-    if (!t) return;
-    todo.save([...todo.cur.current, { id: uid(), text: t, at: todayISO() }]).catch(fail);
-    setText("");
-  };
-  const tick = (id) => todo.save(todo.cur.current.map((x) => (x.id === id ? { ...x, done: x.done ? null : todayISO() } : x))).catch(fail);
-  return (
-    <div className="today-block">
-      <h3 className="today-h">To do</h3>
-      <form className="inline-add" onSubmit={(e) => { e.preventDefault(); add(); }}>
-        <input id="todo-new" className="inp" value={text} placeholder="Buy crayons, call a parent..." aria-label="New to-do" onChange={(e) => setText(e.target.value)} />
-        <button className="btn sm" type="submit" disabled={!text.trim()}><Icon name="plus" size={16} />Add</button>
-      </form>
-      {open.length === 0 && <p className="hint">Nothing on your list.</p>}
-      <ul className="todo-list">
-        {open.map((x) => (
-          <li key={x.id}>
-            <label className="check"><input type="checkbox" checked={false} onChange={() => tick(x.id)} /><span>{x.text}</span></label>
-          </li>
-        ))}
-      </ul>
-      {done.length > 0 && (
-        <div className="todo-done">
-          <button className="link small" aria-expanded={showDone} onClick={() => setShowDone(!showDone)}>{showDone ? "Hide done" : `Done (${done.length})`}</button>
-          {showDone && (
-            <>
-              <ul className="todo-list">
-                {done.map((x) => (
-                  <li key={x.id} className="is-done">
-                    <label className="check"><input type="checkbox" checked onChange={() => tick(x.id)} /><span>{x.text}</span></label>
-                  </li>
-                ))}
-              </ul>
-              <button className="btn ghost sm" onClick={() => todo.save(todo.cur.current.filter((x) => !x.done)).catch(fail)}>Clear done</button>
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ---------- getting ready: what to print and bring for the next classes ---------- */
 function GetReady({ occs, people, plans, courses }) {
   const [ticks, setTicks] = useState(() => ls.get("bm:ready", {}) || {});
@@ -4882,7 +4812,6 @@ function TodayTeacher({ people, groups, view, att, attPrev, plansH, hw, voiceLis
   const [hwOpen, setHwOpen] = useState(null);
   const [skipped, setSkipped] = useState(() => ls.get("bm:skipLog", []) || []);
   const { data } = useCourses();
-  const todo = useTodo(db, userId);
   const courses = data ? data.courses : [];
   const plans = plansH.on ? plansH.plans : {};
   const today = todayISO();
@@ -5038,8 +4967,6 @@ function TodayTeacher({ people, groups, view, att, attPrev, plansH, hw, voiceLis
       )}
 
       <GetReady occs={[...todays.filter((o) => !recordsOf(attFor(o.date), o.key, o.date).taken.length), ...tomorrows]} people={people} plans={plans} courses={courses} />
-
-      {todo.on && <TodoList todo={todo} flash={flash} />}
 
       {money.ready && toPay.length > 0 && (
         <div className="today-block">

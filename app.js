@@ -4750,67 +4750,6 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                 open ? "Close" : label),
             open && React.createElement(HomeworkCheck, { lesson: lesson, people: people, hw: hw, voiceList: voiceList, flash: flash })));
     }
-    /* ---------- the teacher's own to-do list ---------- */
-    function useTodo(db, userId) {
-        const path = db && userId ? "data/users/" + userId + "/todo" : "";
-        const [items, setItems] = useState([]);
-        const [ready, setReady] = useState(false);
-        const cur = useRef([]);
-        useEffect(() => {
-            if (!path)
-                return undefined;
-            let un = () => { };
-            try {
-                un = db.doc(path).onSnapshot((s) => {
-                    const d = s.exists ? s.data() : null;
-                    cur.current = d && Array.isArray(d.items) ? d.items : [];
-                    setItems(cur.current);
-                    setReady(true);
-                }, () => setReady(true));
-            }
-            catch (e) {
-                setReady(true);
-            }
-            return () => un();
-        }, [path]);
-        const save = (next) => { cur.current = next; setItems(next); return queuedSet(db.doc(path), { items: next }); };
-        return { on: !!path, ready, items, save, cur };
-    }
-    function TodoList({ todo, flash }) {
-        const [text, setText] = useState("");
-        const [showDone, setShowDone] = useState(false);
-        const fail = () => flash("That didn't save. Check your connection and try again.");
-        const open = todo.items.filter((x) => !x.done);
-        const done = todo.items.filter((x) => x.done);
-        const add = () => {
-            const t = text.trim();
-            if (!t)
-                return;
-            todo.save([...todo.cur.current, { id: uid(), text: t, at: todayISO() }]).catch(fail);
-            setText("");
-        };
-        const tick = (id) => todo.save(todo.cur.current.map((x) => (x.id === id ? Object.assign(Object.assign({}, x), { done: x.done ? null : todayISO() }) : x))).catch(fail);
-        return (React.createElement("div", { className: "today-block" },
-            React.createElement("h3", { className: "today-h" }, "To do"),
-            React.createElement("form", { className: "inline-add", onSubmit: (e) => { e.preventDefault(); add(); } },
-                React.createElement("input", { id: "todo-new", className: "inp", value: text, placeholder: "Buy crayons, call a parent...", "aria-label": "New to-do", onChange: (e) => setText(e.target.value) }),
-                React.createElement("button", { className: "btn sm", type: "submit", disabled: !text.trim() },
-                    React.createElement(Icon, { name: "plus", size: 16 }),
-                    "Add")),
-            open.length === 0 && React.createElement("p", { className: "hint" }, "Nothing on your list."),
-            React.createElement("ul", { className: "todo-list" }, open.map((x) => (React.createElement("li", { key: x.id },
-                React.createElement("label", { className: "check" },
-                    React.createElement("input", { type: "checkbox", checked: false, onChange: () => tick(x.id) }),
-                    React.createElement("span", null, x.text)))))),
-            done.length > 0 && (React.createElement("div", { className: "todo-done" },
-                React.createElement("button", { className: "link small", "aria-expanded": showDone, onClick: () => setShowDone(!showDone) }, showDone ? "Hide done" : `Done (${done.length})`),
-                showDone && (React.createElement(React.Fragment, null,
-                    React.createElement("ul", { className: "todo-list" }, done.map((x) => (React.createElement("li", { key: x.id, className: "is-done" },
-                        React.createElement("label", { className: "check" },
-                            React.createElement("input", { type: "checkbox", checked: true, onChange: () => tick(x.id) }),
-                            React.createElement("span", null, x.text)))))),
-                    React.createElement("button", { className: "btn ghost sm", onClick: () => todo.save(todo.cur.current.filter((x) => !x.done)).catch(fail) }, "Clear done")))))));
-    }
     /* ---------- getting ready: what to print and bring for the next classes ---------- */
     function GetReady({ occs, people, plans, courses }) {
         const [ticks, setTicks] = useState(() => ls.get("bm:ready", {}) || {});
@@ -5078,7 +5017,6 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
         const [hwOpen, setHwOpen] = useState(null);
         const [skipped, setSkipped] = useState(() => ls.get("bm:skipLog", []) || []);
         const { data } = useCourses();
-        const todo = useTodo(db, userId);
         const courses = data ? data.courses : [];
         const plans = plansH.on ? plansH.plans : {};
         const today = todayISO();
@@ -5225,7 +5163,6 @@ Reply with only JSON in this shape: {"title": "...", "notes": "...", "homework":
                         React.createElement("button", { className: "btn ghost sm", "aria-expanded": hwOpen === l.id, onClick: () => setHwOpen(hwOpen === l.id ? null : l.id) }, hwOpen === l.id ? "Close" : "Check")),
                     hwOpen === l.id && React.createElement(HomeworkCheck, { lesson: l, people: people, hw: hw, voiceList: voiceList, flash: flash })))))),
             React.createElement(GetReady, { occs: [...todays.filter((o) => !recordsOf(attFor(o.date), o.key, o.date).taken.length), ...tomorrows], people: people, plans: plans, courses: courses }),
-            todo.on && React.createElement(TodoList, { todo: todo, flash: flash }),
             money.ready && toPay.length > 0 && (React.createElement("div", { className: "today-block" },
                 React.createElement("h3", { className: "today-h" },
                     "Still to pay in ",
