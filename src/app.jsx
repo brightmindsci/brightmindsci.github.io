@@ -3645,35 +3645,36 @@ async function drawCertificate({ name, level, lang, teacher }) {
   const HEAD = '"Poppins", "DM Sans", sans-serif', BODY = '"DM Sans", sans-serif';
   try { await Promise.all([document.fonts.load('bold 64px "Poppins"'), document.fonts.load('bold 30px "DM Sans"'), document.fonts.load('34px "DM Sans"')]); } catch (e) { /* fallback fonts */ }
   const fr = lang === "fr";
-  const ink = "#2E1D12", soft = "#6B5242", accent = "#B9470B";
-  g.fillStyle = "#FBF3E6"; g.fillRect(0, 0, W, H);
+  const ink = "#15233F", soft = "#56637B", accent = "#2A5AA6", flag = "#C2343F";
+  g.fillStyle = "#F6F8FC"; g.fillRect(0, 0, W, H);
   /* wax-print rings in two corners */
-  const rings = (x, y) => { [[150, "#FDEEE1"], [128, "#FBF3E6"], [112, "#FDEEE1"], [92, "#FBF3E6"], [80, "#FDEEE1"]].forEach(([r, col]) => { g.fillStyle = col; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }); };
+  const rings = (x, y) => { [[150, "#E7EEF9"], [128, "#F6F8FC"], [112, "#E7EEF9"], [92, "#F6F8FC"], [80, "#E7EEF9"]].forEach(([r, col]) => { g.fillStyle = col; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }); };
   rings(W - 62, H - 62); rings(62, 62);
   /* frame */
   g.strokeStyle = ink; g.lineWidth = 12; g.strokeRect(34, 34, W - 68, H - 68);
   g.lineWidth = 2; g.strokeRect(62, 62, W - 124, H - 124);
-  /* woven strips (Baoulé weaving colours) along the top and bottom */
-  const weave = [["#E8731A", 36], ["#F2B630", 10], ["#0E8A55", 30], ["#F2B630", 10], ["#4A2C17", 14], ["#FFF6E8", 6], ["#4A2C17", 6], ["#F2B630", 10]];
+  /* woven strips along the top and bottom, in the app's blue, white and red */
+  const weave = [["#2A5AA6", 36], ["#FFFFFF", 10], ["#C2343F", 30], ["#FFFFFF", 10], ["#15233F", 14], ["#A9C2E6", 6], ["#15233F", 6], ["#FFFFFF", 10]];
   const strip = (y) => {
     let x = 64;
     for (let k = 0; x < W - 64; k++) { const [col, w] = weave[k % weave.length]; g.fillStyle = col; g.fillRect(x, y, Math.min(w, W - 64 - x), 18); x += w; }
-    g.fillStyle = "rgba(0,0,0,.13)"; for (let yy = y; yy < y + 18; yy += 3) g.fillRect(64, yy, W - 128, 1);
+    g.fillStyle = "rgba(0,0,0,.10)"; for (let yy = y; yy < y + 18; yy += 3) g.fillRect(64, yy, W - 128, 1);
   };
   strip(64); strip(H - 82);
   const cx = W / 2;
   g.textAlign = "center"; g.textBaseline = "alphabetic";
   g.fillStyle = ink; g.font = "bold 64px " + HEAD;
   g.fillText(fr ? "Certificat de réussite" : "Certificate of Achievement", cx, 250);
-  g.fillStyle = accent; g.font = "bold 30px " + BODY;
-  g.fillText("Bright Minds", cx, 315);
+  g.font = "bold 30px " + BODY;
+  { const w = g.measureText("Bright Minds").width, bw = g.measureText("B").width; g.textAlign = "left";
+    g.fillStyle = flag; g.fillText("B", cx - w / 2, 315); g.fillStyle = accent; g.fillText("right Minds", cx - w / 2 + bw, 315); g.textAlign = "center"; }
   g.fillStyle = soft; g.font = "34px " + BODY;
   g.fillText(fr ? "Nous certifions que" : "This certifies that", cx, 430);
   let size = 96;
   g.font = `bold ${size}px ${HEAD}`;
   while (g.measureText(name).width > W - 420 && size > 48) { size -= 4; g.font = `bold ${size}px ${HEAD}`; }
   const nw = g.measureText(name).width;
-  g.fillStyle = "#F6C343"; g.fillRect(cx - nw / 2 - 16, 560 - size * 0.3, nw + 32, size * 0.36);
+  g.fillStyle = "#D9E5F6"; g.fillRect(cx - nw / 2 - 16, 560 - size * 0.3, nw + 32, size * 0.36);
   g.fillStyle = ink; g.fillText(name, cx, 560);
   g.font = "38px " + BODY;
   g.fillText(fr ? `a terminé avec succès le niveau ${level} en anglais.` : `has successfully completed the ${level} level in English.`, cx, 670);

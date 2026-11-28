@@ -1,34 +1,35 @@
 
-/* Look: warm and Ivorian. Cream cotton and dark brown ink (Korhogo cloth), orange and green from the flag,
-   a woven strip (Baoulé weaving) under the header and on top of the main cards. Bottom tab bar with a publish dock above it. */
+/* Look: blue, white and red, kept subtle (chosen by the teacher, 28 Nov 2026). White and soft blue paper, navy ink,
+   blue buttons and open tab, red only as a small accent (the B, badges, notices). The woven strip stays, in the same colours.
+   Bottom tab bar with a publish dock above it. */
 :root{
-  --paper:#FBF3E6;--surface:#FFFCF6;--ink:#2E1D12;--ink-soft:#6B5242;--line:#EADBC6;
-  --rule:#F2E6D4;--rule-strong:#CDB494;--hl:#F6C343;--hw:#FFF0CC;
-  --accent:#B9470B;--on-accent:#FFFFFF;--accent-soft:#FDEEE1;
+  --paper:#F6F8FC;--surface:#FFFFFF;--ink:#15233F;--ink-soft:#56637B;--line:#DFE5EF;
+  --rule:#EDF1F7;--rule-strong:#B7C3D6;--hl:#D9E5F6;--hw:#EFF4FB;
+  --accent:#2A5AA6;--on-accent:#FFFFFF;--accent-soft:#E7EEF9;--flag:#C2343F;--on-flag:#FFFFFF;
   --ok:#11734A;--ok-bg:#DDF0E4;--bad:#B42318;--bad-bg:#FBE3DF;--on-ink:#FFFFFF;
-  --c1:#C2410C;--c2:#00897B;--c3:#B7860B;--star:#D99A0B;
-  --w1:#E8731A;--w2:#F2B630;--w3:#0E8A55;--w4:#4A2C17;--w5:#FFF6E8;
-  --shadow:0 1px 2px rgba(74,44,23,.06),0 10px 24px -14px rgba(74,44,23,.35);
+  --c1:#2A5AA6;--c2:#C2343F;--c3:#00897B;--star:#D99A0B;
+  --w1:#2A5AA6;--w2:#FFFFFF;--w3:#C2343F;--w4:#15233F;--w5:#A9C2E6;
+  --shadow:0 1px 2px rgba(21,35,63,.06),0 10px 24px -14px rgba(21,35,63,.28);
   --font-body:'DM Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   --font-head:'Poppins','DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
-  --weave:repeating-linear-gradient(0deg,rgba(0,0,0,.13) 0 1px,transparent 1px 3px),
+  --weave:repeating-linear-gradient(0deg,rgba(0,0,0,.10) 0 1px,transparent 1px 3px),
     repeating-linear-gradient(90deg,var(--w1) 0 18px,var(--w2) 18px 23px,var(--w3) 23px 39px,var(--w2) 39px 44px,var(--w4) 44px 52px,var(--w5) 52px 55px,var(--w4) 55px 58px,var(--w2) 58px 63px);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --paper:#1A130E;--surface:#261B14;--ink:#F7EBDD;--ink-soft:#C4AF9D;--line:#3D2C20;
-  --rule:#33251B;--rule-strong:#5E4836;--hl:#5E4512;--hw:#2F2416;
-  --accent:#F28A3B;--on-accent:#1A130E;--accent-soft:#432A17;
-  --ok:#62CC94;--ok-bg:#18372A;--bad:#F28B7E;--bad-bg:#3E2120;--on-ink:#1A130E;
-  --c1:#D2671E;--c2:#1A9888;--c3:#B88A1E;--star:#F2B630;
-  --w1:#E8731A;--w2:#E0A92C;--w3:#1E9A63;--w4:#8A5A36;--w5:#F3E3CC;
+  --paper:#0E1527;--surface:#162036;--ink:#EAF0FA;--ink-soft:#A8B5CB;--line:#26324A;
+  --rule:#1D2840;--rule-strong:#3B4B68;--hl:#2A3D63;--hw:#1A2541;
+  --accent:#86AEEB;--on-accent:#0E1527;--accent-soft:#1F2F50;--flag:#F0858C;--on-flag:#0E1527;
+  --ok:#62CC94;--ok-bg:#17352B;--bad:#F28B7E;--bad-bg:#3E2228;--on-ink:#0E1527;
+  --c1:#5B8BD6;--c2:#D9545E;--c3:#2BA89A;--star:#F2B630;
+  --w1:#4A7BC8;--w2:#DCE6F5;--w3:#D9545E;--w4:#0B1222;--w5:#86AEEB;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 24px -14px rgba(0,0,0,.7);color-scheme:dark}}
 :root[data-theme="dark"]{
-  --paper:#1A130E;--surface:#261B14;--ink:#F7EBDD;--ink-soft:#C4AF9D;--line:#3D2C20;
-  --rule:#33251B;--rule-strong:#5E4836;--hl:#5E4512;--hw:#2F2416;
-  --accent:#F28A3B;--on-accent:#1A130E;--accent-soft:#432A17;
-  --ok:#62CC94;--ok-bg:#18372A;--bad:#F28B7E;--bad-bg:#3E2120;--on-ink:#1A130E;
-  --c1:#D2671E;--c2:#1A9888;--c3:#B88A1E;--star:#F2B630;
-  --w1:#E8731A;--w2:#E0A92C;--w3:#1E9A63;--w4:#8A5A36;--w5:#F3E3CC;
+  --paper:#0E1527;--surface:#162036;--ink:#EAF0FA;--ink-soft:#A8B5CB;--line:#26324A;
+  --rule:#1D2840;--rule-strong:#3B4B68;--hl:#2A3D63;--hw:#1A2541;
+  --accent:#86AEEB;--on-accent:#0E1527;--accent-soft:#1F2F50;--flag:#F0858C;--on-flag:#0E1527;
+  --ok:#62CC94;--ok-bg:#17352B;--bad:#F28B7E;--bad-bg:#3E2228;--on-ink:#0E1527;
+  --c1:#5B8BD6;--c2:#D9545E;--c3:#2BA89A;--star:#F2B630;
+  --w1:#4A7BC8;--w2:#DCE6F5;--w3:#D9545E;--w4:#0B1222;--w5:#86AEEB;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 24px -14px rgba(0,0,0,.7);color-scheme:dark}
 body{background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
 *{box-sizing:border-box}
@@ -42,7 +43,7 @@ ul,ol{list-style:none;padding:0}
 .top{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0 16px;margin-bottom:20px}
 .top::after{content:"";position:absolute;left:0;right:0;bottom:0;height:6px;border-radius:3px;background:var(--weave)}
 .brand{font-family:var(--font-head);font-weight:700;font-size:20px;line-height:1.3;letter-spacing:-.01em;white-space:nowrap}
-.brand::first-letter{color:var(--accent)}
+.brand::first-letter{color:var(--flag)}
 .who{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;justify-content:flex-end;font-size:14px;color:var(--ink-soft);min-width:0}
 .who>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:14ch}
 .link{background:none;border:0;padding:6px 2px;text-decoration:underline;text-underline-offset:3px;cursor:pointer;color:var(--ink)}
@@ -121,7 +122,7 @@ textarea.inp{min-height:88px;resize:vertical}
 .result-big{font-family:var(--font-head);font-size:42px;font-weight:700;line-height:1.15}
 .new-best{font-weight:700;color:var(--ok);margin-top:4px}
 .entries>li{display:grid;grid-template-columns:52px 1fr;gap:0 14px;padding:16px 0;border-bottom:1px solid var(--line)}
-.entry-date{border-right:3px solid var(--accent);padding-right:10px;text-align:right;line-height:1.1}
+.entry-date{border-right:3px solid var(--flag);padding-right:10px;text-align:right;line-height:1.1}
 .d-day{display:block;font-family:var(--font-head);font-size:24px;font-weight:700}
 .d-mon{display:block;font-size:13px;color:var(--ink-soft)}
 .entry-body{min-width:0}
@@ -168,17 +169,17 @@ textarea.inp{min-height:88px;resize:vertical}
 .pubbar p{flex:1 1 100%;font-size:15px;font-weight:700;min-width:0}
 .pubbar-actions{display:flex;gap:8px;margin-left:auto}
 .pubbar .btn.ghost{border-color:var(--ink)}
-.tabbar{background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -6px 18px -12px rgba(74,44,23,.25);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.tabbar{background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -6px 18px -12px rgba(21,35,63,.2);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .tabbar .dock-in{display:flex}
 .tab{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px 10px;background:none;border:0;cursor:pointer;color:var(--ink-soft);font-size:13px}
 .tab[aria-current="page"]{color:var(--ink);font-weight:700}
 .tab svg{box-sizing:content-box;padding:4px 14px;border-radius:999px}
 .tab[aria-current="page"] svg{background:var(--accent-soft);color:var(--accent)}
-.badge{position:absolute;top:4px;left:calc(50% + 8px);min-width:18px;height:18px;border-radius:9px;background:var(--accent);color:var(--on-accent);box-shadow:0 0 0 2px var(--surface);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.badge{position:absolute;top:4px;left:calc(50% + 8px);min-width:18px;height:18px;border-radius:9px;background:var(--flag);color:var(--on-flag);box-shadow:0 0 0 2px var(--surface);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px}
 .welcome{max-width:480px;margin:0 auto;padding-block:28px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .welcome-page{padding:44px 22px 36px;margin-bottom:22px}
 .welcome-title{font-family:var(--font-head);font-size:clamp(32px,9vw,40px);font-weight:700;line-height:1.1;letter-spacing:-.02em}
-.welcome-title::first-letter{color:var(--accent)}
+.welcome-title::first-letter{color:var(--flag)}
 .welcome-sub{font-size:17px;color:var(--ink-soft);margin-top:10px;max-width:24ch}
 .stack{display:grid;gap:10px}
 .stack .btn{width:100%}
@@ -204,8 +205,8 @@ a.btn{text-decoration:none}
 .log-date{width:auto;min-height:36px;padding:6px 10px;font-size:15px}
 .welcome-lang{display:flex;justify-content:flex-end;margin:-12px 0 8px}
 .notices{margin-bottom:10px}
-.notice{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:var(--hw);border-left:5px solid var(--accent);margin-bottom:10px;white-space:pre-wrap;overflow-wrap:anywhere;font-weight:700}
-.notice svg{flex:none;margin-top:3px;color:var(--accent)}
+.notice{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:var(--hw);border-left:5px solid var(--flag);margin-bottom:10px;white-space:pre-wrap;overflow-wrap:anywhere;font-weight:700}
+.notice svg{flex:none;margin-top:3px;color:var(--flag)}
 .notices-teacher{margin-bottom:24px;padding-bottom:8px;border-bottom:1px solid var(--line)}
 .notice-row{display:flex;align-items:center;gap:12px;padding:10px 0}
 .status-card{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:var(--surface);margin-bottom:16px}
@@ -379,7 +380,7 @@ a.btn{text-decoration:none}
 .star-pick{display:flex;gap:6px;margin-bottom:10px}
 .star-btn{width:48px;height:48px;display:inline-flex;align-items:center;justify-content:center;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);cursor:pointer}
 .star-btn.on{color:var(--star);border-color:var(--star)}
-.new-chip{display:inline-block;margin-left:8px;font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--accent);color:var(--on-accent);vertical-align:2px}
+.new-chip{display:inline-block;margin-left:8px;font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--flag);color:var(--on-flag);vertical-align:2px}
 
 /* what I can do */
 .progress-sum{padding:26px 20px 20px;margin-bottom:18px}
@@ -485,8 +486,8 @@ a.btn{text-decoration:none}
 /* Lessons: Lessons, Words, Library, Voice in one row */
 .seg-lessons{display:flex;max-width:100%}
 .seg-lessons button{flex:1 1 auto;padding:8px 10px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:5px}
-.seg-count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:var(--on-accent);font-size:11px;font-weight:700}
-.seg button[aria-pressed="true"] .seg-count{background:var(--on-accent);color:var(--accent)}
+.seg-count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--flag);color:var(--on-flag);font-size:11px;font-weight:700}
+.seg button[aria-pressed="true"] .seg-count{background:var(--on-accent);color:var(--flag)}
 @media (max-width:360px){.seg-lessons button{padding:8px 6px;font-size:14px}.seg-lessons{padding:2px}}
 
 /* free trial */
